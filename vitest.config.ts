@@ -1,7 +1,6 @@
-import path from 'path';
-
-import { coverageConfigDefaults, defineConfig, mergeConfig } from 'vitest/config';
-
+/// <reference types="vitest" />
+import { mergeConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import viteConfig from './vite.config';
 
 export default mergeConfig(
@@ -10,25 +9,14 @@ export default mergeConfig(
         test: {
             globals: true,
             environment: 'jsdom',
-            setupFiles: path.resolve(__dirname, './src/setupTests.ts'),
-            css: true,
-            passWithNoTests: true,
-            alias: {
-                '@root': path.resolve(__dirname, './src')
-            },
+            setupFiles: ['./src/test/setup.ts'],
             coverage: {
                 provider: 'v8',
-                reporter: ['text', 'html', 'lcov'],
-                reportsDirectory: 'coverage',
-                include: ['src/**/*.{ts,tsx}'],
-                exclude: [
-                    ...coverageConfigDefaults.exclude,
-                    'src/main.tsx',
-                    'src/**/*.d.ts',
-                    'src/**/__mocks__/**',
-                    'src/**/*.stories.tsx'
-                ]
-            }
+                reporter: ['text', 'json'],
+                exclude: ['node_modules/', 'src/test/'],
+                reportsDirectory: './coverage'
+            },
+            include: ['src/**/*.{test,spec}.{ts,tsx}']
         }
     })
 );
