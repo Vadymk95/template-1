@@ -1,4 +1,4 @@
-export default {
+const config = {
     extends: ['@commitlint/config-conventional'],
     rules: {
         'type-enum': [
@@ -10,5 +10,4 @@ export default {
     }
 };
 
-//! Example
-// feat(blog): add comment section
+export default config;
