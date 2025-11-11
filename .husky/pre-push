@@ -1,5 +1,13 @@
-npx tsc -b --force --noEmit
-if [ $? -ne 0 ]; then
-  echo "❌ TypeScript type-check failed. Fix errors before push."
-  exit 1
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/h"
+
+if command -v nvm >/dev/null 2>&1; then
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    # shellcheck disable=SC1091
+    . "$NVM_DIR/nvm.sh"
+    nvm use >/dev/null
+fi
+
+if [ -f package.json ]; then
+    npm run test --if-present
 fi

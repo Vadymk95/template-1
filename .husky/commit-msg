@@ -1,1 +1,8 @@
-npx --no-install commitlint --edit "$1"
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/h"
+
+if [ -x "node_modules/.bin/commitlint" ]; then
+    npx --no commitlint --edit "$1"
+else
+    echo "husky (commit-msg): commitlint not installed, skipping"
+fi
