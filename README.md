@@ -18,8 +18,8 @@ A batteries-included starter for building modern React apps with TypeScript. The
 ```
 src/
   components/       // UI primitives, layout shell, ErrorBoundary
-  hooks/            // Custom hooks (e.g. Zustand selectors)
   hocs/             // Custom HOCs (e.g. WithSuspense)
+  hooks/            // Custom hooks (e.g. Zustand selectors)
   pages/            // Route-level components
   router/           // React Router setup and route constants
   store/            // Zustand store with utilities
