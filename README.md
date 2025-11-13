@@ -4,11 +4,12 @@ A batteries-included starter for building modern React apps with TypeScript. The
 
 ### What’s inside
 
-- **React 19** (functional components + hooks) rendered via Vite’s React plugin
+- **React 19** (functional components + hooks) rendered via Vite's React plugin
 - **TypeScript** with a shared `@root/*` alias for clean imports
 - **React Router v7** for routing and error boundaries at the shell level
 - **@tanstack/react-query** pre-configured with a `QueryClientProvider`
 - **Zustand** store with selectors and Redux DevTools support
+- **React Hook Form** + **Zod** for form validation with type-safe schemas
 - **Tailwind CSS** + shadcn/ui primitives + Lucide icons for styling
 - **Vitest** + Testing Library with shared render helpers
 - **ESLint** (flat config), Prettier, import order rules, lint-staged, and Husky hooks
