@@ -2,6 +2,8 @@
 
 A batteries-included starter for building modern React apps with TypeScript. The template ships with state management, data fetching, routing, styling, linting, and testing already wired together so you can focus on features instead of setup. The project targets Node.js **v24** and uses Vite as the build tool.
 
+> **Note:** This is a GitHub template repository. Click "Use this template" on GitHub to create a new repository from this template, or clone it and set your own remote.
+
 ### What’s inside
 
 - **React 19** (functional components + hooks) rendered via Vite's React plugin
