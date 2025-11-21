@@ -1,9 +1,10 @@
 import { createBrowserRouter } from 'react-router-dom';
 
-import { App } from '@root/App';
-import { WithSuspense } from '@root/hocs/WithSuspense';
-import { HomePage } from '@root/pages/HomePage';
-import { NotFoundPage } from '@root/pages/NotFoundPage';
+import { App } from '@/App';
+import { WithSuspense } from '@/hocs/WithSuspense';
+import { DevPlayground } from '@/pages/DevPlayground';
+import { HomePage } from '@/pages/HomePage';
+import { NotFoundPage } from '@/pages/NotFoundPage';
 
 import { RoutesPath } from './routes';
 
@@ -20,7 +21,15 @@ export const router = createBrowserRouter([
             {
                 path: RoutesPath.NotFound,
                 element: WithSuspense(<NotFoundPage />)
-            }
+            },
+            ...(import.meta.env.DEV
+                ? [
+                      {
+                          path: RoutesPath.DevPlayground,
+                          element: WithSuspense(<DevPlayground />)
+                      }
+                  ]
+                : [])
         ]
     }
 ]);

@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Minus, Plus, RotateCcw } from 'lucide-react';
 import type { FC } from 'react';
 
-import { Button } from '@root/components/ui';
-import { useCounter } from '@root/hooks';
+import { Button } from '@/components/ui';
+import { useCounter } from '@/hooks';
 
 export const HomePage: FC = () => {
     const { count, increase, decrease, resetCount } = useCounter();

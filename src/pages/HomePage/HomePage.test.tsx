@@ -1,8 +1,8 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { useAppStore } from '@root/store';
-import { renderWithProviders } from '@root/test/test-utils';
+import { useAppStore } from '@/store';
+import { renderWithProviders } from '@/test/test-utils';
 
 import { HomePage } from './index';
 
