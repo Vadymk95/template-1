@@ -1,4 +1,4 @@
-import { useAppStore } from '@root/store';
+import { useAppStore } from '@/store';
 
 type CounterSelectors = {
     count: number;

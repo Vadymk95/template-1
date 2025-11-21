@@ -7,7 +7,7 @@ A batteries-included starter for building modern React apps with TypeScript. The
 ### What’s inside
 
 - **React 19** (functional components + hooks) rendered via Vite's React plugin
-- **TypeScript** with a shared `@root/*` alias for clean imports
+- **TypeScript** with a shared `@/*` alias for clean imports
 - **React Router v7** for routing and error boundaries at the shell level
 - **@tanstack/react-query** pre-configured with a `QueryClientProvider`
 - **Zustand** store with selectors and Redux DevTools support
@@ -67,11 +67,20 @@ npm run dev
 
 - ESLint uses the flat config in `eslint.config.js` with:
     - TypeScript, React Hooks, React Query, and import-order plugins
-    - Type-aware import resolution via the `@root` alias
+    - Type-aware import resolution via the `@` alias
     - Opinionated import sorting (`import/order`) and Prettier integration
 - Pre-commit hook (`.husky/pre-commit`) executes `lint-staged`, which runs:
     - `eslint --fix` followed by `prettier --write` on staged TypeScript/JavaScript files
 - Run `npm run lint -- --fix` to clean imports/order across the entire repo manually.
+
+### CI Pipeline
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) is configured to run on every push and pull request to the `master` branch. It executes:
+
+1.  **Dependencies installation** (`npm ci`)
+2.  **Linting** (`npm run lint`)
+3.  **Formatting check** (`npm run format:check`)
+4.  **Tests** (`npm run test`)
 
 ### Testing utilities
 
