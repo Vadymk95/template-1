@@ -1,7 +1,7 @@
 {
     "name": "template-1",
     "private": true,
-    "version": "0.0.0",
+    "version": "1.0.0",
     "type": "module",
     "engines": {
         "node": ">=24.0.0"
@@ -60,13 +60,16 @@
         "lint-staged": "^16.2.6",
         "postcss": "^8.4.49",
         "prettier": "^3.6.2",
+        "rollup-plugin-visualizer": "^6.0.5",
         "tailwindcss": "^3.4.13",
         "tailwindcss-animate": "^1.0.7",
         "typescript": "~5.9.3",
         "typescript-eslint": "^8.46.3",
         "vite": "npm:rolldown-vite@7.2.2",
+        "vite-plugin-compression": "^0.5.1",
         "vite-plugin-eslint2": "^5.0.4",
         "vite-plugin-svgr": "^4.5.0",
+        "vite-plugin-webfont-dl": "^3.11.1",
         "vitest": "^4.0.8"
     },
     "overrides": {
