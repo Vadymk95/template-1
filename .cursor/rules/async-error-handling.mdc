@@ -1,0 +1,30 @@
+---
+description: "Error handling patterns, ErrorBoundary, and async operations"
+globs: ["**/*.ts", "**/*.tsx", "**/hooks/**/*.ts"]
+alwaysApply: false
+---
+
+## Error Handling
+
+- **Always handle errors**
+- **Use ErrorBoundary** for components (available in `src/components/common/ErrorBoundary`)
+- **ErrorBoundary includes ARIA attributes** (`role="alert"`, `aria-live="assertive"`), recovery buttons, and error monitoring hooks
+- **Show clear error messages** to users
+- **Technical error details** only visible in dev mode (production-safe)
+- **Handle loading and error states** in TanStack Query
+
+## ErrorBoundary Usage
+
+- **Wrap components** that may throw errors:
+  ```typescript
+  <ErrorBoundary>
+    <YourComponent />
+  </ErrorBoundary>
+  ```
+
+### Features
+
+- ARIA attributes (`role="alert"`, `aria-live="assertive"`)
+- Recovery buttons (Try again, Reload page)
+- Error monitoring hooks (Sentry, LogRocket ready)
+- Technical details only visible in development
