@@ -1,0 +1,20 @@
+{
+    "title": "Welcome",
+    "description": "This is your enterprise-grade React template",
+    "subtitle": "Get started by editing the pages in src/pages/",
+    "features": {
+        "title": "Features",
+        "react": "React 19 with automatic JSX",
+        "vite": "Vite 7.2 with Rolldown",
+        "typescript": "TypeScript 5.9 strict mode",
+        "routing": "React Router v7",
+        "state": "Zustand + TanStack Query",
+        "styling": "Tailwind CSS + Shadcn UI"
+    },
+    "gettingStarted": {
+        "title": "Getting Started",
+        "step1": "Configure your environment variables",
+        "step2": "Customize components for your needs",
+        "step3": "Start building your SaaS application"
+    }
+}

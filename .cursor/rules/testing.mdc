@@ -1,0 +1,52 @@
+---
+description: 'Testing patterns with Vitest and Testing Library'
+globs: ['**/*.test.tsx', '**/*.test.ts', '**/*.spec.tsx', '**/*.spec.ts']
+alwaysApply: false
+---
+
+## Testing
+
+### Test-Driven Development (TDD)
+
+**Follow TDD approach** (see `test-driven-development.mdc` for full details):
+
+- **For business logic** (stores, hooks, utils): Write tests **BEFORE** implementation (strict TDD)
+- **For UI components**: Use hybrid approach - TDD for hooks, then component tests
+- **Always describe requirements** before writing tests
+- **Use BDD-style** test structure with clear `describe` and `it` blocks
+
+### Required Tests
+
+- **Always write tests for new components**
+- **Tests should be in file `ComponentName.test.tsx`** next to the component
+- **If component already had tests and you made changes** - **update or supplement tests**
+- **Cover main functionality**, edge cases, and errors
+- **Use Vitest and @testing-library/react**
+
+### Test Structure
+
+- **Use `describe`** for grouping tests
+- **Use `it` or `test`** for individual tests
+- **Use `beforeEach`, `afterEach`** for setup/teardown when needed
+- **Use `renderWithProviders`** from `src/test/test-utils.tsx` for components that need QueryClient provider
+
+### Example
+
+```typescript
+import { renderWithProviders } from '@/test/test-utils';
+import { Component } from './Component';
+
+describe('Component', () => {
+    it('renders correctly', () => {
+        renderWithProviders(<Component />);
+        // assertions...
+    });
+});
+```
+
+### Test Organization
+
+- **Tests next to components/stores** (`ComponentName.test.tsx`)
+- **Tests next to hooks** (`hookName.test.ts`) - except dev-only utilities (e.g., HMR hooks)
+- **Tests next to stores** (`storeName.test.ts`)
+- **Direct imports** (no `index.ts` re-exports) for optimal tree-shaking

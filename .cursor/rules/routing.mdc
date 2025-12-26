@@ -1,0 +1,32 @@
+---
+description: "React Router v7 routing patterns and lazy loading"
+globs: ["**/router/**/*.tsx", "**/pages/**/*.tsx"]
+alwaysApply: false
+---
+
+## Routing
+
+- **Use React Router v7** for routing
+- **Routes configuration** in `src/router/routes.ts` using `RoutesPath` object
+- **Router setup** in `src/router/index.tsx`
+- **Use `WithSuspense` HOC** for lazy-loaded pages (wraps `React.lazy` with Suspense)
+- Example: `element: WithSuspense(<LazyPage />)`
+
+## Modular Route Organization
+
+- **Routes organized in modules** (`router/modules/`) from day one
+- **Each domain can have its own route module** (e.g., `user.routes.tsx`, `billing.routes.tsx`)
+- **Combine route modules** in `router/index.tsx`
+- **Prevents monolithic route configuration** files and reduces merge conflicts
+
+### Example Structure
+
+```
+router/
+  ├── index.tsx          # Router assembly (combines route modules)
+  ├── routes.ts          # Route path constants
+  └── modules/
+      ├── base.routes.tsx      # Base routes
+      ├── user.routes.tsx      # User management routes
+      └── billing.routes.tsx    # Billing routes
+```
