@@ -1,0 +1,80 @@
+---
+description: 'Workflow, planning, and git commit guidelines'
+alwaysApply: true
+---
+
+## Workflow & Planning
+
+- **Always plan before implementing**: Before writing code, create a plan of changes
+- **Confirm plan with user**: Present the plan and wait for user confirmation before proceeding
+- **Plan should include**:
+    - List of files to be modified/created
+    - Brief description of changes for each file
+    - Test strategy (which parts use TDD, which use hybrid approach)
+    - Any dependencies or considerations
+- **Only after confirmation**: Proceed with implementation once user approves the plan
+- **Exception**: For very simple, single-file changes (up to 10 lines), planning can be skipped, but still inform user about the change
+
+## Implementation Workflow (TDD Integration)
+
+**Follow Test-First Development** (see `test-driven-development.mdc` for details):
+
+1. **Plan** (if needed) - describe changes and test strategy
+2. **Describe requirements** - clearly state what code should do
+3. **Write tests first** - for business logic (stores, hooks, utils) use strict TDD
+4. **Implement code** - write minimal code to pass tests
+5. **Refactor** - improve code quality while keeping tests green
+6. **Verify** - ensure all tests pass, linting passes, no errors
+
+**For UI components**, use hybrid approach:
+
+- Extract complex logic to hook (TDD for hook)
+- Create component structure
+- Write component integration tests
+- Complete component implementation
+
+## Project Context
+
+- **Use @ mentions**: When working with multiple files, use `@File`, `@Folder`, or `@Codebase` to provide context
+- **`.cursorignore` file**: Automatically excludes files from Cursor's indexing
+    - Files and directories listed in `.cursorignore` are not included in AI context to save tokens and improve performance
+    - Follows `.gitignore` syntax patterns
+    - Cursor automatically reads `.cursorignore` from the project root - no additional configuration needed
+
+## Git Commits and Pushes
+
+### Before Committing
+
+- **ALWAYS check files before committing and pushing**
+- Run linting: `npm run lint` or `eslint .`
+- Run formatting check: `npm run format:check` or `prettier --check .`
+- Run tests: `npm test` or `vitest run`
+- Fix any errors or warnings before committing
+
+### Commit Message Format
+
+- **MUST follow commitlint rules** from `commitlint.config.mjs`
+- Use conventional commit format: `type(scope): subject`
+- Allowed types: `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `perf`, `test`, `revert`
+- Header maximum length: 96 characters
+- Format: `type(scope): subject` (scope is optional)
+
+### Commit Message Examples
+
+```
+feat(page): add new feature page
+fix(ui): handle form validation errors
+chore(deps): update dependencies
+docs(readme): update installation instructions
+style(button): fix spacing in component
+refactor(store): extract state management logic
+perf(query): optimize data fetching
+test(component): add tests for component functionality
+```
+
+### Before Pushing
+
+- Ensure all checks pass (lint, format, tests)
+- Review changed files with `git status` and `git diff`
+- Verify commit message follows commitlint rules
+- Only push if everything is correct

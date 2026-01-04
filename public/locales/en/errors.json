@@ -1,0 +1,27 @@
+{
+    "api": {
+        "network": "Network error. Please check your connection.",
+        "timeout": "Request timeout. Please try again.",
+        "unknown": "An unexpected error occurred."
+    },
+    "http": {
+        "400": "Bad request",
+        "401": "Unauthorized. Please log in.",
+        "403": "Access denied",
+        "404": "Resource not found",
+        "500": "Server error. Please try again later.",
+        "503": "Service temporarily unavailable"
+    },
+    "validation": {
+        "required": "This field is required",
+        "email": "Invalid email format",
+        "minLength": "Value is too short",
+        "maxLength": "Value is too long",
+        "pattern": "Invalid format"
+    },
+    "page": {
+        "404": "Page not found",
+        "500": "Internal server error",
+        "generic": "Something went wrong. Please try again later."
+    }
+}

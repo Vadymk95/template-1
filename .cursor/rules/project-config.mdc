@@ -1,0 +1,71 @@
+---
+description: 'Project configuration, accessibility, and internationalization'
+alwaysApply: true
+---
+
+## Project Configuration
+
+### Technology Stack
+
+- **React**: React 19
+- **State Management**: Zustand for global state, TanStack Query for server state
+- **TypeScript**: Strict mode with `@/*` path aliases
+- **Routing**: React Router v7
+- **Styling**: Tailwind CSS
+- **Testing**: Vitest + Testing Library
+
+## Accessibility
+
+- **Use semantic HTML tags**
+- **Add ARIA attributes** where needed (e.g., `role="status"`, `aria-live="polite"` for loading states)
+- **Use `role="alert"` and `aria-live="assertive"`** for critical messages (errors)
+- **Ensure keyboard navigation**
+- **Use shadcn/ui components** which include accessibility features
+- **Don't overuse ARIA** - prefer semantic HTML first
+
+## Internationalization (i18n)
+
+- **i18n included by default** with production-ready configuration
+- **Lazy Loading**: Translations loaded from `/public/locales/{lng}/{ns}.json` via HTTP
+- **Caching**: Built-in i18next caching prevents redundant downloads
+- **Language Detection**: Automatically detects language from localStorage → browser → fallback 'en'
+- **Namespace Structure**: `common` (UI elements), `errors` (API/HTTP/validation errors), page-specific namespaces (e.g., `home`), and feature namespaces (e.g., `feedback`)
+- **Initial Load**: Loads `common`, `errors`, and current page namespace on mount
+- **Lazy Loading**: Feature namespaces (e.g., `feedback`) are loaded on demand when components use them
+- **Hot Module Replacement**: Automatic translation reload in development mode when files in `public/locales/` are modified
+
+### Structure
+
+```
+public/locales/
+  en/
+    common.json    # UI elements, buttons, general phrases
+    errors.json    # API/HTTP/validation errors
+    home.json      # HomePage-specific content
+    feedback.json  # FeedbackForm feature translations
+```
+
+### Usage in Components
+
+```typescript
+import { useTranslation } from 'react-i18next';
+
+// Page-specific namespace
+const { t } = useTranslation(['common', 'home']);
+return <h1>{t('home:title')}</h1>;
+
+// Feature namespace (lazy-loaded)
+const { t } = useTranslation(['feedback']);
+return <button>{t('feedback:submit.label')}</button>;
+```
+
+### Adding a New Language
+
+1. Create `public/locales/{lng}/` directory (e.g., `public/locales/uk/`)
+2. Copy JSON files from `en/` and translate
+3. Add language to `SUPPORTED_LANGUAGES` in `src/lib/i18n/constants.ts`
+
+### Adding a New Namespace
+
+1. Create `public/locales/en/{namespace}.json`
+2. Load namespace when needed: `useTranslation(['common', 'namespace'])`

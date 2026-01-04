@@ -1,0 +1,83 @@
+---
+description: "React 19 patterns, components, hooks, pages, and HOCs"
+globs: ["**/*.tsx", "**/hooks/**/*.ts", "**/hocs/**/*.tsx"]
+alwaysApply: false
+---
+
+## React 19
+
+- **DO NOT import React from 'react'** - React 19 does not require React import for JSX
+- **Use only types from React**: `import type { FC, PropsWithChildren } from 'react'`
+- **Always use functional components**
+
+## Functions and Components
+
+- **Always use arrow functions**, NOT function declarations
+- **Type components with `FC` or `FC<PropsType>`**
+- Example: `export const ComponentName: FC<ComponentProps> = () => { ... }`
+
+## Component Architecture
+
+- **Components should be maximally presentational** (UI only)
+- **Always extract all logic into a local hook** next to the component
+- **Hook should be in file `useComponentName.ts`** in the same folder
+- **Component imports hook**: `import { useComponentName } from './useComponentName'`
+
+### Example Structure
+
+```
+ComponentName/
+  ├── ComponentName.tsx (or index.tsx)
+  ├── ComponentName.test.tsx
+  └── useComponentName.ts
+```
+
+## Pages
+
+- **Pages can use different patterns** depending on whether they need lazy loading:
+  - **Without lazy loading** (entry page): `index.tsx` with direct export
+  - **With lazy loading**: `PageName.tsx` + `index.ts` with `React.lazy`
+- **Use `WithSuspense` HOC** in router for lazy-loaded pages
+- **Follow existing pattern** in the project
+
+### Example Structures
+
+```typescript
+// HomePage/index.tsx (no lazy loading, entry page)
+export const HomePage: FC = () => { ... };
+
+// NotFoundPage.tsx (with lazy loading)
+export const NotFoundPage: FC = () => { ... };
+
+// NotFoundPage/index.ts
+import { lazy } from 'react';
+export const NotFoundPage = lazy(() => import('./NotFoundPage'));
+```
+
+## HOCs (Higher-Order Components)
+
+- **HOCs are located in `src/hocs/`**
+- **Use `WithSuspense` HOC** for wrapping lazy-loaded components with Suspense
+- Example: `WithSuspense(<LazyComponent />)` wraps component with Suspense and loading fallback
+
+## Hooks Organization
+
+- **Hooks organized by domain** in `src/hooks/` for better scalability
+- **Each hook in its domain folder** with tests alongside
+- **Tests next to hook files** (`hookName.test.ts`) - except dev-only utilities (e.g., HMR hooks)
+- **Direct imports** (no `index.ts` re-exports) for optimal tree-shaking
+- **Group related hooks by domain** (i18n, user, api, etc.)
+
+### Example Structure
+
+```
+src/hooks/
+  ├── i18n/
+  │   └── useI18nReload.ts       # Dev-only HMR hook (no tests)
+  ├── user/
+  │   ├── useUserProfile.ts
+  │   └── useUserProfile.test.ts
+  └── api/
+      ├── useApiQuery.ts
+      └── useApiQuery.test.ts
+```

@@ -1,0 +1,28 @@
+---
+description: "Constants and enums conventions"
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: false
+---
+
+## Constants and Enums
+
+- **DO NOT use magic strings and magic numbers**
+- **Search for existing constants** in `src/constants/` (if exists)
+- **If constant doesn't exist** - create it in `src/constants/` directory
+- **Use descriptive names** following UPPER_SNAKE_CASE convention
+
+## Constant Format
+
+- **Use `as const`** to create readonly objects
+- **Export type from constant**: `export type TypeName = (typeof CONST_NAME)[keyof typeof CONST_NAME]`
+
+### Example
+
+```typescript
+export const STATUS = {
+    IDLE: 'idle',
+    LOADING: 'loading'
+} as const;
+
+export type Status = (typeof STATUS)[keyof typeof STATUS];
+```
