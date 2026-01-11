@@ -1,0 +1,17 @@
+---
+description: "Performance optimization patterns for React components"
+globs: ["**/*.tsx", "**/hooks/**/*.ts"]
+alwaysApply: false
+---
+
+## Performance Optimization
+
+- **Use `React.memo`** for components that re-render frequently with same props
+- **Use `useMemo`** for expensive computations (filtering/sorting large arrays, complex calculations)
+  - For arrays with more than 100 elements or heavy calculations: implement useMemo
+  - Don't memoize small arrays (2-3 elements) or simple operations - it's overhead
+- **Use `useCallback`** when passing functions as props to memoized child components
+  - Only if child component is wrapped in `React.memo`
+  - If unsure, ask before implementing
+- **Leverage TanStack Query caching** for data fetching
+- **Don't optimize prematurely** - performance optimizations should be based on actual needs

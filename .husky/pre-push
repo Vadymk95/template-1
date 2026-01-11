@@ -1,0 +1,5 @@
+npx tsc -b --force --noEmit
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript type-check failed. Fix errors before push."
+  exit 1
+fi

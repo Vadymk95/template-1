@@ -1,0 +1,224 @@
+---
+description: 'Test-Driven Development (TDD) patterns for writing tests before implementation'
+globs:
+    [
+        '**/*.test.tsx',
+        '**/*.test.ts',
+        '**/*.spec.tsx',
+        '**/*.spec.ts',
+        '**/store/**/*.ts',
+        '**/hooks/**/*.ts',
+        '**/lib/**/*.ts'
+    ]
+alwaysApply: true
+---
+
+## Test-Driven Development (TDD) Approach
+
+**Follow Test-First Development with Context-Aware Approach** - write tests before implementation for business logic, use hybrid approach for UI components.
+
+### When to Use Strict TDD (Test First)
+
+**Always use strict TDD for:**
+
+- **Business logic** in stores (`src/store/**/*.ts`)
+- **Custom hooks** with complex logic (`src/hooks/**/*.ts`)
+- **Utility functions** (`src/lib/**/*.ts`)
+- **API operations** and data transformations
+- **Form validation logic** and schemas
+- **State management logic** (actions, reducers, selectors)
+
+**TDD Workflow for Business Logic:**
+
+1. **Describe requirements** - clearly state what the code should do
+2. **Write failing test** - write test that describes the expected behavior
+3. **Implement minimal code** - write just enough code to make test pass
+4. **Refactor if needed** - improve code quality while keeping tests green
+5. **Repeat** - move to next requirement
+
+### Hybrid Approach for UI Components
+
+**For React components** (`src/components/**/*.tsx`), use hybrid approach:
+
+1. **Extract logic to hook** - if component has complex logic, extract it to `useComponentName.ts` hook
+2. **TDD for hook** - write tests first for the hook (strict TDD)
+3. **Create component structure** - create basic component structure
+4. **Write component tests** - write integration tests for component behavior
+5. **Implement component** - connect component to hook and complete implementation
+
+**Why hybrid approach for UI?**
+
+- UI components are primarily presentational (following React patterns rule)
+- Complex logic should be in hooks anyway (which use TDD)
+- Component tests verify integration and user interactions
+- This aligns with "maximally presentational components" principle
+
+### TDD Process Steps
+
+#### Step 1: Describe Requirements
+
+**Before writing any test**, explicitly describe what you're testing:
+
+```typescript
+// Example: "I need to test that userStore properly handles API errors"
+// Requirements:
+// - When API returns error, store should set error code 'networkError'
+// - isSubmitting should be reset to false after error
+// - Error should be stored in state for component to display
+```
+
+#### Step 2: Write Test First (BDD-style)
+
+**Use BDD-style test structure** with clear `describe` and `it` blocks:
+
+```typescript
+describe('userStore', () => {
+    describe('updateUser', () => {
+        it('should handle API errors and set error code', async () => {
+            // Arrange
+            const apiError = new Error('network error');
+            vi.mocked(updateUserApi).mockRejectedValue(apiError);
+
+            // Act
+            const updateUser = useUserStore.getState().updateUser;
+            await expect(
+                updateUser({
+                    id: '123',
+                    name: 'Test User'
+                })
+            ).rejects.toThrow('networkError');
+
+            // Assert
+            expect(useUserStore.getState().error).toBe('networkError');
+            expect(useUserStore.getState().isSubmitting).toBe(false);
+        });
+    });
+});
+```
+
+#### Step 3: Implement Minimal Code
+
+**Write just enough code to make test pass:**
+
+```typescript
+// Minimal implementation to pass the test
+const updateUser = async (data: UserData) => {
+    set({ isSubmitting: true, error: null });
+    try {
+        await updateUserApi(data);
+        set({ isSubmitting: false });
+    } catch (error) {
+        const errorCode =
+            error instanceof Error && error.message.includes('network')
+                ? 'networkError'
+                : 'unknownError';
+        set({ isSubmitting: false, error: errorCode });
+        throw new Error(errorCode);
+    }
+};
+```
+
+#### Step 4: Refactor (if needed)
+
+**Improve code quality while keeping tests green** - extract helpers, improve naming, add edge cases.
+
+### Test Requirements
+
+#### Test Structure
+
+- **Use BDD-style**: `describe` blocks for grouping, `it` blocks for individual tests
+- **Clear test names**: Test names should clearly describe what is being tested
+- **Arrange-Act-Assert pattern**: Structure tests with clear sections
+- **Independent tests**: Each test should be independent and not rely on other tests
+
+#### Test Coverage
+
+- **Happy path**: Test successful scenarios
+- **Edge cases**: Test boundary conditions and edge cases
+- **Error handling**: Test error scenarios and error codes
+- **State changes**: Verify state changes correctly (for stores)
+
+#### Test Quality
+
+- **Use proper mocks**: Mock external dependencies (APIs, etc.)
+- **Use `renderWithProviders`**: For components that need QueryClient provider
+- **Test user interactions**: For components, test user interactions (clicks, input, etc.)
+- **Avoid testing implementation details**: Test behavior, not implementation
+
+### Example: TDD for Store
+
+```typescript
+// Step 1: Describe requirements
+// "I need to test that userStore resets state correctly"
+
+// Step 2: Write test first
+describe('userStore', () => {
+    it('should reset state to initial values', () => {
+        // Arrange
+        useUserStore.setState({ isSubmitting: true, error: 'Test error' });
+
+        // Act
+        useUserStore.getState().reset();
+
+        // Assert
+        expect(useUserStore.getState().isSubmitting).toBe(false);
+        expect(useUserStore.getState().error).toBe(null);
+    });
+});
+
+// Step 3: Implement (in userStore.ts)
+const useUserStoreBase = create<UserStoreState>((set) => ({
+    // ... other state
+    reset: () => set({ isSubmitting: false, error: null })
+}));
+```
+
+### Example: Hybrid Approach for Component
+
+```typescript
+// Step 1: Extract logic to hook (TDD for hook)
+// useComponentName.test.ts
+describe('useComponentName', () => {
+    it('should handle form submission', async () => {
+        // Test hook logic first
+    });
+});
+
+// Step 2: Create component structure
+// ComponentName.tsx
+export const ComponentName: FC<ComponentProps> = () => {
+    const { handleSubmit } = useComponentName();
+    return <form onSubmit={handleSubmit}>...</form>;
+};
+
+// Step 3: Write component integration tests
+// ComponentName.test.tsx
+describe('ComponentName', () => {
+    it('should submit form on button click', async () => {
+        // Test component integration
+    });
+});
+```
+
+### Integration with Workflow
+
+**TDD integrates with existing workflow rules:**
+
+1. **Planning phase**: Describe requirements and what will be tested
+2. **Implementation phase**: Follow TDD process (test -> code -> refactor)
+3. **Commit phase**: All tests must pass before commit
+
+### Exceptions
+
+**Strict TDD can be skipped for:**
+
+- **Very simple functions** (< 10 lines, single responsibility)
+- **Type-only files** (pure TypeScript types/interfaces)
+- **Configuration files** (constants, configs)
+- **Dev-only utilities** (HMR hooks, dev helpers)
+
+**Even for exceptions, consider adding tests if:**
+
+- Function has complex logic
+- Function is critical for business logic
+- Function is reused in multiple places

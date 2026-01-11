@@ -1,0 +1,71 @@
+---
+description: 'Code style, formatting, file structure, and naming conventions'
+globs: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx']
+alwaysApply: true
+---
+
+## Code Formatting
+
+- **Use Prettier configuration** from the project (`trailingComma: 'none'`, `singleQuote: true`, `printWidth: 100`, `tabWidth: 4`)
+- **Follow ESLint rules** configured in `eslint.config.js`
+- **Use 4 spaces** for indentation
+- **Always end files** with an empty line
+
+## Comments
+
+- **Comments only in English**
+- **Comments only for complex logic** that requires explanation
+- Example of acceptable comment:
+    ```typescript
+    // Complex algorithm that requires explanation
+    // Handles edge cases and specific business logic
+    const processData = (data: string) => { ... }
+    ```
+
+## Imports
+
+- **Use path aliases**: `@/components`, `@/constants`, `@/types`, `@/utils`
+- **Group imports**: external libraries first, then internal
+- **Use `import type`** for types
+- **Follow import order rules** from ESLint config (categories separated by empty lines)
+
+## Project Structure
+
+### Folders and Files
+
+- **Components** in `src/components/`:
+    - `common/` - common components (ErrorBoundary, etc.)
+    - `features/` - feature components (FeedbackForm, etc.)
+    - `layout/` - layout components (Header, Footer, Main)
+    - `ui/` - UI primitives (button, input, card, etc.)
+- **Pages** in `src/pages/` (each page in its own folder with `index.tsx`)
+- **Hooks** in `src/hooks/` (organized by domain)
+- **Store** in `src/store/` (Zustand stores, each in its own folder with tests)
+- **Router** in `src/router/`
+- **Types** in `src/types/` (if exists)
+- **Constants** in `src/constants/` (if exists)
+- **Utilities** in `src/lib/` (queryClient, utils, etc.)
+
+## Accessibility
+
+- **Use semantic HTML tags**
+- **Add ARIA attributes** where needed (e.g., `role="status"`, `aria-live="polite"` for loading states)
+- **Use `role="alert"` and `aria-live="assertive"`** for critical messages (errors)
+- **Ensure keyboard navigation**
+- **Use shadcn/ui components** which include accessibility features
+- **Don't overuse ARIA** - prefer semantic HTML first
+
+### Naming Conventions
+
+- **Components**: PascalCase (`ComponentName`)
+- **Component files**: PascalCase or kebab-case (follow existing style)
+- **Hooks**: camelCase with `use` prefix (`useComponentName`)
+- **Constants**: UPPER_SNAKE_CASE (`STATUS`, `ROUTES_PATH`)
+- **Types**: PascalCase (`ComponentProps`, `StatusType`)
+- **Routes**: Use `RoutesPath` object in `src/router/routes.ts` for route constants
+
+## Code Quality
+
+- **Write code professionally**: Production-ready, maintainable code
+- **Prefer more code over complex constructions**: Better readability is more important than fewer lines
+- **Code should be understandable**: Any developer should be able to understand the code without deep knowledge

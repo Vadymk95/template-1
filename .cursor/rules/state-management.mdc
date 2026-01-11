@@ -1,0 +1,50 @@
+---
+description: "Zustand stores and TanStack Query patterns"
+globs: ["**/store/**/*.ts", "**/*.tsx"]
+alwaysApply: false
+---
+
+## State Management
+
+- **Use Zustand** for global state management (stores in `src/store/`)
+- **Each store should be in its own folder** with tests alongside (e.g., `src/store/user/userStore.ts` + `userStore.test.ts`)
+- **Use `createSelectors` utility** from `src/store/utils/createSelectors.ts` for auto-selectors
+- **Store exports both regular selector and auto-selector**: `useStore((state) => state.value)` or `useStore.use.value()`
+- **Use TanStack Query** for server state and data fetching
+- **Configure QueryClient** in `src/lib/queryClient.ts` using `createQueryClient()` helper
+- **Keep local state in components** when possible, use Zustand for shared state
+
+## Store Structure
+
+- **Modular store pattern**: Each domain has its own store folder
+- **Tests next to store files** (`storeName.test.ts`)
+- **Direct imports** (no `index.ts` re-exports) for optimal tree-shaking
+- **Store-related files** (types, utils) can be added to the same folder when needed
+
+### Example Structure
+
+```
+src/store/
+  ├── user/
+  │   ├── userStore.ts
+  │   └── userStore.test.ts
+  ├── settings/
+  │   ├── settingsStore.ts
+  │   └── settingsStore.test.ts
+  └── utils/
+      └── createSelectors.ts
+```
+
+### Example Usage
+
+```typescript
+// src/store/user/userStore.ts
+import { create } from 'zustand';
+import { createSelectors } from '../utils/createSelectors';
+
+const useUserStoreBase = create(...);
+export const useUserStore = createSelectors(useUserStoreBase);
+
+// Import directly
+import { useUserStore } from '@/store/user/userStore';
+```
