@@ -1,0 +1,75 @@
+---
+description: 'React Router v7 patterns and route organization'
+globs: ['**/router/**/*.{ts,tsx}', '**/pages/**/*.{ts,tsx}']
+alwaysApply: false
+priority: 78
+---
+
+# Routing Protocol (React Router v7)
+
+## Structure
+
+```
+src/router/
+  index.tsx          # createBrowserRouter — assembly point only
+  routes.ts          # Route name/path constants
+  modules/
+    base.routes.tsx  # Base routes (home, 404, ...)
+    admin.routes.tsx # Domain-specific route modules (add here)
+```
+
+## Adding a Route
+
+1. Create page: `src/pages/FooPage/FooPage.tsx` + `index.ts` (lazy export).
+2. Add route path constant to `src/router/routes.ts`.
+3. Add to `src/router/modules/base.routes.tsx` (or create new module).
+4. Wrap lazy page element with `WithSuspense`.
+5. Assemble in `src/router/index.tsx` if new module.
+
+```typescript
+// routes.ts — path constants
+export const ROUTES = {
+    HOME: '/',
+    FOO: '/foo',
+    NOT_FOUND: '*',
+} as const;
+
+// base.routes.tsx
+import { FooPage } from '@/pages/FooPage';
+import { WithSuspense } from '@/hocs/WithSuspense';
+
+{ path: ROUTES.FOO, element: WithSuspense(<FooPage />) }
+```
+
+## Page Pattern
+
+```typescript
+// FooPage.tsx — the component
+export function FooPage() { ... }
+
+// index.ts — lazy export (used in router)
+import { lazy } from 'react';
+export const FooPage = lazy(() => import('./FooPage'));
+```
+
+**Exception**: Entry route (e.g., `HomePage`) can be non-lazy if it needs to be the initial load target.
+
+## Navigation
+
+```typescript
+// Programmatic navigation
+import { useNavigate } from 'react-router-dom';
+const navigate = useNavigate();
+navigate(ROUTES.FOO);
+
+// Declarative
+import { Link } from 'react-router-dom';
+<Link to={ROUTES.FOO}>Go to Foo</Link>
+```
+
+## Anti-Patterns (FORBIDDEN)
+
+- ❌ Hardcoded path strings in `<Link to="/foo">` — use `ROUTES.FOO`.
+- ❌ Lazy pages without `WithSuspense` — causes blank screen on load.
+- ❌ Route logic (guards, redirects) in components — belongs in route module.
+- ❌ Adding routes directly to `index.tsx` — always use a module file.

@@ -1,0 +1,24 @@
+---
+description: 'Global Engineering Standards & Intelligence Protocol'
+globs: ['**/*']
+alwaysApply: true
+priority: 95
+---
+
+# Global Standards
+
+## Pipeline Initialization (CRITICAL)
+
+- **Any task MUST begin by initializing the protocol defined in `agent-pipeline.mdc`.**
+- The pipeline (Priority 100) orchestrates all phases: Discovery → Simulation → TDD Execution → Verification → Brain Sync → Confidence.
+- Domain standards live in their respective rules. The pipeline enforces them — never bypass it.
+
+## Intelligence & Context
+
+- **Reasoning**: Use `sequential-thinking` for logic and `context7` for docs lookups. Russian for chat, English for code/comments.
+- **Authority**: `.cursor/brain/` (MAP, DECISIONS, SKELETONS, DICTIONARY) is the Source of Truth. Sync drifts immediately.
+- **Stack**: Strict **TypeScript**. React 19. Prioritize existing libs over custom logic.
+- **Quality**: Minimalist code. No magic strings — use constants or i18n keys.
+- **Clean Code**: Descriptive naming, performance-oriented. Explain complex logic with single-line `//` only.
+- **Hygiene**: NO spec files, docs, or AI metadata in root. All AI context stays in `.cursor/`.
+- **Git**: `type(scope): description` — English, max 96 chars. No "Co-authored-by" tags.

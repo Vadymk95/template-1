@@ -1,0 +1,55 @@
+---
+description: 'Constants, magic strings, and configuration values'
+globs: ['**/*.{ts,tsx}']
+alwaysApply: false
+priority: 75
+---
+
+# Constants Protocol
+
+## 1. Rule: No Magic Strings or Numbers
+
+Every domain-specific string or number with semantic meaning MUST be a named constant.
+
+```typescript
+// Bad
+if (user.role === 'admin') { ... }
+setTimeout(fn, 5000);
+
+// Good
+const USER_ROLES = { ADMIN: 'admin', EDITOR: 'editor' } as const;
+const TIMEOUTS = { SESSION_REFRESH_MS: 5000 } as const;
+if (user.role === USER_ROLES.ADMIN) { ... }
+```
+
+## 2. Storage Location
+
+| Scope | Location |
+|---|---|
+| Global / cross-domain | `src/lib/constants/<domain>.ts` |
+| Single component | Co-locate above component in same file |
+| Store-level | `src/store/<domain>/constants.ts` |
+| Route paths | `src/router/routes.ts` |
+| i18n namespace names | `src/lib/i18n/constants.ts` |
+
+## 3. Pattern
+
+```typescript
+// as const — enables literal type inference
+export const STATUS = {
+    PENDING: 'pending',
+    ACTIVE: 'active',
+    INACTIVE: 'inactive',
+} as const;
+
+// Derive union type from const
+export type Status = (typeof STATUS)[keyof typeof STATUS];
+// Result: 'pending' | 'active' | 'inactive'
+```
+
+## 4. Anti-Patterns (FORBIDDEN)
+
+- ❌ `enum` — use `as const` + type derivation instead.
+- ❌ Duplicated string literals across files.
+- ❌ Magic numbers in business logic without named constants.
+- ❌ Boolean flags as function params — use options object or named constants.

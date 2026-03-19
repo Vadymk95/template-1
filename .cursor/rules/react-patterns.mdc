@@ -1,0 +1,101 @@
+---
+description: 'React 19 patterns, components, hooks, pages, and HOCs'
+globs: ['**/*.tsx', '**/hooks/**/*.ts', '**/hocs/**/*.tsx']
+alwaysApply: false
+priority: 87
+---
+
+# React 19 Patterns
+
+## 1. Components
+
+- **Function declarations + PascalCase** for components (not arrow functions).
+- **Type**: `interface Props { ... }` — always explicit. No inline anonymous types for props.
+- **Ref**: In React 19, refs are passed as **regular props** — `forwardRef` is deprecated and removed.
+- **Named exports only**: Default exports only for lazy-loaded pages (React Router lazy).
+
+```typescript
+// React 19 — no forwardRef needed
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+    label?: string;
+    ref?: React.Ref<HTMLInputElement>;
+}
+
+export function Input({ label, ref, ...props }: InputProps) {
+    return (
+        <label>
+            {label && <span>{label}</span>}
+            <input ref={ref} {...props} />
+        </label>
+    );
+}
+```
+
+## 2. Component Architecture: Logic Separation
+
+- **Components must be maximally presentational** — UI only.
+- **Extract all logic to a local hook** next to the component: `useComponentName.ts`.
+- Component imports hook: `import { useComponentName } from './useComponentName'`.
+
+```
+UserCard/
+  UserCard.tsx          # UI only, imports useUserCard
+  useUserCard.ts        # All logic, state, event handlers
+  UserCard.test.tsx     # Integration test
+```
+
+## 3. Hooks
+
+- **Arrow functions** for hooks.
+- **Domain grouping**: `src/hooks/<domain>/hookName.ts` + `hookName.test.ts` alongside.
+- **Direct imports** — no `index.ts` barrel re-exports.
+- **Rules of Hooks**: Hooks only in React components or other hooks. Never in callbacks, loops, or conditions.
+
+```typescript
+// Bad — hook in callback
+const handleClick = () => { const data = useQuery(...); };
+
+// Good — hook at top level
+const { data } = useUserQuery(id);
+const handleClick = () => doSomethingWith(data);
+```
+
+## 4. Pages
+
+```
+// Entry page (no lazy) — direct named export
+export function HomePage() { ... }
+
+// All other pages (lazy-loaded)
+// PageName.tsx — component
+export function NotFoundPage() { ... }
+
+// index.ts — lazy wrapper
+import { lazy } from 'react';
+export const NotFoundPage = lazy(() => import('./NotFoundPage'));
+
+// Router — always wrap lazy pages with WithSuspense
+{ path: '*', element: WithSuspense(<NotFoundPage />) }
+```
+
+## 5. HOCs
+
+- HOCs in `src/hocs/`.
+- `WithSuspense` wraps all lazy-loaded components in the router.
+- Function call style (not decorator): `WithSuspense(<Component />)`.
+
+## 6. Accessibility
+
+- Use semantic HTML first: `<button>`, `<nav>`, `<main>`, `<header>`, `<footer>`.
+- Add ARIA only where semantic HTML is insufficient.
+- Loading states: `role="status"` + `aria-live="polite"`.
+- Critical errors: `role="alert"` + `aria-live="assertive"`.
+- Forms: `<label>` always associated with input (via `htmlFor` or wrapping).
+
+## 7. Anti-Patterns (FORBIDDEN)
+
+- ❌ `React.forwardRef` — deprecated in React 19. Pass `ref` as a regular prop.
+- ❌ Arrow function components with default exports (confuses lazy imports).
+- ❌ Logic > 10 lines directly in JSX — extract to hook.
+- ❌ `import React from 'react'` — not needed in React 19 with JSX transform.
+- ❌ `any` in component props.

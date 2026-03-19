@@ -1,0 +1,199 @@
+---
+description: 'Main autonomous execution engine. Orchestrates all other rules.'
+globs: ['**/*']
+alwaysApply: true
+priority: 100
+---
+
+# Agent Pipeline — Principal Autonomy Engine
+
+> Defines the **process**. Quality standards live in domain rules. Pipeline enforces them — never bypass it.
+
+---
+
+## Phase 1: Deep Discovery (mandatory)
+
+Before any reasoning about implementation:
+
+1. **Brain Scan**: Read `.cursor/brain/MAP.md` (store topology, data flows, routes, component wiring).
+2. **Risk Detection**: Read `.cursor/brain/SKELETONS.md` — check if task touches any danger zone.
+3. **Context Gathering**: Identify affected files (components, hooks, stores, API). Search codebase for existing implementations of similar logic.
+4. **Scope Declaration**: Produce clear **In-scope / Out-of-scope** list.
+5. **Explicit declaration**: State in one message: scope + SKELETONS zones touched (or "none"). Do not code before this.
+
+> **Gate**: If task touches a SKELETONS zone — flag the risk and propose mitigation before Phase 2.
+
+---
+
+## Phase 2: Architectural Simulation
+
+### Inference-Time Scaling
+
+Before simulating changes:
+
+- Activate `sequential-thinking` with `totalThoughts >= 3` for any task > 3 steps.
+- Dedicate at least one thought to **adversarial analysis**: "What could go wrong? What existing behavior might break?"
+
+### Architectural Critique
+
+1. **Layer Compliance**: Does change respect `@/` alias boundaries? No relative `../../`? No circular deps?
+2. **State Boundary**: Zustand for global state only. TanStack Query for server state only. Local state for component-only concerns.
+3. **Tech Debt Check**: Will this create magic strings, implicit coupling, or untyped contracts?
+4. **Ghost Principle Audit**: Is every planned modification strictly necessary? Flag "while I'm here" temptations.
+5. **Store Impact**: If Zustand touched — `createSelectors` used? Store isolated? Direct import (no index.ts re-export)?
+
+### Solver-Verifier (mental test cases)
+
+After the critique, generate **1–2 mental test cases** per non-trivial function:
+
+- Pick happy path + edge case.
+- Trace execution: "Given X, step 1 does A, step 2 does B, result is Y."
+- If trace reveals unexpected result — revise plan **before writing code**.
+
+> **Gate**: Present Architectural Critique. For tasks > 10 lines or touching stores/API: wait for approval (**The Approval Law** from `workflow.mdc`). Minor fixes (< 10 lines) proceed with brief notification.
+
+---
+
+## Phase 3: TDD-First Execution
+
+### For Business Logic (stores, hooks, utils)
+
+1. **Requirements**: List test cases explicitly in chat before coding.
+2. **Red**: Write failing tests (BDD: `describe`/`it`, Arrange-Act-Assert).
+3. **Green**: Write minimal code to pass.
+4. **Refactor**: Clean up while staying green.
+
+### For UI Components
+
+Implement directly → write integration tests via `renderWithProviders`.
+
+### Iteration Protocol
+
+- **Batch size**: 1–2 files per iteration. Never modify > 2 files without intermediate verification.
+- **Ghost Principle enforcement**: After each edit — "Did I modify ONLY what the task requires?"
+- **Pattern check**: Before writing new code — confirm no existing pattern already solves it.
+- **Style lock**: Match exact indentation (4 spaces), naming, formatting of surrounding code. Zero drift.
+
+### Per-File Checklist
+
+- [ ] Read file before editing (mandatory).
+- [ ] Surgical `StrReplace` — no full-file rewrites unless creating a new file.
+- [ ] Imports use `@/` aliases, never relative `../../`.
+- [ ] No magic strings/numbers — use constants.
+- [ ] Errors logged via `logger.error` with context — never raw `console.error(e)`.
+- [ ] No `console.log` left in code.
+
+---
+
+## Phase 4: Autonomous Verification Loop
+
+### 4.1 Automated Checks
+
+```bash
+npm run lint          # must exit 0
+npm run format:check  # Prettier compliance
+tsc --noEmit          # zero type errors
+npm test              # all tests green
+```
+
+### 4.2 Self-Correction with Root Cause Analysis
+
+If any check fails:
+
+1. **Do NOT patch the symptom.**
+2. Use `sequential-thinking` to trace error back to origin.
+3. Fix the **root cause**, not the surface error.
+4. Re-run full loop after fix.
+
+### 4.3 Manual Checks (code review pass)
+
+- Grep changed files for `console.error(e)` without context — all must use `logger.error`.
+- Verify no new circular imports or missing `@/` aliases.
+- Confirm no hardcoded user-visible strings — use `t()`.
+
+### 4.4 Diff Self-Review (mandatory)
+
+Re-read every changed file and verify:
+
+1. **Plan alignment**: Does diff match Phase 2 simulation? Flag unplanned additions.
+2. **Ghost Principle final check**: Anything outside original scope?
+3. **Regression scan**: Could any removed/changed line break an existing caller?
+
+---
+
+## Phase 5: Brain Auto-Sync
+
+Before marking task complete:
+
+| Brain File | Update Trigger |
+|---|---|
+| `MAP.md` | New/changed stores, routes, data flows, component wiring |
+| `DECISIONS.md` | New architectural pattern, deviation from existing, trade-off made |
+| `SKELETONS.md` | New risk discovered, existing risk mitigated |
+| `DICTIONARY.md` | New domain term, acronym, or concept introduced |
+
+**Rule**: If no update needed — explicitly state: `"Brain sync: none needed."`
+**FORBIDDEN**: Completing a task without this declaration.
+
+---
+
+## Phase 6: Confidence Declaration
+
+Every task MUST end with:
+
+- `Confidence: HIGH` — all checks pass, diff aligns with plan, no SKELETONS touched, mental traces passed.
+- `Confidence: MEDIUM` — checks pass but task touched unfamiliar code or edge case not fully traceable. State what is uncertain.
+- `Confidence: LOW` — workaround applied, or SKELETONS risk mitigated but not eliminated. Requires review.
+
+Format: `Confidence: HIGH | MEDIUM | LOW — <one-line reason>`
+
+---
+
+## Pipeline Flowchart
+
+```
+START
+  │
+  ▼
+[Phase 1: Deep Discovery]
+  │ Brain scan → Risk detection → Scope declaration
+  │
+  ▼
+[Phase 2: Architectural Simulation + Solver-Verifier]
+  │ sequential-thinking → Critique → Mental test cases
+  │ ── Gate: Approval if > 10 lines or stores/API touched ──
+  │
+  ▼
+[Phase 3: TDD-First Execution]
+  │ Requirements → Red → Green → Refactor
+  │ 1–2 files/iteration → Ghost Principle check
+  │
+  ▼
+[Phase 4: Verification Loop + Diff Self-Review]
+  │ lint → format → types → tests → manual review
+  │ ── Fail? → Root Cause Analysis → Fix → Re-verify ──
+  │
+  ▼
+[Phase 5: Brain Auto-Sync]
+  │ MAP / DECISIONS / SKELETONS / DICTIONARY
+  │
+  ▼
+[Phase 6: Confidence Declaration]
+  │ HIGH / MEDIUM / LOW + reason
+  │
+  ▼
+DONE
+```
+
+---
+
+## Anti-Patterns (FORBIDDEN)
+
+- ❌ Skipping Phase 1 and jumping straight to code.
+- ❌ Editing > 2 files without intermediate verification.
+- ❌ Patching lint/type errors without Root Cause Analysis.
+- ❌ Completing a task without Brain sync declaration.
+- ❌ Modifying code outside declared scope (Ghost Principle violation).
+- ❌ Writing business logic without tests first.
+- ❌ Using relative `../../` imports instead of `@/` aliases.
+- ❌ Leaving `console.log` or raw `console.error(e)` in code.
