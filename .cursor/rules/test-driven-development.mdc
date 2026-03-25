@@ -1,0 +1,88 @@
+---
+description: 'TDD protocol and testing standards for Vitest + Testing Library'
+globs: ['**/*.{test,spec}.{ts,tsx}', '**/store/**/*.ts', '**/hooks/**/*.ts', '**/lib/**/*.ts']
+alwaysApply: false
+priority: 85
+---
+
+# TDD Protocol
+
+## 1. Mandatory Test-First (Strict TDD)
+
+Write tests **before** implementation for:
+
+- **Zustand stores** (`src/store/*/`)
+- **Custom hooks** with logic > 10 lines (`src/hooks/*/`)
+- **Utilities and transforms** (`src/lib/`)
+- **Zod schemas** — validate schema before using it
+
+## 2. Hybrid UI Approach
+
+- **Runtime orchestration → Hook** (strict TDD for the hook)
+- **Pure computation → Utility** (strict TDD for the utility)
+- **UI → Component** (integration test after component is built)
+- **Rule**: If component logic exceeds 10 lines — extract to `useComponentName.ts` hook, apply strict TDD to the hook.
+
+```typescript
+// Integration test with providers
+import { renderWithProviders } from '@/test/test-utils';
+import { screen } from '@testing-library/react';
+
+it('displays user name after login', async () => {
+    renderWithProviders(<UserCard id="1" />);
+    expect(await screen.findByText('John')).toBeInTheDocument();
+});
+```
+
+## 3. Implementation Cycle
+
+1. **Requirements**: List test cases explicitly before coding.
+2. **Red**: Failing test — BDD style (`describe`/`it`), Arrange-Act-Assert.
+3. **Green**: Minimal code to pass.
+4. **Refactor**: Clean up while staying green.
+
+## 4. Quality Standards
+
+- **Isolation**: Mock external APIs and modules via `vi.mock()`. Never let tests hit real network.
+- **Edge cases**: Always include error boundary tests, empty state, and network failure scenarios.
+- **Behavior over internals**: Test public API and user behavior — not implementation details.
+- **BDD naming**: `describe('UserStore')` → `it('sets username and marks as logged in on setUser()')`.
+
+```typescript
+describe('userStore', () => {
+    it('sets username and isLoggedIn on setUser()', () => {
+        const { result } = renderHook(() => useUserStore());
+        act(() => result.current.setUser('alice'));
+        expect(result.current.username).toBe('alice');
+        expect(result.current.isLoggedIn).toBe(true);
+    });
+
+    it('clears state on logout()', () => {
+        const { result } = renderHook(() => useUserStore());
+        act(() => { result.current.setUser('alice'); result.current.logout(); });
+        expect(result.current.username).toBeNull();
+        expect(result.current.isLoggedIn).toBe(false);
+    });
+});
+```
+
+## 5. Test File Location
+
+- Co-locate tests with the file: `userStore.ts` → `userStore.test.ts`.
+- Component tests: `ComponentName.test.tsx` next to `ComponentName.tsx`.
+- No separate `__tests__` directories.
+
+## 6. Exceptions (TDD can be skipped for)
+
+- Type-only files (interfaces, `*.d.ts`)
+- Static constants
+- Simple presentational components with no logic
+- Dev-only utilities (e.g., HMR hooks)
+
+## 7. Commands
+
+```bash
+npm test              # vitest run (CI)
+npm run test:watch    # vitest watch (development)
+npm run test:coverage # coverage report
+```

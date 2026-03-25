@@ -1,0 +1,87 @@
+---
+description: 'Workflow, The Approval Law, and git commit guidelines'
+globs: ['**/*']
+alwaysApply: true
+priority: 90
+---
+
+# Workflow & Approval Protocol
+
+## The Approval Law
+
+| Task Size | Protocol |
+|---|---|
+| < 10 lines, single file | Proceed with brief notification |
+| > 10 lines OR touches store/API/router | Present plan → wait for approval → implement |
+| New architecture pattern | Always present plan |
+
+**FORBIDDEN**: Starting implementation of a non-trivial task before approval.
+
+## Planning Requirements
+
+A plan must include:
+
+1. Files to be modified/created.
+2. Brief description of change per file.
+3. Test strategy: which parts use strict TDD, which use hybrid.
+4. Any SKELETONS zones touched.
+
+## Implementation Workflow
+
+1. **Discover** — Brain scan + scope declaration (Phase 1 of agent-pipeline).
+2. **Simulate** — `sequential-thinking` for tasks > 3 steps. Architectural critique.
+3. **Approve** — Get approval if > 10 lines or store/API touched.
+4. **Execute** — TDD for logic. Max 1–2 files per iteration.
+5. **Verify** — Full loop: `npm run lint && npm run format:check && npx tsc -b --noEmit && npm test`.
+6. **Brain Sync** — Update MAP/DECISIONS/SKELETONS/DICTIONARY as needed.
+7. **Confidence** — Declare HIGH | MEDIUM | LOW.
+
+## Hook vs Utility Extraction Policy (MANDATORY)
+
+- **Extract to hook** when logic requires React runtime: `useEffect` orchestration, subscriptions, timers, browser/DOM APIs, store mutations/selectors, router navigation, async UI state handling in event handlers.
+- **Extract to utility** when logic is pure and deterministic: mapping, filtering, sorting, formatting, parsing, validation, data transformation.
+- **Mandatory split rule**: if a hook contains pure computation, extract that computation to a utility first. The hook must stay a thin orchestration layer.
+- **Never keep pure business computation in hooks** when it can be unit-tested as a utility.
+
+## Post-Edit Verification
+
+Always run after code changes:
+
+```bash
+npm run lint          # ESLint (exit 0 required)
+npm run format:check  # Prettier check
+npx tsc -b --noEmit   # TypeScript solution (project references)
+npm test              # All tests green
+```
+
+## Git Commits
+
+### Format
+
+```
+type(scope): description
+```
+
+- **Types**: `feat` `fix` `chore` `docs` `style` `refactor` `perf` `test` `revert`
+- **Max 96 chars** on header line.
+- **English only**, imperative mood ("add", not "added" or "adds").
+- **No Co-authored-by tags**.
+
+### Before Committing
+
+- [ ] `npm run lint` — clean
+- [ ] `npx tsc -b --noEmit` — no errors
+- [ ] `npm test` — all green
+- [ ] `git diff` reviewed — no unintended changes
+- [ ] No `console.log` left in production code
+
+### Examples
+
+```
+feat(auth): add JWT token refresh on 401 response
+fix(store): prevent race condition in userStore setUser
+chore(deps): update react-router-dom to 7.13.1
+refactor(api): extract query key factory to userKeys
+perf(query): set staleTime on user queries to reduce refetches
+test(store): add edge cases for logout with expired session
+```

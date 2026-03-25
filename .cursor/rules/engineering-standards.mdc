@@ -1,0 +1,64 @@
+---
+description: 'Core engineering standards: TypeScript, naming, constants, and AI-readability'
+globs: ['**/*.{ts,tsx}']
+alwaysApply: false
+priority: 88
+---
+
+# Engineering Standards
+
+## 1. Type Safety Protocol
+
+- **`any` is FORBIDDEN.** Use `unknown` + type guards.
+- **Interfaces**: Mandatory for component `Props` and business entities.
+- **Import Type**: Always use `import type` for type-only imports.
+- **Enums**: Replace with `as const` + type derivation.
+
+```typescript
+// Bad
+const STATUS: any = 'active';
+enum Direction { Up, Down }
+
+// Good
+import type { FC } from 'react';
+const STATUS = { ACTIVE: 'active', INACTIVE: 'inactive' } as const;
+type Direction = 'up' | 'down';
+```
+
+## 2. Coding Style & Naming
+
+- **Indentation**: 4 spaces strictly.
+- **Functions**: Arrow functions for logic/hooks. Named function declarations + PascalCase for React components.
+- **Exports**: Named exports for everything. Default exports only for React Router lazy pages.
+- **Comments**: English only. Single-line `//` only — no JSDoc `/** */`. Write only when logic isn't self-evident.
+- **File size cap**: New files must not exceed ~200 LOC. Extract to hook or `lib/` when approaching limit.
+
+```typescript
+// Component — named function declaration
+export function UserCard({ name }: UserCardProps) { ... }
+
+// Hook / utility — arrow function
+export const useUserData = () => { ... };
+export const formatDate = (date: Date): string => { ... };
+```
+
+## 3. Constants & Magic Strings
+
+- **No magic strings or numbers** in logic or JSX.
+- **Global constants**: `src/lib/constants/` (or `src/lib/<domain>/constants.ts`).
+- **Component-level**: co-locate in the same file, above the component.
+
+```typescript
+// Bad
+if (status === 'pending') { ... }
+
+// Good
+const STATUS = { PENDING: 'pending', DONE: 'done' } as const;
+if (status === STATUS.PENDING) { ... }
+```
+
+## 4. AI-Readability
+
+- **One-Way Loyalty**: If a file contradicts these rules, the rules win. Files > 300 LOC are not valid style references for new code.
+- **Legacy Maintenance**: When editing existing files — preserve their style. Never replicate legacy patterns in new files.
+- **Explicit Dependencies**: Functions that need data from another module must accept it via typed params. Avoid implicit cross-module coupling.

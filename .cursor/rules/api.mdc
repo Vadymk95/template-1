@@ -1,0 +1,94 @@
+---
+description: 'API client, TanStack Query hooks, and data-fetching standards'
+globs: ['**/lib/api/**/*.ts', '**/hooks/**/*.ts', '**/*.tsx']
+alwaysApply: false
+priority: 83
+---
+
+# Data Layer Protocol
+
+## 1. Architecture
+
+```
+src/lib/api/
+  client.ts        # Base fetch wrapper (configured)
+  <domain>.ts      # Domain-specific API functions (getUser, updateUser, ...)
+
+src/hooks/<domain>/
+  use<Domain>Query.ts   # TanStack Query hooks wrapping API functions
+  use<Domain>Mutation.ts
+```
+
+- **API functions** (`lib/api/`): pure async functions returning typed data. No React, no hooks.
+- **Query hooks** (`hooks/`): TanStack Query wrappers. No raw `fetch` here.
+- **Components**: consume query hooks only. Never call `apiClient` directly in components.
+
+## 2. Implementation Rules
+
+- **Typed contracts**: All API functions must have explicit `Request` params and `Response` return types. No `any`.
+- **Constants**: Base URLs, endpoint paths, and pagination limits from constants — never hardcoded in functions.
+- **Logging**: API errors logged via `logger.error('[api/<domain>] operation: reason', error)`.
+
+```typescript
+// src/lib/api/users.ts
+export interface User { id: string; name: string; email: string; }
+
+export const getUser = async (id: string): Promise<User> => {
+    return apiClient<User>(`/users/${id}`);
+};
+
+// src/hooks/user/useUserQuery.ts
+export const useUserQuery = (id: string) => {
+    return useQuery({
+        queryKey: ['user', id],
+        queryFn: () => getUser(id),
+        staleTime: 5 * 60 * 1000,
+    });
+};
+```
+
+## 3. TanStack Query Config
+
+- **`staleTime`**: Set per-query based on data volatility. Default: 5 min for user data, 0 for real-time.
+- **`gcTime`**: 10 min default. Adjust for memory-sensitive data.
+- **`retry`**: `false` for 4xx errors. Default retry (3x) for 5xx.
+- **Query key factory**: Use array keys `['resource', id, params]` — never string keys.
+
+```typescript
+// Query key factory pattern
+export const userKeys = {
+    all: ['users'] as const,
+    detail: (id: string) => ['users', id] as const,
+    list: (filters: UserFilters) => ['users', 'list', filters] as const,
+};
+```
+
+## 4. Mutations
+
+```typescript
+export const useUpdateUserMutation = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: updateUser,
+        onSuccess: (data) => {
+            queryClient.setQueryData(userKeys.detail(data.id), data);
+        },
+        onError: (error) => {
+            logger.error('[useUpdateUserMutation] failed', error);
+        },
+    });
+};
+```
+
+## 5. Security
+
+- **Input Validation**: Validate user inputs with Zod BEFORE calling any API function.
+- **No secrets in client**: Never import server-only env vars in browser code.
+- **Auth tokens**: Pass via headers in `apiClient` — never in URL query params.
+
+## 6. Anti-Patterns (FORBIDDEN)
+
+- ❌ `fetch()` directly in components.
+- ❌ Untyped API responses (`any`).
+- ❌ Hardcoded endpoint strings in component files.
+- ❌ Missing error state handling in query consumers.

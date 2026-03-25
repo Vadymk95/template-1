@@ -1,0 +1,61 @@
+---
+description: 'Error handling, resilience, and debugging protocol'
+globs: ['**/*.{ts,tsx}', '**/store/**/*.ts', '**/lib/api/**/*.ts']
+alwaysApply: false
+priority: 92
+---
+
+# Resilience & Forensics Protocol
+
+## 1. Error Handling
+
+- **UI Safety**: Wrap risky component trees in `ErrorBoundary` with `role="alert"` and a user-friendly fallback.
+- **Logging**: All errors MUST include context. Never log a bare error object.
+
+```typescript
+// Bad
+console.error(error);
+catch (e: unknown) { throw e; }
+
+// Good — always include [module] operation: reason via logger
+logger.error('[UserStore] setUser: failed to update user state', error, { userId });
+```
+
+- **Silent catch**: FORBIDDEN. Every `catch` must either log with context or rethrow.
+- **API errors**: Use the `ApiError` interface from `src/lib/api/client.ts`. Never expose raw stack traces to the UI.
+
+## 2. TanStack Query Error Handling
+
+```typescript
+const { data, error } = useQuery({
+    queryKey: ['user', id],
+    queryFn: () => apiClient<User>(`/users/${id}`),
+});
+
+// Render error state — never swallow it silently
+if (error) return <ErrorMessage message={error.message} />;
+```
+
+- Always handle `error` state in query results.
+- Use `onError` in `QueryClient` defaults for global error logging.
+- Use `retry: false` for non-retryable errors (4xx).
+
+## 3. Form Validation
+
+- All form inputs validated via Zod schema **before** any API call.
+- `react-hook-form` + `@hookform/resolvers/zod` for all forms.
+- Validation errors displayed inline — never alert/toast only.
+
+## 4. Debugging Strategy (Forensics)
+
+- **Evidence first**: Use `rg` and `git log -S` to trace bugs. Don't guess.
+- **Root Cause**: Trace to origin — not the surface symptom.
+- **Post-Mortem**: Document new risks in `.cursor/brain/SKELETONS.md` after critical fixes.
+
+## 5. Anti-Patterns (FORBIDDEN)
+
+- ❌ `console.error(e)` or `console.error(error)` without context.
+- ❌ Silent `catch` blocks.
+- ❌ `catch (error: any)` — use `unknown` and narrow.
+- ❌ Missing dependencies in `useEffect` closures.
+- ❌ Exposing raw API error messages/stack traces to the user.

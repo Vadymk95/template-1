@@ -1,0 +1,76 @@
+---
+description: 'Project configuration, Tailwind v4, i18n, and accessibility standards'
+alwaysApply: true
+---
+
+# Project Configuration
+
+## Technology Stack
+
+| Layer | Choice |
+|---|---|
+| UI | React 19 |
+| State | Zustand 5 (global) + TanStack Query 5 (server) |
+| Language | TypeScript 5.9 strict |
+| Bundler | Vite 8 (Rolldown + Oxc — official `vite` package) |
+| Styling | Tailwind CSS **v4** (CSS-based config — no tailwind.config.ts) |
+| Components | shadcn/ui (new-york style) |
+| Routing | React Router v7 |
+| Forms | react-hook-form v7 + zod v4 |
+| i18n | i18next 25 + react-i18next |
+| Testing | Vitest 4 + Testing Library |
+
+## Tailwind v4 (CRITICAL)
+
+**There is no `tailwind.config.ts`.** All config in `src/index.css`:
+
+```css
+@import "tailwindcss";
+@import "tw-animate-css";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-primary: hsl(var(--primary));
+  /* ... all tokens here */
+}
+
+:root { --primary: 221.2 83.2% 53.3%; }
+.dark { --primary: 217.2 91.2% 59.8%; }
+```
+
+- Dark mode via `.dark` class (NOT `darkMode: 'class'` in JS config — that file doesn't exist).
+- Animations via `tw-animate-css` package (CSS import, not a PostCSS plugin).
+- `@tailwindcss/vite` handles compilation — do NOT add tailwindcss to PostCSS.
+- Adding new color token: add HSL value to `:root`, map in `@theme inline`.
+
+## i18n
+
+- Translations in `public/locales/{lng}/{ns}.json`
+- Namespaces: `common` (always loaded), `errors` (always loaded), page-specific (lazy), feature-specific (lazy on demand)
+- Language detection: `localStorage` → browser → fallback `'en'`
+- HMR: auto-reload translations in dev when files in `public/locales/` change
+- No hardcoded user-visible strings — always use `t('key')`.
+
+```typescript
+const { t } = useTranslation(['common', 'home']);
+return <h1>{t('home:title')}</h1>;
+```
+
+## Accessibility
+
+- Semantic HTML first: prefer `<button>`, `<nav>`, `<main>` over `<div role="...">`.
+- ARIA only where semantic HTML is insufficient.
+- Loading states: `role="status"` + `aria-live="polite"`.
+- Error states: `role="alert"` + `aria-live="assertive"`.
+- Keyboard navigation: all interactive elements must be keyboard-reachable.
+- shadcn/ui components include accessibility by default — don't override without reason.
+
+## Path Aliases
+
+`@/` maps to `src/`. **Only use `@/` aliases — never relative `../../`.**
+
+```typescript
+import { useUserStore } from '@/store/user/userStore';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+```

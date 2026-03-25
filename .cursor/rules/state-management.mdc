@@ -1,0 +1,65 @@
+---
+description: 'Zustand stores and TanStack Query patterns'
+globs: ['**/store/**/*.ts', '**/*.tsx', '**/hooks/**/*.ts']
+alwaysApply: false
+priority: 82
+---
+
+# State Management Protocol
+
+## 1. State Boundaries
+
+```
+Zustand      →  global client state (auth, UI preferences, cross-component shared state)
+TanStack Q   →  server state (fetching, caching, synchronization)
+useState     →  local component state (not shared beyond component)
+```
+
+**Rule**: Default to local `useState`. Escalate to Zustand only when state crosses component boundaries. Use TanStack Query for any async server data — never Zustand for server state.
+
+## 2. Zustand Store Standards
+
+- **Location**: `src/store/<domain>/` — one store per domain.
+- **Test alongside**: `userStore.ts` + `userStore.test.ts` in the same folder.
+- **Selectors**: Always wrap with `createSelectors` from `src/store/utils/createSelectors.ts`.
+- **Direct imports**: Import from the store file directly — no `index.ts` re-exports.
+- **DevTools**: Wire every store to Redux DevTools via `devtools()`. Use `type: 'store-name/slice/action'` naming.
+
+```typescript
+// src/store/user/userStore.ts
+const useUserStoreBase = create<UserState>()(
+    devtools(
+        (set) => ({
+            username: null,
+            setUser: (username) => set({ username }, false, { type: 'user-store/user/setUser' }),
+        }),
+        { name: 'user-store' }
+    )
+);
+
+export const useUserStore = createSelectors(useUserStoreBase);
+
+// Usage — both patterns supported
+useUserStore((s) => s.username)   // standard selector
+useUserStore.use.username()       // auto-selector via createSelectors
+```
+
+## 3. TanStack Query Standards
+
+- **Config root**: `src/lib/queryClient.ts` — configure `defaultOptions` here (retry, staleTime, etc.).
+- **Query hooks**: in `src/hooks/<domain>/` — wrapping API functions from `src/lib/api/`.
+- **Query keys**: Use factory pattern — always arrays, never strings.
+- **Mutations**: `onSuccess` → invalidate or update cache. `onError` → log with context.
+
+## 4. Integration Rules
+
+- **No raw fetch in stores**: Zustand stores must not call `fetch` or API functions directly. Populate via TanStack Query `onSuccess` or explicit action calls from components.
+- **HMR resilience**: Stores with persistent state must be resilient to hot module replacement in dev.
+- **Local first**: Keep state local when not shared. A store created for one component is a code smell.
+
+## 5. Anti-Patterns (FORBIDDEN)
+
+- ❌ Fetching server data with `useEffect` + `useState` — use TanStack Query.
+- ❌ Storing server-fetched data in Zustand as the primary cache.
+- ❌ Cross-store imports (store A importing store B).
+- ❌ `index.ts` barrel re-exports for stores (breaks tree-shaking and circular dep detection).
