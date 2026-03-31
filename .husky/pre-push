@@ -1,5 +1,11 @@
-npx tsc -b --force --noEmit
-if [ $? -ne 0 ]; then
-  echo "❌ TypeScript type-check failed. Fix errors before push."
-  exit 1
-fi
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use --silent 2>/dev/null || true
+
+echo "→ format:check"
+npm run format:check || { echo "❌ Formatting check failed. Run 'npm run format' and re-commit."; exit 1; }
+
+echo "→ lint"
+npm run lint || { echo "❌ Lint failed. Fix errors before push."; exit 1; }
+
+echo "→ type-check"
+npx tsc -b --force --noEmit || { echo "❌ TypeScript type-check failed. Fix errors before push."; exit 1; }

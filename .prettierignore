@@ -1,5 +1,5 @@
 node_modules
 dist
 coverage
-.husky/_/husky.sh
-
+.claude
+.cursor
