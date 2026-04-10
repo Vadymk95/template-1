@@ -57,11 +57,8 @@ export default defineConfig([
             'import-x/resolver-next': [
                 createTypeScriptImportResolver({
                     alwaysTryTypes: true,
-                    project: [
-                        './tsconfig.app.json',
-                        './tsconfig.node.json',
-                        './tsconfig.vitest.json'
-                    ]
+                    // Root solution tsconfig (`references` → app, node, vitest); one project = no multi-project warn.
+                    project: './tsconfig.json'
                 })
             ]
         },
