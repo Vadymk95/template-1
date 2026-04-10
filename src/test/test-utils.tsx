@@ -11,12 +11,14 @@ import { createQueryClient } from '@/lib/queryClient';
 // Using direct JSON imports - Vitest/Vite handles these correctly
 // Dynamic imports are not possible with TypeScript, so we use static imports
 // mapped to namespace constants
+import authTranslations from '../../public/locales/en/auth.json';
 import commonTranslations from '../../public/locales/en/common.json';
 import errorsTranslations from '../../public/locales/en/errors.json';
 import homeTranslations from '../../public/locales/en/home.json';
 
 // Map namespaces to their translation objects
 const translationMap = {
+    auth: authTranslations,
     common: commonTranslations,
     errors: errorsTranslations,
     home: homeTranslations
@@ -24,7 +26,7 @@ const translationMap = {
 
 // Ensure i18next is initialized for tests
 if (!i18n.isInitialized) {
-    i18n.use(initReactI18next).init({
+    void i18n.use(initReactI18next).init({
         lng: DEFAULT_LANGUAGE,
         fallbackLng: DEFAULT_LANGUAGE,
         ns: ALL_NAMESPACES,

@@ -1,9 +1,9 @@
-import type { FC } from 'react';
+import type { FunctionComponent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-export const DevPlayground: FC = () => {
+export const DevPlayground: FunctionComponent = () => {
     return (
         <div className="container mx-auto max-w-4xl space-y-8 p-8">
             <div className="space-y-2">

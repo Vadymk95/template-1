@@ -37,6 +37,8 @@ npx shadcn@latest add <component>
 
 ```
 Zustand  →  global UI/auth state (userStore, settingsStore, ...)
+           userStore uses persist middleware → survives page refresh (localStorage key: "user-store")
+           getAuthToken() exported for apiClient — avoids circular imports
 TanStack →  server data, caching, background refetch
 Local    →  component-only state (useState)
 ```
@@ -44,9 +46,11 @@ Local    →  component-only state (useState)
 ## Routing
 
 ```
-/ → HomePage (no lazy, entry route)
-/* → NotFoundPage (lazy + WithSuspense)
-/dev → DevPlayground (dev only, remove in prod)
+/           → HomePage (no lazy, entry route)
+/login      → LoginPage (lazy + WithSuspense)
+/dashboard  → DashboardPage (lazy + WithSuspense, behind ProtectedRoute)
+/*          → NotFoundPage (lazy + WithSuspense)
+/dev        → DevPlayground (dev only, lazy + WithSuspense, remove in prod)
 ```
 
 ## i18n Flow
@@ -68,6 +72,11 @@ src/index.css — single source of truth for Tailwind v4:
   @theme inline {}         — maps TW utility names → CSS variables
   :root / .dark {}         — HSL design tokens
 ```
+
+Dark mode toggle: `src/hooks/theme/useTheme.ts`
+- Modes: `'light' | 'dark' | 'system'` (system follows OS preference)
+- Toggles `.dark` class on `<html>`, persists to `localStorage` key `"theme"`
+- Usage: `const { theme, setTheme } = useTheme()`
 
 To change brand color: update `--primary` HSL values in `:root`.
 To add new color token: add to `:root`, then map in `@theme inline`.

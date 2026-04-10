@@ -3,3 +3,4 @@ dist
 coverage
 .claude
 .cursor
+public/mockServiceWorker.js

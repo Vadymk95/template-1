@@ -1,6 +1,6 @@
-import type { FC } from 'react';
+import type { FunctionComponent } from 'react';
 
-export const NotFoundPage: FC = () => {
+export const NotFoundPage: FunctionComponent = () => {
     return <div>NotFoundPage</div>;
 };
 

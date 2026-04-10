@@ -128,6 +128,15 @@
     --ring: 224.3 76.3% 48%;
 }
 
+/*
+ * FOUC prevention: hide content until i18next finishes loading translations.
+ * Class is set in index.html and removed by src/lib/i18n/index.ts after init.
+ * Prevents flash of untranslated keys on first paint.
+ */
+html.i18n-loading {
+    visibility: hidden;
+}
+
 @layer base {
     body {
         @apply bg-background text-foreground min-h-screen antialiased;

@@ -1,6 +1,6 @@
-import type { FC } from 'react';
+import type { FunctionComponent } from 'react';
 
-export const Footer: FC = () => {
+export const Footer: FunctionComponent = () => {
     return (
         <footer className="border-t bg-card py-4 text-center text-sm text-muted-foreground">
             Footer

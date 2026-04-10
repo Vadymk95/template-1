@@ -7,7 +7,6 @@
         "module": "ESNext",
         "types": ["vite/client"],
         "skipLibCheck": true,
-        "baseUrl": "./",
         "paths": {
             "@/*": ["./src/*"]
         },
@@ -18,6 +17,7 @@
         "verbatimModuleSyntax": true,
         "moduleDetection": "force",
         "noEmit": true,
+        "resolveJsonModule": true,
         "jsx": "react-jsx",
 
         /* Linting */

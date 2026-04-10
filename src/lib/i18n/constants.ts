@@ -4,7 +4,7 @@ export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 export const DEFAULT_LANGUAGE: SupportedLanguage = 'en';
 
-export const DEFAULT_NAMESPACES = ['common', 'errors', 'home'] as const;
+export const DEFAULT_NAMESPACES = ['common', 'errors', 'home', 'auth'] as const;
 
 const LAZY_NAMESPACES = [] as const;
 

@@ -1,3 +1,7 @@
+// Side-effect import — applies i18next TypeScript type augmentation globally.
+// Must be imported before any t() call. See resources.ts for details.
+import './resources';
+
 import i18next from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import HttpBackend from 'i18next-http-backend';
@@ -36,7 +40,7 @@ const i18nInitPromise = i18next
         fallbackLng: DEFAULT_LANGUAGE,
         defaultNS: DEFAULT_NAMESPACE,
         ns: DEFAULT_NAMESPACES,
-        initImmediate: false,
+        // initImmediate removed in i18next v26 — init is always promise-based now
         detection: {
             order: ['localStorage', 'navigator'],
             lookupLocalStorage: I18N_STORAGE_KEY,
@@ -49,7 +53,8 @@ const i18nInitPromise = i18next
                       const timestamp = Date.now();
                       return namespaces
                           .map(
-                              (ns: string) => `/${LOCALES_DIR}/${lngs[0]}/${ns}.json?v=${timestamp}`
+                              (ns: string) =>
+                                  `/${LOCALES_DIR}/${lngs[0]}/${ns}.json?v=${String(timestamp)}`
                           )
                           .join(',');
                   }

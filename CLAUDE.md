@@ -8,7 +8,7 @@ Danger zones: `.cursor/brain/SKELETONS.md`
 
 ## Stack
 
-React 19 · TypeScript 5.9 strict · Vite 8 (Rolldown) · Tailwind **v4** · shadcn/ui · Zustand 5 · TanStack Query 5 · React Router 7 · i18next · Vitest 4.1
+React 19 · TypeScript 6.0 strict · Vite 8 (Rolldown) · Tailwind **v4** · shadcn/ui · Zustand 5 · TanStack Query 5 · React Router 7 · i18next · Vitest 4.1
 
 ## Critical Rules
 

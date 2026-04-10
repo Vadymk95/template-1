@@ -6,6 +6,7 @@ import { RouterProvider } from 'react-router-dom';
 
 import i18n, { i18nInitPromise } from '@/lib/i18n';
 import { queryClient } from '@/lib/queryClient';
+import { reportWebVitals } from '@/lib/vitals';
 import { router } from '@/router';
 import './index.css';
 
@@ -20,12 +21,10 @@ const RootProviders = () => {
 
     useEffect(() => {
         if (!isI18nReady) {
-            i18nInitPromise.then(() => {
+            // i18n-loading CSS class is removed inside i18n/index.ts init chain.
+            // lang attribute is also set there. Only state update needed here.
+            void i18nInitPromise.then(() => {
                 setIsI18nReady(true);
-                if (typeof document !== 'undefined') {
-                    document.documentElement.lang = i18n.language;
-                    document.documentElement.classList.remove('i18n-loading');
-                }
             });
         }
     }, [isI18nReady]);
@@ -48,3 +47,6 @@ createRoot(rootElement).render(
         <RootProviders />
     </StrictMode>
 );
+
+// Load lazily — runs after paint, no startup impact
+reportWebVitals();

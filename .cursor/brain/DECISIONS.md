@@ -20,19 +20,27 @@
 
 ---
 
-## [2026-03] ESLint 9 (not 10) — intentional hold
+## [2026-04] ESLint 9 (not 10) — intentional hold
 
 **Decision**: Holding on ESLint **9.x**. Not upgrading to ESLint **10** yet.
 
-**Why**: `typescript-eslint` **8.57.2** already lists `eslint@^10` as a peer, but **`eslint-plugin-react-hooks`** (v5 and v7) still only declares peer support through **ESLint 9** — upgrading ESLint would yield peer-dep conflicts or forced `legacy-peer-deps`. Revisit when `eslint-plugin-react-hooks` declares ESLint 10 support (or team drops/ replaces that rule pack).
+**Why**: `eslint-plugin-react` **7.x** uses `context.getFilename()` which was **removed in ESLint 10**. Runtime crash, not a peer-dep warning. No v8 of the plugin exists. Revisit when `eslint-plugin-react` releases ESLint 10 support.
 
 ---
 
-## [2026-03] TypeScript 5.9 (not 6) — intentional hold
+## [2026-04] TypeScript 6 — upgraded
 
-**Decision**: Stay on **TypeScript 5.9.x** (`~5.9.3`).
+**Decision**: Running **TypeScript 6.0.x** (`~6.0.2`).
 
-**Why**: `typescript-eslint` **8.57.2** peer range is `typescript: '>=4.8.4 <6.0.0'`. Moving to TS 6 requires a **typescript-eslint** major that supports it; avoid until that ships.
+**Why**: `typescript-eslint` 8.58.1 supports TypeScript 6. One breaking change affected our config: `baseUrl` is deprecated in TS6. Fixed by removing `"baseUrl"` from both `tsconfig.json` and `tsconfig.app.json` — `paths` works without it in TS6.
+
+---
+
+## [2026-04] Component pattern: arrow function + FunctionComponent
+
+**Decision**: All React components use `const X: FunctionComponent<Props> = () => {}`. No `FC`, no function declarations for components.
+
+**Why**: `FC` is an alias (`type FC<P> = FunctionComponent<P>`) — writing `FunctionComponent` makes the type relationship explicit. Arrow functions are consistent with hooks/utilities style. ESLint enforces both: `no-restricted-imports` bans `FC`, `func-style: expression` bans function declarations (exception: `src/components/ui/` which is shadcn-generated).
 
 ---
 

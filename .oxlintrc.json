@@ -1,0 +1,35 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": ["react", "typescript"],
+    "env": {
+        "browser": true,
+        "es2022": true
+    },
+    "rules": {
+        "no-debugger": "error",
+        "no-console": "warn",
+        "eqeqeq": "error",
+        "no-var": "error",
+        "prefer-const": "error",
+        "no-unused-vars": "error",
+
+        "react/jsx-no-target-blank": "error",
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "warn",
+        "react/jsx-key": "error",
+        "react/no-danger": "error",
+        "react/no-direct-mutation-state": "error",
+        "react/no-unknown-property": "error",
+        "react/no-string-refs": "error"
+    },
+    "overrides": [
+        {
+            "files": ["**/*.test.{ts,tsx}", "src/test/**/*.{ts,tsx}"],
+            "rules": {
+                "no-console": "off",
+                "no-unused-vars": "off"
+            }
+        }
+    ],
+    "ignorePatterns": ["dist/**", "node_modules/**", "public/mockServiceWorker.js", "**/*.d.ts"]
+}

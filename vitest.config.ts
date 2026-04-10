@@ -18,9 +18,27 @@ export default mergeConfig(
             setupFiles: ['./src/test/setup.ts'],
             coverage: {
                 provider: 'v8',
-                reporter: ['text', 'json'],
-                exclude: ['node_modules/', 'src/test/'],
-                reportsDirectory: './coverage'
+                // text: terminal summary, json-summary: CI badge/diff, lcov: Codecov/Coveralls, html: local drill-down
+                reporter: ['text', 'json-summary', 'lcov', 'html'],
+                // Explicit include ensures ALL src files appear in the report —
+                // not just those imported by tests. Prevents inflated coverage %.
+                include: ['src/**'],
+                exclude: [
+                    'src/test/**',
+                    'src/env.ts',
+                    'src/components/ui/**',
+                    '**/*.d.ts',
+                    '**/*.config.{ts,js}'
+                ],
+                reportsDirectory: './coverage',
+                // Raise thresholds incrementally — each new feature should add tests.
+                // CI fails if coverage drops below these numbers.
+                thresholds: {
+                    statements: 45,
+                    lines: 45,
+                    functions: 40,
+                    branches: 40
+                }
             },
             include: ['src/**/*.{test,spec}.{ts,tsx}', 'vite-plugins/**/*.{test,spec}.{ts,tsx}']
         }

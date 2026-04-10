@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { afterAll, afterEach, beforeAll } from 'vitest';
+
+import { server } from './server';
 
 // Mock import.meta for tests
 if (typeof (globalThis as { import?: unknown }).import === 'undefined') {
@@ -16,6 +18,14 @@ if (typeof (globalThis as { import?: unknown }).import === 'undefined') {
     });
 }
 
+// MSW server lifecycle — runs once per test suite
+beforeAll(() => {
+    server.listen({ onUnhandledRequest: 'warn' });
+});
 afterEach(() => {
+    server.resetHandlers(); // undo per-test overrides
     cleanup();
+});
+afterAll(() => {
+    server.close();
 });

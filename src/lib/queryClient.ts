@@ -13,7 +13,7 @@ const DEFAULTS = {
 // Do not retry client errors (4xx) — they will not resolve on retry
 const shouldRetry = (failureCount: number, error: unknown): boolean => {
     const apiError = error as ApiError;
-    if (apiError?.status && apiError.status < 500) return false;
+    if (typeof apiError.status === 'number' && apiError.status < 500) return false;
     return failureCount < 2;
 };
 

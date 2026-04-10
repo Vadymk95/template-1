@@ -9,26 +9,28 @@ priority: 87
 
 ## 1. Components
 
-- **Function declarations + PascalCase** for components (not arrow functions).
+- **Arrow functions + `FunctionComponent` type** — no `FC` (alias), no function declarations.
 - **Type**: `interface Props { ... }` — always explicit. No inline anonymous types for props.
 - **Ref**: In React 19, refs are passed as **regular props** — `forwardRef` is deprecated and removed.
 - **Named exports only**: Default exports only for lazy-loaded pages (React Router lazy).
 
 ```typescript
-// React 19 — no forwardRef needed
+import type { FunctionComponent } from 'react';
+
+// React 19 — no forwardRef needed, ref as regular prop
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label?: string;
     ref?: React.Ref<HTMLInputElement>;
 }
 
-export function Input({ label, ref, ...props }: InputProps) {
+export const Input: FunctionComponent<InputProps> = ({ label, ref, ...props }) => {
     return (
         <label>
             {label && <span>{label}</span>}
             <input ref={ref} {...props} />
         </label>
     );
-}
+};
 ```
 
 ## 2. Component Architecture: Logic Separation
@@ -66,11 +68,11 @@ const handleClick = () => doSomethingWith(data);
 
 ```
 // Entry page (no lazy) — direct named export
-export function HomePage() { ... }
+export const HomePage: FunctionComponent = () => { ... };
 
 // All other pages (lazy-loaded)
 // PageName.tsx — component
-export function NotFoundPage() { ... }
+export const NotFoundPage: FunctionComponent = () => { ... };
 
 // index.ts — lazy wrapper
 import { lazy } from 'react';
@@ -97,6 +99,8 @@ export const NotFoundPage = lazy(() => import('./NotFoundPage'));
 ## 7. Anti-Patterns (FORBIDDEN)
 
 - ❌ `React.forwardRef` — deprecated in React 19. Pass `ref` as a regular prop.
+- ❌ `FC` from react — use `FunctionComponent` explicitly (ESLint enforced).
+- ❌ Function declarations for components — use `const X: FunctionComponent<Props> = () => {}`.
 - ❌ Arrow function components with default exports (confuses lazy imports).
 - ❌ Logic > 10 lines directly in JSX — extract to hook.
 - ❌ `import React from 'react'` — not needed in React 19 with JSX transform.

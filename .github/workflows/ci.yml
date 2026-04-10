@@ -6,6 +6,12 @@ on:
     push:
         branches: [master]
 
+# Cancel in-progress runs on the same branch when a new commit is pushed.
+# Master pushes are never cancelled (allow full pipeline to finish).
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
     validate:
         runs-on: ubuntu-latest
@@ -29,14 +35,33 @@ jobs:
             - name: Audit dependencies
               run: npm audit --audit-level=moderate
 
-            - name: Run Linter
+            # Type check first — fast feedback before slow linting
+            - name: Type check
+              run: npm run typecheck
+
+            # oxlint: Rust-based linter (~100x faster than ESLint)
+            # Catches basic errors instantly; ESLint handles TS-specific rules after
+            - name: Lint (oxlint)
+              run: npm run lint:oxlint
+
+            - name: Lint (ESLint)
               run: npm run lint
 
             - name: Check Formatting
               run: npm run format:check
 
-            - name: Run Tests
-              run: npm run test
+            # Coverage run enforces thresholds defined in vitest.config.ts.
+            # Plain `test` skips thresholds — always use `test:coverage` in CI.
+            - name: Run Tests with Coverage
+              run: npm run test:coverage
+
+            - name: Upload coverage report
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: coverage-report
+                  path: coverage/
+                  retention-days: 14
 
             - name: Production build
               run: npm run build

@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui';
+import { logger } from '@/lib/logger';
 
 interface ErrorBoundaryProps {
     children: ReactNode;
@@ -22,13 +23,12 @@ class ErrorBoundaryComponent extends Component<ErrorBoundaryProps, ErrorBoundary
     }
 
     componentDidCatch(error: Error, info: ErrorInfo) {
-        console.error('ErrorBoundary caught an error:', error, info);
-
-        // Error monitoring service integration (Sentry, LogRocket, etc.)
-        // Example integration:
-        // if (import.meta.env.PROD) {
-        //   Sentry.captureException(error, { contexts: { react: { componentStack: info.componentStack } } });
-        // }
+        logger.error('React ErrorBoundary caught an error', {
+            message: error.message,
+            stack: error.stack,
+            componentStack: info.componentStack ?? undefined
+        });
+        // To add Sentry: Sentry.captureException(error, { contexts: { react: { componentStack: info.componentStack } } });
     }
 
     handleReset = () => {

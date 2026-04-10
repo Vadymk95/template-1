@@ -9,47 +9,62 @@
  * Replace this file or extend it based on your backend needs.
  */
 
-// Backend API URL (configure via .env file or use default)
-// Note: Frontend runs on port 3000, backend typically runs on different port (e.g., 3001, 8000, etc.)
-// Examples: 'http://localhost:3001/api' (local backend), 'https://api.yourapp.com' (production)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { env } from '@/env';
+import { getAuthToken } from '@/store/user/userStore';
 
-export interface ApiError {
-    message: string;
-    status: number;
+// Backend API URL — configure VITE_API_URL in .env (validated by src/env.ts via t3-env + zod)
+const API_BASE_URL = env.VITE_API_URL ?? 'http://localhost:3001/api';
+
+// Proper Error subclass so instanceof checks and only-throw-error rule work correctly
+export class ApiError extends Error {
+    // Declared separately: parameter properties are forbidden with erasableSyntaxOnly
+    readonly status: number;
+
+    constructor(status: number, message: string) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+    }
 }
 
+const extractErrorMessage = (data: unknown): string | null => {
+    if (data === null || typeof data !== 'object') return null;
+    const obj = data as Record<string, unknown>;
+    if (typeof obj.message === 'string') return obj.message;
+    if (typeof obj.error === 'string') return obj.error;
+    if (obj.error !== null && typeof obj.error === 'object') {
+        const nested = obj.error as Record<string, unknown>;
+        if (typeof nested.message === 'string') return nested.message;
+    }
+    return null;
+};
+
 export const apiClient = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
+    const token = getAuthToken();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers: {
             'Content-Type': 'application/json',
-            // Add auth token if available
-            // Authorization: `Bearer ${token}`,
-            ...options?.headers
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            // Cast: HeadersInit can be string[][] but our callers pass Record<string, string>
+            ...(options?.headers as Record<string, string> | undefined)
         }
     });
 
     if (!response.ok) {
-        // Try to read detailed error message from JSON response
         let errorMessage = response.statusText || 'Unknown error';
 
         try {
-            const errorData = await response.json();
-            // Support common error response formats: { message }, { error }, { error: { message } }
+            const errorData: unknown = await response.json();
             errorMessage =
-                errorData?.message || errorData?.error?.message || errorData?.error || errorMessage;
+                (extractErrorMessage(errorData) ?? response.statusText) ||
+                `HTTP ${String(response.status)}`;
         } catch {
-            // If JSON parsing fails, fallback to statusText
-            errorMessage = response.statusText || `HTTP ${response.status}`;
+            errorMessage = response.statusText || `HTTP ${String(response.status)}`;
         }
 
-        const error: ApiError = {
-            message: errorMessage,
-            status: response.status
-        };
-        throw error;
+        throw new ApiError(response.status, errorMessage);
     }
 
-    return response.json();
+    return response.json() as Promise<T>;
 };

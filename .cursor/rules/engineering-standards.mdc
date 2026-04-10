@@ -18,9 +18,10 @@ priority: 88
 // Bad
 const STATUS: any = 'active';
 enum Direction { Up, Down }
+import type { FC } from 'react'; // FC is banned — use FunctionComponent
 
 // Good
-import type { FC } from 'react';
+import type { FunctionComponent } from 'react';
 const STATUS = { ACTIVE: 'active', INACTIVE: 'inactive' } as const;
 type Direction = 'up' | 'down';
 ```
@@ -28,16 +29,19 @@ type Direction = 'up' | 'down';
 ## 2. Coding Style & Naming
 
 - **Indentation**: 4 spaces strictly.
-- **Functions**: Arrow functions for logic/hooks. Named function declarations + PascalCase for React components.
+- **Functions**: Arrow functions everywhere — components, hooks, utilities.
+- **Components**: `const X: FunctionComponent<Props> = ({ ... }) => { ... }` — `FunctionComponent` always explicit, never `FC`.
 - **Exports**: Named exports for everything. Default exports only for React Router lazy pages.
 - **Comments**: English only. Single-line `//` only — no JSDoc `/** */`. Write only when logic isn't self-evident.
 - **File size cap**: New files must not exceed ~200 LOC. Extract to hook or `lib/` when approaching limit.
 
 ```typescript
-// Component — named function declaration
-export function UserCard({ name }: UserCardProps) { ... }
+import type { FunctionComponent } from 'react';
 
-// Hook / utility — arrow function
+// Component — arrow function + FunctionComponent type
+export const UserCard: FunctionComponent<UserCardProps> = ({ name }) => { ... };
+
+// Hook / utility — arrow function (no FunctionComponent type)
 export const useUserData = () => { ... };
 export const formatDate = (date: Date): string => { ... };
 ```

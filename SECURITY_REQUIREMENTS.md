@@ -8,13 +8,16 @@ This document contains **mandatory security configurations** that must be implem
 
 Configure these headers on your CDN or server:
 
-| Header                        | Purpose                               | Example Value                                          |
-| ----------------------------- | ------------------------------------- | ------------------------------------------------------ |
-| **Strict-Transport-Security** | Protection against MITM attacks       | `max-age=31536000; includeSubDomains; preload`         |
-| **X-Frame-Options**           | Protection against Clickjacking       | `SAMEORIGIN`                                           |
-| **X-Content-Type-Options**    | Protection against MIME-type sniffing | `nosniff`                                              |
-| **X-XSS-Protection**          | Enable XSS filter (legacy browsers)   | `1; mode=block`                                        |
-| **Content-Security-Policy**   | XSS and injection attack prevention   | See [CSP Nonce Injection](#-csp-nonce-injection) below |
+| Header                        | Purpose                             | Example Value                                          |
+| ----------------------------- | ----------------------------------- | ------------------------------------------------------ |
+| **Strict-Transport-Security** | Protection against MITM attacks     | `max-age=31536000; includeSubDomains; preload`         |
+| **X-Frame-Options**           | Clickjacking protection             | `DENY`                                                 |
+| **X-Content-Type-Options**    | MIME-type sniffing protection       | `nosniff`                                              |
+| **Referrer-Policy**           | Controls referrer info in requests  | `strict-origin-when-cross-origin`                      |
+| **Permissions-Policy**        | Restrict browser feature access     | `camera=(), microphone=(), geolocation=()`             |
+| **Content-Security-Policy**   | XSS and injection attack prevention | See [CSP Nonce Injection](#-csp-nonce-injection) below |
+
+> **Note on `X-XSS-Protection`:** This header is **deprecated** and should not be set. It was removed from modern browsers (Chrome 78+) and can introduce vulnerabilities in legacy browsers. CSP is the correct defense against XSS.
 
 ### Implementation Examples
 
@@ -22,9 +25,10 @@ Configure these headers on your CDN or server:
 
 ```nginx
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-add_header X-Frame-Options "SAMEORIGIN" always;
+add_header X-Frame-Options "DENY" always;
 add_header X-Content-Type-Options "nosniff" always;
-add_header X-XSS-Protection "1; mode=block" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
 ```
 
 **Vercel (`vercel.json`):**
@@ -41,11 +45,19 @@ add_header X-XSS-Protection "1; mode=block" always;
                 },
                 {
                     "key": "X-Frame-Options",
-                    "value": "SAMEORIGIN"
+                    "value": "DENY"
                 },
                 {
                     "key": "X-Content-Type-Options",
                     "value": "nosniff"
+                },
+                {
+                    "key": "Referrer-Policy",
+                    "value": "strict-origin-when-cross-origin"
+                },
+                {
+                    "key": "Permissions-Policy",
+                    "value": "camera=(), microphone=(), geolocation=()"
                 }
             ]
         }
@@ -60,9 +72,10 @@ add_header X-XSS-Protection "1; mode=block" always;
   for = "/*"
   [headers.values]
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    X-Frame-Options = "SAMEORIGIN"
+    X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
-    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 ```
 
 ## 🔐 CSP Nonce Injection
@@ -91,7 +104,7 @@ For static hosting, add nonce generation and HTML/header injection in your own b
 2. Inject the nonce into the served HTML or build artifact
 3. Set the same nonce in the CSP header on your CDN/server
 
-#### Option 2: Edge/Dynamic Hosting (Request-time Nonce) - Maximum Security
+#### Option 2: Edge/Dynamic Hosting (Request-time Nonce) — Maximum Security
 
 **For:** Vercel Edge Functions, Cloudflare Workers, AWS Lambda@Edge
 
@@ -126,6 +139,7 @@ For per-request nonce generation (unique nonce per user request), implement edge
 Before deploying to production, verify:
 
 - [ ] All required HTTP headers are configured on CDN/server
+- [ ] `X-XSS-Protection` is **NOT set** (deprecated, potentially harmful)
 - [ ] **CSP nonce injection:** Implement nonce generation in your hosting or build pipeline
 - [ ] **Verify nonce injection:** Check that the delivered HTML and CSP header use the same nonce value
 - [ ] **CDN configuration:** Configure your CDN/server to emit the matching CSP header
@@ -133,12 +147,14 @@ Before deploying to production, verify:
 - [ ] **Nonce matching:** Ensure nonce in CSP header matches nonce in script/style tags
 - [ ] HSTS header is configured with appropriate `max-age`
 - [ ] All external domains in CSP `connect-src` are whitelisted
+- [ ] `Permissions-Policy` restricts unused browser APIs
 - [ ] Security headers are tested (use [Security Headers Scanner](https://securityheaders.com/))
 
 ## 🔗 Resources
 
 - [MDN: Content Security Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP)
 - [OWASP: Security Headers](https://owasp.org/www-project-secure-headers/)
+- [MDN: X-XSS-Protection (deprecated)](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-XSS-Protection)
 - [Security Headers Scanner](https://securityheaders.com/)
 
 ---
