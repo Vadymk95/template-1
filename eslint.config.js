@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import queryPlugin from '@tanstack/eslint-plugin-query';
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import pluginImport from 'eslint-plugin-import-x';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import oxlintPlugin from 'eslint-plugin-oxlint';
@@ -49,21 +50,20 @@ export default defineConfig([
         },
         settings: {
             react: { version: 'detect' },
-            'import-x/resolver': {
-                typescript: {
+            // resolver-next is the new API for eslint-plugin-import-x.
+            // The legacy 'import-x/resolver' interface throws "node with invalid interface"
+            // at runtime. createTypeScriptImportResolver wraps eslint-import-resolver-typescript
+            // with the new contract that import-x expects.
+            'import-x/resolver-next': [
+                createTypeScriptImportResolver({
+                    alwaysTryTypes: true,
                     project: [
                         './tsconfig.app.json',
                         './tsconfig.node.json',
                         './tsconfig.vitest.json'
-                    ],
-                    alwaysTryTypes: true,
-                    noWarnOnMultipleProjects: true
-                },
-                node: {
-                    extensions: ['.js', '.jsx', '.ts', '.tsx']
-                }
-            },
-            'import-x/extensions': ['.js', '.jsx', '.ts', '.tsx']
+                    ]
+                })
+            ]
         },
         rules: {
             // ─── Import ordering ─────────────────────────────────────────────
