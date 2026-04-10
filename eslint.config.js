@@ -1,6 +1,6 @@
 import js from '@eslint/js';
 import queryPlugin from '@tanstack/eslint-plugin-query';
-import pluginImport from 'eslint-plugin-import';
+import pluginImport from 'eslint-plugin-import-x';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import oxlintPlugin from 'eslint-plugin-oxlint';
 import prettierRecommended from 'eslint-plugin-prettier/recommended';
@@ -49,7 +49,7 @@ export default defineConfig([
         },
         settings: {
             react: { version: 'detect' },
-            'import/resolver': {
+            'import-x/resolver': {
                 typescript: {
                     project: [
                         './tsconfig.app.json',
@@ -63,11 +63,11 @@ export default defineConfig([
                     extensions: ['.js', '.jsx', '.ts', '.tsx']
                 }
             },
-            'import/extensions': ['.js', '.jsx', '.ts', '.tsx']
+            'import-x/extensions': ['.js', '.jsx', '.ts', '.tsx']
         },
         rules: {
             // ─── Import ordering ─────────────────────────────────────────────
-            'import/order': [
+            'import-x/order': [
                 'error',
                 {
                     groups: ['builtin', 'external', 'internal', ['parent', 'sibling', 'index']],
