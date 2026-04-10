@@ -55,6 +55,8 @@ Skipping hooks (`--no-verify`) bypasses all checks — don't do it.
 
 `eslint.config.js` is the only ESLint config. Do not add a legacy `.eslintrc.*` — flat config owns all rules; a second config file risks confusion and stale docs.
 
+CI and lint-staged also run **Oxlint** (`.oxlintrc.json`) before ESLint — fast structural checks; ESLint remains authoritative for TypeScript- and React-specific rules.
+
 ## userStore — persist middleware
 
 `userStore` uses Zustand `persist` with `localStorage` key `"user-store"`.

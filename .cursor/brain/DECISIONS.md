@@ -28,6 +28,14 @@
 
 ---
 
+## [2026-04] eslint-import-resolver-typescript — single solution `tsconfig`
+
+**Decision**: `createTypeScriptImportResolver` uses **`./tsconfig.json`** only (solution file with `references`), not an array of `tsconfig.*.json`.
+
+**Why**: The resolver warns when multiple `project` entries are passed; its README recommends one config with project references. With a single file it sets `references: 'auto'` and follows `tsconfig.app` / `tsconfig.node` / `tsconfig.vitest` like `tsc -b`.
+
+---
+
 ## [2026-04] TypeScript 6 — upgraded
 
 **Decision**: Running **TypeScript 6.0.x** (`~6.0.2`).
@@ -70,9 +78,9 @@
 
 ## [2026-03] CI: production build + audit + Dependabot
 
-**Decision**: GitHub Actions runs `npm ci` → `npm audit --audit-level=moderate` → lint → format → test → **`npm run build`**. Workflow triggers on PR and push to `master`. Dependabot opens weekly npm update PRs (capped at 8 open).
+**Decision**: GitHub Actions runs `npm ci` → audit → `typecheck` → `lint:oxlint` → `lint` (ESLint) → `format:check` → `test:coverage` → **`npm run build`**. Triggers on PR and push to `master`. Dependabot opens weekly npm update PRs (capped at 8 open).
 
-**Why**: Without a production build step, broken Vite/Rollup/`tsc -b` paths could pass CI. Audit at moderate+ fails the pipeline on registry-reported issues. Dependabot reduces manual drift for security patches. These add **CI minutes only**, not local dev overhead.
+**Why**: Typecheck and dual lint stages catch errors early; coverage in CI enforces thresholds from Vitest config. Production build still gates bundler regressions. Audit at moderate+ fails on registry-reported issues. Dependabot reduces manual drift for security patches.
 
 **Trade-offs**: `audit-level=moderate` may fail on moderate+ advisories that have no fix yet — then pin, ignore with documented exception, or wait for upstream (team choice).
 

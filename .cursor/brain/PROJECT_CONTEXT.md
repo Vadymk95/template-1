@@ -9,7 +9,7 @@ Production-ready React SPA template. Copy, rename, start building. Includes all 
 | Layer        | Choice                            | Version                   |
 | ------------ | --------------------------------- | ------------------------- |
 | UI           | React                             | 19                        |
-| Language     | TypeScript                        | 5.9 strict                |
+| Language     | TypeScript                        | 6.0 strict                |
 | Bundler      | Vite + Rolldown (official `vite`) | 8                         |
 | Styling      | Tailwind CSS                      | **v4** (CSS-based config) |
 | Components   | shadcn/ui (new-york)              | latest                    |
@@ -17,9 +17,9 @@ Production-ready React SPA template. Copy, rename, start building. Includes all 
 | Server State | TanStack Query                    | 5                         |
 | Routing      | React Router                      | 7                         |
 | Forms        | react-hook-form + zod             | 7 / 4                     |
-| i18n         | i18next + react-i18next           | 25 / 16                   |
+| i18n         | i18next + react-i18next           | 26 / 17                   |
 | Testing      | Vitest + Testing Library          | 4                         |
-| Linting      | ESLint flat config                | 9                         |
+| Linting      | ESLint 9 flat + Oxlint (staged)   | 9 / 1.x                   |
 | Formatting   | Prettier                          | 3                         |
 | Git hooks    | Husky + commitlint + lint-staged  | 9 / 20                    |
 
@@ -30,30 +30,33 @@ src/
   components/
     common/      # App-level: ErrorBoundary etc.
     layout/      # Header, Footer, Main
-    ui/          # shadcn/ui components (Button, Input, ...)
-  hocs/          # WithSuspense
+    ui/          # shadcn/ui primitives
+  hocs/          # WithSuspense, ProtectedRoute (auth gate for nested routes)
   hooks/
     i18n/        # useI18nReload (dev HMR)
-    <domain>/    # Domain hooks with tests alongside
+    theme/       # useTheme (light / dark / system)
+    <domain>/    # Feature hooks with tests alongside
   lib/
-    api/         # Base fetch client + example
-    i18n/        # i18next setup, constants, types
+    api/         # client, auth helpers, example usage
+    i18n/        # i18next setup, constants, resources
     queryClient  # TanStack Query client factory
-    utils        # cn() helper (clsx + tailwind-merge)
+    env.ts       # @t3-oss/env-core validated public env
+    logger, vitals, utils  # observability + cn()
   pages/
-    HomePage/    # Entry page (no lazy)
-    NotFoundPage/ # Lazy loaded (PageName.tsx + index.ts)
-    DevPlayground/ # Dev sandbox (remove before prod)
+    HomePage/       # Index route (not lazy)
+    LoginPage/      # Auth UI (lazy)
+    DashboardPage/  # Behind ProtectedRoute (lazy)
+    NotFoundPage/   # Catch-all (lazy)
+    DevPlayground/  # DEV-only sandbox
   router/
     index.tsx    # createBrowserRouter assembly
-    modules/     # Route modules: base.routes.tsx
-    routes.ts    # Route name constants
+    modules/     # base.routes.tsx (+ future route modules)
+    routes.ts    # Path constants (e.g. DevPlayground → /dev/ui)
   store/
-    user/        # userStore.ts + userStore.test.ts
-    utils/       # createSelectors.ts
+    user/        # userStore + tests
+    utils/       # createSelectors
   test/
-    setup.ts     # Vitest setup
-    test-utils   # Custom render with providers
+    setup.ts, server.ts, handlers.ts, test-utils
 ```
 
 ## Key Patterns
@@ -99,9 +102,11 @@ export const useUserStore = createSelectors(useUserStoreBase);
 
 ## Dev Tooling
 
-- `npm run dev` — dev server on :3000
-- `npm run build` — tsc + vite build (OXC minifier)
-- `npm run build:analyze` — bundle visualizer (ANALYZE=true)
-- `npm run test` — vitest run
-- `npm run lint` — eslint flat config
-- `DISABLE_ESLINT_PLUGIN=true npm run dev` — skip eslint in dev
+- `npm run dev` — Vite dev server (`vite.config.ts` pins port 3000)
+- `npm run dev:nolint` — dev without ESLint plugin (same as `DISABLE_ESLINT_PLUGIN=true vite`)
+- `npm run build` — `tsc -b` then Vite production build (Rolldown)
+- `npm run build:analyze` — bundle visualizer (`ANALYZE=true`)
+- `npm run typecheck` — `tsc -b` only (also used in CI before lint)
+- `npm run test` — Vitest run
+- `npm run lint` — ESLint (flat config); `lint:oxlint` for standalone Oxlint
+- Staged commits: Oxlint fix → ESLint fix → Prettier (see `lint-staged` in package.json)

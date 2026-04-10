@@ -26,17 +26,12 @@
 
 ## Adding a shadcn Component
 
-```bash
-npx shadcn@latest add <component>
-# Components land in src/components/ui/
-```
-
-> components.json is configured for Tailwind v4 (config: "")
+Use the shadcn CLI; primitives land under `src/components/ui/`. `components.json` targets Tailwind v4 (no separate JS theme file).
 
 ## State Boundaries
 
 ```
-Zustand  →  global UI/auth state (userStore, settingsStore, ...)
+Zustand  →  global UI/auth state (e.g. userStore; add domain stores under `src/store/<domain>/`)
            userStore uses persist middleware → survives page refresh (localStorage key: "user-store")
            getAuthToken() exported for apiClient — avoids circular imports
 TanStack →  server data, caching, background refetch
@@ -46,11 +41,11 @@ Local    →  component-only state (useState)
 ## Routing
 
 ```
-/           → HomePage (no lazy, entry route)
-/login      → LoginPage (lazy + WithSuspense)
-/dashboard  → DashboardPage (lazy + WithSuspense, behind ProtectedRoute)
-/*          → NotFoundPage (lazy + WithSuspense)
-/dev        → DevPlayground (dev only, lazy + WithSuspense, remove in prod)
+/            → HomePage (index route, not lazy)
+/login       → LoginPage (lazy + WithSuspense)
+/dashboard   → DashboardPage (lazy + WithSuspense; parent layout ProtectedRoute → redirect to /login if unauthenticated)
+/*           → NotFoundPage (lazy + WithSuspense)
+/dev/ui      → DevPlayground (DEV only, lazy + WithSuspense; omitted in production build)
 ```
 
 ## i18n Flow
@@ -98,5 +93,5 @@ To update after MSW upgrade: `npx msw init public/`.
 
 | Artifact                   | Role                                                                 |
 | -------------------------- | -------------------------------------------------------------------- |
-| `.github/workflows/ci.yml` | PR + push `master`: audit (moderate+), lint, format, test, **build** |
+| `.github/workflows/ci.yml` | PR + push `master`: audit (moderate+) → typecheck → oxlint → ESLint → format → test:coverage → **build** |
 | `.github/dependabot.yml`   | Weekly npm version PRs (limit 8 open)                                |
