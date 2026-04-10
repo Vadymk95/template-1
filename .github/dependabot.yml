@@ -12,3 +12,10 @@ updates:
               dependency-type: production
           development-dependencies:
               dependency-type: development
+      # ESLint 10 ecosystem: most plugins (jsx-a11y, react, react-hooks) declare
+      # peer deps up to ^9 only. Ignore until plugin ecosystem catches up.
+      ignore:
+          - dependency-name: eslint
+            versions: ['>=10']
+          - dependency-name: '@eslint/js'
+            versions: ['>=10']
