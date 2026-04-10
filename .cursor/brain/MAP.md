@@ -81,6 +81,19 @@ Dark mode toggle: `src/hooks/theme/useTheme.ts`
 To change brand color: update `--primary` HSL values in `:root`.
 To add new color token: add to `:root`, then map in `@theme inline`.
 
+## Testing / MSW
+
+MSW runs in two modes — same handlers, different adapter:
+
+| Mode | Where | Adapter | When to use |
+|------|-------|---------|-------------|
+| **Node** | `src/test/server.ts` | `msw/node` | Unit + integration tests (Vitest). No browser needed. |
+| **Browser** | `public/mockServiceWorker.js` | `msw/browser` | Dev without a real backend, Storybook, Playwright in-browser. |
+
+`public/mockServiceWorker.js` is a generated Service Worker — do not edit it manually.
+To enable browser mode: call `setupWorker(...handlers)` in `src/main.tsx` under `import.meta.env.DEV`.
+To update after MSW upgrade: `npx msw init public/`.
+
 ## CI / Supply chain
 
 | Artifact                   | Role                                                                 |
