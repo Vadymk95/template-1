@@ -4,14 +4,14 @@
 
 | File                   | Role                                                |
 | ---------------------- | --------------------------------------------------- |
-| `index.html`           | HTML shell — i18n-loading class for FOUC prevention |
-| `src/main.tsx`         | Root: i18n init → QueryClient → Router providers    |
+| `index.html`           | HTML shell — `i18n-loading` FOUC guard + `#i18n-boot` decorative spinner until i18n ready |
+| `src/main.tsx`         | Root: i18n ready gate (or `I18nInitErrorFallback` on init failure) → `I18nextProvider` → QueryClient → Router; `reportWebVitals()` after mount |
 | `src/App.tsx`          | Layout shell: ErrorBoundary → Header/Main/Footer    |
 | `src/router/index.tsx` | Router assembly, merge route modules here           |
 
 ## Adding a New Page
 
-1. Create `src/pages/FooPage/FooPage.tsx` + `index.ts` (lazy export)
+1. Create page files: lazy routes use `FooPage.tsx` + `index.ts` with `lazy()`; the index route (`HomePage`) is eager and may use `index.tsx` as the page module (see `pages/HomePage/`)
 2. Add route to `src/router/modules/base.routes.tsx` (or new module)
 3. Wrap with `WithSuspense` in route element
 4. Add translations: `public/locales/en/foo.json`
@@ -52,10 +52,14 @@ Local    →  component-only state (useState)
 
 ```
 app start → i18next init → loads common + errors + <current page ns>
-→ RootProviders renders (isI18nReady gate)
+→ RootProviders: isI18nReady gate; init rejection → English-only error UI (no i18n)
 → document.lang set
 → HMR: useI18nReload watches public/locales/** in dev
 ```
+
+## Observability (Web Vitals)
+
+`src/lib/vitals.ts` schedules reporting after paint; dynamic imports pick `subscribeStandard` vs `subscribeAttribution` from `src/lib/webVitals/`. CI runs `scripts/check-web-vitals-chunks.mjs` on `dist/` after build to guard chunk split (see `DECISIONS.md`).
 
 ## CSS / Theming
 
@@ -93,5 +97,6 @@ To update after MSW upgrade: `npx msw init public/`.
 
 | Artifact                   | Role                                                                 |
 | -------------------------- | -------------------------------------------------------------------- |
-| `.github/workflows/ci.yml` | PR + push `master`: audit (moderate+) → typecheck → oxlint → ESLint → format → test:coverage → **build** |
+| `.github/workflows/ci.yml` | PR + push `master`: audit (moderate+) → typecheck → oxlint → ESLint → format → test:coverage → **build** → web-vitals chunk check |
+| `.cursor/brain/VERIFICATION.md` | **When to run which checks** (agents: avoid full pipeline for tiny edits); local mirror: `npm run ci:local` |
 | `.github/dependabot.yml`   | Weekly npm version PRs (limit 8 open)                                |

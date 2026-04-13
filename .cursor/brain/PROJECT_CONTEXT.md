@@ -28,7 +28,7 @@ Production-ready React SPA template. Copy, rename, start building. Includes all 
 ```
 src/
   components/
-    common/      # App-level: ErrorBoundary etc.
+    common/      # App-level: ErrorBoundary, I18nInitErrorFallback (i18n boot failure)
     layout/      # Header, Footer, Main
     ui/          # shadcn/ui primitives
   hocs/          # WithSuspense, ProtectedRoute (auth gate for nested routes)
@@ -39,11 +39,12 @@ src/
   lib/
     api/         # client, auth helpers, example usage
     i18n/        # i18next setup, constants, resources
-    queryClient  # TanStack Query client factory
+    webVitals/   # subscribeStandard / subscribeAttribution (loaded from vitals.ts)
+    queryClient.ts  # TanStack Query client factory
     env.ts       # @t3-oss/env-core validated public env
-    logger, vitals, utils  # observability + cn()
+    vitals.ts, logger, utils  # observability + cn()
   pages/
-    HomePage/       # Index route (not lazy)
+    HomePage/       # Index route (not lazy); page exported from index.tsx
     LoginPage/      # Auth UI (lazy)
     DashboardPage/  # Behind ProtectedRoute (lazy)
     NotFoundPage/   # Catch-all (lazy)
@@ -100,11 +101,24 @@ export const useUserStore = createSelectors(useUserStoreBase);
 - `home` — loaded with HomePage
 - Feature namespaces — lazy loaded on demand
 
+### Web Vitals
+
+- `src/lib/vitals.ts` — lazy reporting after hydration; optional `VITE_WEB_VITALS_ATTRIBUTION=true` loads `web-vitals/attribution` via `subscribeAttribution.ts` (flag also in `src/env.ts` for Zod/docs; **branch uses `import.meta.env`** so Vite drops the unused chunk). Load failures: `logger.warn` with context.
+- Custom backend: pass `reportWebVitals(yourReporter)`.
+- **Re-verify chunk split:** after `npm run build`, `node scripts/check-web-vitals-chunks.mjs` (CI runs this on `dist/`). Full regression (two builds: default + attribution): `npm run verify:web-vitals-chunks`.
+
+### Pre-i18n shell
+
+- `index.html` `#i18n-boot` + `src/index.css`: decorative spinner while `html.i18n-loading` (no translated strings — i18n not ready).
+
 ## Dev Tooling
 
+- **Which checks to run** — see `.cursor/brain/VERIFICATION.md` (point-in-time vs full `ci:local`; avoids running audit/build/vitals for every small change).
+- `npm run ci:local` — mirrors `.github/workflows/ci.yml` locally (audit → typecheck → oxlint → eslint → format → test:coverage → build → web-vitals chunk check).
 - `npm run dev` — Vite dev server (`vite.config.ts` pins port 3000)
 - `npm run dev:nolint` — dev without ESLint plugin (same as `DISABLE_ESLINT_PLUGIN=true vite`)
 - `npm run build` — `tsc -b` then Vite production build (Rolldown)
+- `npm run verify:web-vitals-chunks` — asserts standard vs attribution web-vitals chunks (two production builds; use after changing `src/lib/vitals.ts` or env wiring)
 - `npm run build:analyze` — bundle visualizer (`ANALYZE=true`)
 - `npm run typecheck` — `tsc -b` only (also used in CI before lint)
 - `npm run test` — Vitest run

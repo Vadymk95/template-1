@@ -26,6 +26,8 @@ export default mergeConfig(
                 exclude: [
                     'src/test/**',
                     'src/env.ts',
+                    // Entry: i18n boot + providers — integration-tested manually; keeps thresholds honest vs untestable orchestration.
+                    'src/main.tsx',
                     'src/components/ui/**',
                     '**/*.d.ts',
                     '**/*.config.{ts,js}'

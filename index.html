@@ -14,6 +14,14 @@
         <!-- Inter Font is downloaded and bundled by vite-plugin-webfont-dl -->
     </head>
     <body>
+        <!-- Pre-i18n shell: visible while html.i18n-loading (see src/index.css). No copy here — i18n not ready yet. -->
+        <div
+            id="i18n-boot"
+            class="i18n-boot"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+        ></div>
         <div id="root" class="root-container"></div>
 
         <script type="module" src="/src/main.tsx"></script>

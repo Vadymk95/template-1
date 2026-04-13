@@ -5,6 +5,7 @@
 Always read `.cursor/brain/PROJECT_CONTEXT.md` before any task.
 Architecture map: `.cursor/brain/MAP.md`
 Danger zones: `.cursor/brain/SKELETONS.md`
+Verification (what to run per change): `.cursor/brain/VERIFICATION.md`
 
 ## Stack
 
@@ -27,11 +28,16 @@ Dark mode via `.dark` class. Animations via `tw-animate-css`.
 
 ## Post-Edit Commands
 
+Pick checks by task — **`.cursor/brain/VERIFICATION.md`**. Typical TS/React change:
+
 ```bash
-npm run lint
-npm run format:check
-npx tsc --noEmit
-npm run test
+npm run lint && npm run typecheck && npm run test
+```
+
+Full local CI (same as GitHub Actions):
+
+```bash
+npm run ci:local
 ```
 
 ## Commit Format

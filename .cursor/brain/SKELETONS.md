@@ -10,7 +10,7 @@
 
 ## i18n Init Race
 
-`main.tsx` has a `isI18nReady` gate — app renders `null` until i18next resolves.
+`main.tsx` has a `isI18nReady` gate — app renders `null` until i18next resolves. If `i18nInitPromise` rejects, `html.i18n-loading` is removed in the error path and `I18nInitErrorFallback` is shown (English-only copy — `t()` is unavailable).
 
 - Don't call `t()` outside the `I18nextProvider` subtree
 - Don't add async providers between `I18nextProvider` and `RouterProvider` without updating the gate

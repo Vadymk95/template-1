@@ -65,3 +65,6 @@ jobs:
 
             - name: Production build
               run: npm run build
+
+            - name: Verify Web Vitals chunk split (default build)
+              run: node scripts/check-web-vitals-chunks.mjs

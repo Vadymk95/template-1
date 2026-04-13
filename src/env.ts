@@ -7,7 +7,12 @@ import { z } from 'zod';
 export const env = createEnv({
     clientPrefix: 'VITE_',
     client: {
-        VITE_API_URL: z.url().optional()
+        VITE_API_URL: z.url().optional(),
+        // When true, loads web-vitals/attribution (LCP/INP/CLS debug targets). ~1–2 KB extra vs standard build.
+        VITE_WEB_VITALS_ATTRIBUTION: z
+            .string()
+            .optional()
+            .transform((val) => val === 'true')
     },
     runtimeEnv: import.meta.env
 });

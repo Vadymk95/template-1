@@ -1,5 +1,29 @@
 # Architectural Decisions
 
+## [2026-04] Verification guide (`VERIFICATION.md`) + `ci:local`
+
+**Decision**: `.cursor/brain/VERIFICATION.md` defines minimal checks per task type; `npm run ci:local` mirrors CI. Agents should read it and avoid running audit/build/vitals-analyze for every trivial edit.
+
+**Why**: Reduces noise, latency, and false “full audit” habits while keeping a single command for pre-push confidence.
+
+---
+
+## [2026-04] i18n init failure — English-only fallback
+
+**Decision**: If `i18nInitPromise` rejects, `main.tsx` removes `html.i18n-loading`, logs via `logger.error('[i18n] …')`, and renders `I18nInitErrorFallback` (fixed English; `t()` is not available).
+
+**Why**: Previously the app could stay on an empty tree forever when locale JSON failed to load. User-facing copy cannot use i18n in this branch.
+
+---
+
+## [2026-04] Web Vitals chunk split — automated check
+
+**Decision**: `scripts/check-web-vitals-chunks.mjs` asserts `dist/assets` after build: default bundle must contain only `subscribeStandard` + standard `web-vitals` chunk; optional `npm run verify:web-vitals-chunks` runs two builds and asserts the attribution variant too.
+
+**Why**: Branching on `env` from `@/env` pulled both dynamic imports into the graph; `import.meta.env.VITE_WEB_VITALS_ATTRIBUTION` is required for dead-code elimination. The script catches regressions without manual bundle inspection.
+
+---
+
 ## [2026-03] Tailwind v4 migration
 
 **Decision**: Migrated from Tailwind v3 (config in `tailwind.config.ts`) to Tailwind v4 (config in `src/index.css`).
@@ -78,9 +102,9 @@
 
 ## [2026-03] CI: production build + audit + Dependabot
 
-**Decision**: GitHub Actions runs `npm ci` → audit → `typecheck` → `lint:oxlint` → `lint` (ESLint) → `format:check` → `test:coverage` → **`npm run build`**. Triggers on PR and push to `master`. Dependabot opens weekly npm update PRs (capped at 8 open).
+**Decision**: GitHub Actions runs `npm ci` → audit → `typecheck` → `lint:oxlint` → `lint` (ESLint) → `format:check` → `test:coverage` → **`npm run build`** → **Web Vitals chunk verification** (`node scripts/check-web-vitals-chunks.mjs` on `dist/`). Triggers on PR and push to `master`. Dependabot opens weekly npm update PRs (capped at 8 open).
 
-**Why**: Typecheck and dual lint stages catch errors early; coverage in CI enforces thresholds from Vitest config. Production build still gates bundler regressions. Audit at moderate+ fails on registry-reported issues. Dependabot reduces manual drift for security patches.
+**Why**: Typecheck and dual lint stages catch errors early; coverage in CI enforces thresholds from Vitest config. Production build gates bundler regressions; post-build chunk check catches accidental web-vitals graph coupling. Audit at moderate+ fails on registry-reported issues. Dependabot reduces manual drift for security patches.
 
 **Trade-offs**: `audit-level=moderate` may fail on moderate+ advisories that have no fix yet — then pin, ignore with documented exception, or wait for upstream (team choice).
 

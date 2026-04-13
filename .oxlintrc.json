@@ -29,6 +29,12 @@
                 "no-console": "off",
                 "no-unused-vars": "off"
             }
+        },
+        {
+            "files": ["scripts/**/*.mjs"],
+            "rules": {
+                "no-console": "off"
+            }
         }
     ],
     "ignorePatterns": ["dist/**", "node_modules/**", "public/mockServiceWorker.js", "**/*.d.ts"]

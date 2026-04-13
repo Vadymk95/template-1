@@ -1,7 +1,7 @@
 {
     "name": "react-enterprise-foundation",
     "private": true,
-    "version": "2.0.0",
+    "version": "3.0.0",
     "type": "module",
     "engines": {
         "node": ">=24.0.0",
@@ -12,6 +12,7 @@
         "dev:nolint": "DISABLE_ESLINT_PLUGIN=true vite",
         "build": "tsc -b && vite build",
         "build:analyze": "ANALYZE=true npm run build",
+        "verify:web-vitals-chunks": "node scripts/check-web-vitals-chunks.mjs --full",
         "typecheck": "tsc -b",
         "lint": "eslint .",
         "lint:oxlint": "oxlint --config .oxlintrc.json .",
@@ -21,6 +22,7 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
+        "ci:local": "npm audit --audit-level=moderate && npm run typecheck && npm run lint:oxlint && npm run lint && npm run format:check && npm run test:coverage && npm run build && node scripts/check-web-vitals-chunks.mjs",
         "preview": "vite preview",
         "prepare": "husky"
     },

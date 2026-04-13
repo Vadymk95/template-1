@@ -4,7 +4,9 @@ import { createRoot } from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
 import { RouterProvider } from 'react-router-dom';
 
+import { I18nInitErrorFallback } from '@/components/common/I18nInitErrorFallback';
 import i18n, { i18nInitPromise } from '@/lib/i18n';
+import { logger } from '@/lib/logger';
 import { queryClient } from '@/lib/queryClient';
 import { reportWebVitals } from '@/lib/vitals';
 import { router } from '@/router';
@@ -18,16 +20,36 @@ if (!rootElement) {
 // eslint-disable-next-line react-refresh/only-export-components
 const RootProviders = () => {
     const [isI18nReady, setIsI18nReady] = useState(i18n.isInitialized);
+    const [i18nInitError, setI18nInitError] = useState<Error | null>(null);
 
     useEffect(() => {
-        if (!isI18nReady) {
-            // i18n-loading CSS class is removed inside i18n/index.ts init chain.
-            // lang attribute is also set there. Only state update needed here.
-            void i18nInitPromise.then(() => {
-                setIsI18nReady(true);
+        let cancelled = false;
+
+        void i18nInitPromise
+            .then(() => {
+                if (!cancelled) {
+                    setIsI18nReady(true);
+                }
+            })
+            .catch((error: unknown) => {
+                if (cancelled) {
+                    return;
+                }
+                document.documentElement.classList.remove('i18n-loading');
+                logger.error('[i18n] Failed to initialize i18next', {
+                    reason: error instanceof Error ? error.message : String(error)
+                });
+                setI18nInitError(error instanceof Error ? error : new Error(String(error)));
             });
-        }
-    }, [isI18nReady]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    if (i18nInitError) {
+        return <I18nInitErrorFallback />;
+    }
 
     if (!isI18nReady) {
         return null;

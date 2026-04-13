@@ -132,9 +132,42 @@
  * FOUC prevention: hide content until i18next finishes loading translations.
  * Class is set in index.html and removed by src/lib/i18n/index.ts after init.
  * Prevents flash of untranslated keys on first paint.
+ *
+ * Descendants may set visibility: visible — used for #i18n-boot (spinner) only.
  */
 html.i18n-loading {
     visibility: hidden;
+}
+
+/* Pre-i18n boot: no translated strings (i18n not loaded). Decorative + status role for AT. */
+html.i18n-loading .i18n-boot {
+    visibility: visible;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    background-color: hsl(var(--background));
+}
+
+html:not(.i18n-loading) .i18n-boot {
+    display: none;
+}
+
+.i18n-boot::after {
+    content: '';
+    width: 2rem;
+    height: 2rem;
+    border: 2px solid hsl(var(--muted));
+    border-top-color: hsl(var(--primary));
+    border-radius: 9999px;
+    animation: i18n-boot-spin 0.7s linear infinite;
+}
+
+@keyframes i18n-boot-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @layer base {
