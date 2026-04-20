@@ -9,7 +9,7 @@ const HOME_NAMESPACE = 'home';
 
 export const HomePage: FunctionComponent = () => {
     const { t } = useTranslation([DEFAULT_NAMESPACE, HOME_NAMESPACE]);
-    const { data, isLoading } = useHomePage();
+    const { data, isLoading, isError } = useHomePage();
 
     return (
         <div className="flex flex-col items-center gap-6">
@@ -21,6 +21,10 @@ export const HomePage: FunctionComponent = () => {
             {isLoading ? (
                 <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
                     {t('common:loading')}
+                </p>
+            ) : isError ? (
+                <p className="text-sm text-destructive" role="alert">
+                    {t('home:greeting.error')}
                 </p>
             ) : (
                 <p className="text-sm text-muted-foreground" role="status" aria-live="polite">

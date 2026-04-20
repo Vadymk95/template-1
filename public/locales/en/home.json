@@ -2,6 +2,9 @@
     "title": "Welcome",
     "description": "This is your enterprise-grade React template",
     "subtitle": "Get started by editing the pages in src/pages/",
+    "greeting": {
+        "error": "Could not load greeting"
+    },
     "features": {
         "title": "Features",
         "react": "React 19 with automatic JSX",
