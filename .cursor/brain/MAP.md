@@ -22,7 +22,8 @@
 1. New store → `src/store/<domain>/store.ts` + `store.test.ts`
 2. Hooks → `src/hooks/<domain>/useHook.ts` + `useHook.test.ts`
 3. Components → `src/components/<domain>/Component/` (tsx + hook + test)
-4. API → `src/lib/api/<domain>.ts` (TanStack Query hooks inside feature or hooks folder)
+4. Server state → `src/lib/api/<domain>.queries.ts`: export a **key factory** + `queryOptions()` factories; `useQuery(detailOptions(id))` in UI, or a thin hook only when wrapping adds value (template: `src/lib/api/_example.queries.ts`)
+5. API transport / client calls → `src/lib/api/<domain>.ts`
 
 ## Adding a shadcn Component
 

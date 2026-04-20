@@ -37,7 +37,7 @@ src/
     theme/       # useTheme (light / dark / system)
     <domain>/    # Feature hooks with tests alongside
   lib/
-    api/         # client, auth helpers, example usage
+    api/         # client, auth helpers; `_example.queries.ts` = query key + queryOptions() reference (not wired)
     i18n/        # i18next setup, constants, resources
     webVitals/   # subscribeStandard / subscribeAttribution (loaded from vitals.ts)
     queryClient.ts  # TanStack Query client factory
@@ -61,6 +61,10 @@ src/
 ```
 
 ## Key Patterns
+
+### TanStack Query — `queryOptions()` + key factories
+
+New features add a `queries.ts` (or `*.queries.ts`) next to the feature under `src/lib/api/`. It exports a stable **key factory** (`exampleKeys`) and **per-query** `queryOptions()` objects (`exampleDetailOptions`). Components call `useQuery(exampleDetailOptions(id))` directly; add a thin custom hook only when it wraps real logic (not for every fetch). See `src/lib/api/_example.queries.ts`.
 
 ### Tailwind v4 (IMPORTANT — no tailwind.config.ts)
 
