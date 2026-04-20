@@ -40,6 +40,11 @@ interface ButtonProps
 export function Button({ className, variant, size, asChild = false, ref, ...props }: ButtonProps) {
     const Comp = asChild ? Slot : 'button';
     return (
-        <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+        <Comp
+            className={cn(buttonVariants({ variant, size, className }))}
+            data-slot="button"
+            ref={ref}
+            {...props}
+        />
     );
 }
