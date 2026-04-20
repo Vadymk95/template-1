@@ -38,10 +38,10 @@ export default mergeConfig(
                 // Raise thresholds incrementally — each new feature should add tests.
                 // CI fails if coverage drops below these numbers.
                 thresholds: {
-                    statements: 45,
-                    lines: 45,
-                    functions: 40,
-                    branches: 40
+                    statements: 57,
+                    lines: 57,
+                    functions: 48,
+                    branches: 48
                 }
             },
             include: ['src/**/*.{test,spec}.{ts,tsx}', 'vite-plugins/**/*.{test,spec}.{ts,tsx}']

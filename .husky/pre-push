@@ -8,4 +8,4 @@ echo "→ lint"
 npm run lint || { echo "❌ Lint failed. Fix errors before push."; exit 1; }
 
 echo "→ type-check"
-npx tsc -b --force --noEmit || { echo "❌ TypeScript type-check failed. Fix errors before push."; exit 1; }
+npx tsc -b --noEmit || { echo "❌ TypeScript type-check failed. Fix errors before push."; exit 1; }

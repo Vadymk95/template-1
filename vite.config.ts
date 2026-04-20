@@ -6,7 +6,6 @@ import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, type Plugin, type PluginOption } from 'vite';
 import compression from 'vite-plugin-compression';
-import eslint from 'vite-plugin-eslint2';
 import svgr from 'vite-plugin-svgr';
 import { webfontDownload } from 'vite-plugin-webfont-dl';
 
@@ -37,9 +36,6 @@ export default defineConfig(({ command }) => ({
         react({
             jsxRuntime: 'automatic'
         }),
-        // ESLint plugin: validates code in dev mode (can be disabled via DISABLE_ESLINT_PLUGIN env)
-        // Note: Still runs on pre-commit via husky, so errors will be caught
-        ...(process.env.DISABLE_ESLINT_PLUGIN !== 'true' ? [eslint()] : []),
         // SVGR: automatically handles SVG imports as React components
         // Only activates when .svg files are imported, so it's lightweight
         svgr(),

@@ -20,7 +20,7 @@ if (typeof (globalThis as { import?: unknown }).import === 'undefined') {
 
 // MSW server lifecycle — runs once per test suite
 beforeAll(() => {
-    server.listen({ onUnhandledRequest: 'warn' });
+    server.listen({ onUnhandledRequest: 'error' });
 });
 afterEach(() => {
     server.resetHandlers(); // undo per-test overrides

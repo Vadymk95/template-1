@@ -211,7 +211,7 @@ Key optimizations configured in `vite.config.ts`:
 
 **Pre-push**:
 
-- Runs `npx tsc -b --force --noEmit`
+- Runs `npm run format:check`, `npm run lint`, and `npx tsc -b --noEmit`
 - Does not run tests automatically
 
 ### CI (GitHub Actions)
@@ -459,6 +459,18 @@ After build, open `dist/bundle-analysis.html` to:
 - Output in `dist/` directory
 - Works with Vercel, Netlify, AWS S3, or any static host
 - Configure security headers on your CDN/server (see [Security & Production](#-security--production))
+
+**Brotli precompression:**
+
+The build emits `.br` siblings for every JS/CSS/HTML asset via `vite-plugin-compression`. Your hosting layer must be configured to serve them — otherwise browsers fall back to uncompressed bytes and the precompression is wasted work.
+
+Minimum contract: when the request has `Accept-Encoding: br` **and** `file.br` exists, serve it with `Content-Encoding: br` and the original file's `Content-Type`; otherwise serve the uncompressed file.
+
+- **nginx:** enable `brotli_static on;` (requires `ngx_brotli` module). CDNs like Cloudflare/Fastly handle the header dance automatically when you upload `.br` files.
+- **Vercel/Netlify:** brotli is applied at the edge — the emitted `.br` files are unused. Keep the plugin only if you push the same `dist/` to a second nginx/S3-backed host.
+- **AWS S3 + CloudFront:** upload `.br` with `Content-Encoding: br` metadata and a routing rule (Lambda@Edge or CloudFront Functions) to pick the encoded object when the client supports it.
+
+If your target does none of the above, remove `vite-plugin-compression` from `vite.config.ts` to save ~300ms of build time.
 
 ## 🔒 Security & Production
 

@@ -70,3 +70,18 @@ jobs:
 
             - name: Verify Web Vitals chunk split (default build)
               run: node scripts/check-web-vitals-chunks.mjs
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              id: playwright-cache
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+            - name: Install Playwright (Chromium only)
+              run: npx playwright install --with-deps chromium
+
+            - name: End-to-end tests (Playwright)
+              run: npm run test:e2e
+              env:
+                  CI: true

@@ -26,10 +26,24 @@ const parentRelativeImportPatternGroup = {
 };
 
 export default defineConfig([
-    globalIgnores(['dist', 'coverage', 'public/mockServiceWorker.js']),
+    globalIgnores([
+        'dist',
+        'coverage',
+        'public/mockServiceWorker.js',
+        'test-results/**',
+        'playwright-report/**',
+        'blob-report/**',
+        'playwright/.cache/**'
+    ]),
     // ─── oxlint — disable ESLint rules that oxlint already covers ────────────
-    // Must come BEFORE the main block so our custom rule overrides (e.g. no-console: error)
-    // take precedence. oxlint runs first (fast); ESLint handles TS-specific rules after.
+    // Contract: oxlint owns JS/ES basics (no-console, eqeqeq, prefer-const, no-unused-vars,
+    // core react/* rules) — it runs first in CI and in lint-staged and is ~100x faster.
+    // ESLint then owns TS-aware rules (typescript-eslint strict + stylistic), React refresh,
+    // import-x ordering/cycles, jsx-a11y, and prettier integration.
+    // `flat/all` disables every rule here that oxlint already enforces, eliminating the
+    // double-authority problem. Must come BEFORE the main block so our custom rule overrides
+    // (e.g. `no-console: 'error'` below) take precedence when we re-enable a shared rule
+    // with a stricter severity for ESLint-only run contexts.
     oxlintPlugin.configs['flat/all'],
     {
         files: ['**/*.{ts,tsx}'],
@@ -210,6 +224,27 @@ export default defineConfig([
             '@typescript-eslint/no-unsafe-call': 'off',
             '@typescript-eslint/no-unsafe-member-access': 'off',
             '@typescript-eslint/no-unsafe-assignment': 'off'
+        }
+    },
+    // Playwright — not part of app tsconfig project references; disable type-aware TS rules.
+    {
+        ...tseslint.configs.disableTypeChecked,
+        files: ['e2e/**/*.ts', 'playwright.config.ts'],
+        languageOptions: {
+            ...tseslint.configs.disableTypeChecked.languageOptions,
+            globals: { ...globals.node }
+        },
+        rules: {
+            ...tseslint.configs.disableTypeChecked.rules,
+            'import-x/no-cycle': 'off',
+            'import-x/order': 'off',
+            'func-style': 'off',
+            'prettier/prettier': [
+                'error',
+                {
+                    trailingComma: 'none'
+                }
+            ]
         }
     }
 ]);

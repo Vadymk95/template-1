@@ -9,7 +9,6 @@
     },
     "scripts": {
         "dev": "vite",
-        "dev:nolint": "DISABLE_ESLINT_PLUGIN=true vite",
         "build": "tsc -b && vite build",
         "build:analyze": "ANALYZE=true npm run build",
         "verify:web-vitals-chunks": "node scripts/check-web-vitals-chunks.mjs --full",
@@ -22,7 +21,9 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
-        "ci:local": "npm audit --audit-level=moderate && npm run typecheck && npm run lint:oxlint && npm run lint && npm run format:check && npm run test:coverage && npm run build && node scripts/check-web-vitals-chunks.mjs",
+        "test:e2e": "playwright test",
+        "test:e2e:ui": "playwright test --ui",
+        "ci:local": "npm audit --audit-level=moderate && npm run typecheck && npm run lint:oxlint && npm run lint && npm run format:check && npm run test:coverage && npm run build && node scripts/check-web-vitals-chunks.mjs && npx playwright install --with-deps chromium && PLAYWRIGHT_USE_PREVIEW=1 npm run test:e2e",
         "preview": "vite preview",
         "prepare": "husky"
     },
@@ -52,6 +53,7 @@
         "@commitlint/cli": "^20.5.0",
         "@commitlint/config-conventional": "^20.5.0",
         "@eslint/js": "^9.39.4",
+        "@playwright/test": "^1.59.1",
         "@tailwindcss/vite": "^4.2.2",
         "@tanstack/eslint-plugin-query": "^5.97.0",
         "@testing-library/jest-dom": "^6.9.1",
@@ -85,7 +87,6 @@
         "typescript-eslint": "^8.58.1",
         "vite": "^8.0.8",
         "vite-plugin-compression": "^0.5.1",
-        "vite-plugin-eslint2": "^5.1.0",
         "vite-plugin-svgr": "^5.2.0",
         "vite-plugin-webfont-dl": "^3.12.0",
         "vitest": "^4.1.4"

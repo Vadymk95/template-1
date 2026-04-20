@@ -11,13 +11,15 @@ interface UserState {
     logout: () => void;
 }
 
+// devtools ships Redux DevTools bridge code even with `enabled: false`.
+// Gate the whole middleware behind import.meta.env.DEV so the tree-shaker drops it in prod,
+// keeping the auth token out of the DevTools extension surface for end users.
+// The `as typeof devtools` cast preserves the enhanced `set(state, replace, action)` signature
+// used below; the extra action arg is silently ignored by the underlying setter in prod.
+const withDevtools = (import.meta.env.DEV ? devtools : <T>(fn: T): T => fn) as typeof devtools;
+
 const useUserStoreBase = create<UserState>()(
-    /**
-     * devtools wires the store to Redux DevTools.
-     * action.type follows user-store/<slice>/<action> to keep event history searchable.
-     * persist saves isLoggedIn + token to localStorage so the session survives page refresh.
-     */
-    devtools(
+    withDevtools(
         persist(
             (set) => ({
                 isLoggedIn: false,

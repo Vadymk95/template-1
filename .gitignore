@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 coverage
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
 *.local
 .eslintcache
 
