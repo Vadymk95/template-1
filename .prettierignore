@@ -1,9 +1,16 @@
 node_modules
 dist
+dist-ssr
 coverage
 .claude
 .cursor
+.husky/_
 public/mockServiceWorker.js
 test-results
 playwright-report
 blob-report
+package-lock.json
+*.tsbuildinfo
+.eslintcache
+*.log
+logs
