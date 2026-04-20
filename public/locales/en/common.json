@@ -1,5 +1,6 @@
 {
     "skipToMain": "Skip to main content",
+    "appName": "React Enterprise Foundation",
     "button": {
         "submit": "Submit",
         "cancel": "Cancel",
@@ -19,6 +20,27 @@
     "navigation": {
         "home": "Home",
         "about": "About",
-        "contact": "Contact"
+        "contact": "Contact",
+        "dashboard": "Dashboard"
+    },
+    "theme": {
+        "label": "Theme",
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+    },
+    "auth": {
+        "signIn": "Sign in",
+        "signOut": "Sign out"
+    },
+    "language": {
+        "label": "Language"
+    },
+    "footer": {
+        "copyright": "© {{year}} {{appName}}",
+        "version": "v{{version}}"
+    },
+    "notFound": {
+        "goHome": "Go to home"
     }
 }

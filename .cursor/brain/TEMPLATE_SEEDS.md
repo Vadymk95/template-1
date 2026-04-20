@@ -26,8 +26,10 @@ to look". They are the reference the rest of `.cursor/brain/*.md` points to.
 | `src/lib/api/_example.queries.ts`                 | TanStack Query pattern   | Key factory, `queryOptions()` factories, cancellable `fetch`                 | First real `<domain>.queries.ts` wired into a page              |
 | `src/lib/api/_example.ts`                         | REST transport pattern   | Typed `apiClient` usage with response interface                              | First real `<domain>.ts` transport module exists                |
 | `src/pages/DevPlayground/*` (`/dev/ui` route)     | shadcn primitives demo   | Button variants, Input states, form error styles — DEV-only route           | You have enough real pages to cover variant coverage visually   |
+| `src/components/common/ThemeToggle/*`             | `useTheme` consumer      | Three-state light/dark/system cycle, icon button with a11y label             | Replaced by the product's real theme control                    |
+| `src/components/common/LanguageSwitcher/*`        | `SUPPORTED_LANGUAGES` UI | Degrades to badge when one locale; becomes `<select>` once ≥ 2 locales       | Replaced by the product's real language picker / locked to one  |
 | `src/components/layout/Header/*` demo wiring      | Hooks composition        | `useTheme`, `useTranslation`, `useUserStore` meeting in one layout shell     | Header is replaced with brand-specific nav / auth UI            |
-| `src/components/layout/Footer/*` demo wiring      | Metadata surface         | `APP_VERSION` from env, copyright year via `Date`                            | Footer is replaced with real links (legal, support, social)     |
+| `src/components/layout/Footer/*` demo wiring      | Metadata surface         | `__APP_VERSION__` (Vite define from `package.json`), copyright year via `Date` | Footer is replaced with real links (legal, support, social)   |
 
 ## Why the underscore prefix?
 

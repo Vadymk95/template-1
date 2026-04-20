@@ -8,6 +8,7 @@ import { defineConfig, type Plugin, type PluginOption } from 'vite';
 import compression from 'vite-plugin-compression';
 import { webfontDownload } from 'vite-plugin-webfont-dl';
 
+import pkg from './package.json' with { type: 'json' };
 import { htmlOptimize } from './vite-plugins/html-optimize';
 import { i18nHmr } from './vite-plugins/i18n-hmr';
 
@@ -30,6 +31,11 @@ export default defineConfig(({ command }) => ({
         cors: true
     },
     base: '/',
+    define: {
+        // Exposed to app code (e.g. Footer) via global declared in src/vite-env.d.ts.
+        // Single source of truth: package.json version.
+        __APP_VERSION__: JSON.stringify(pkg.version)
+    },
     plugins: [
         tailwindcss(),
         react({
