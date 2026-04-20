@@ -6,8 +6,11 @@ import { renderWithProviders } from '@/test/test-utils';
 import { NotFoundPage } from './NotFoundPage';
 
 describe('NotFoundPage', () => {
-    it('renders not-found label', () => {
+    it('renders translated not-found copy', () => {
         renderWithProviders(<NotFoundPage />);
-        expect(screen.getByText('NotFoundPage')).toBeInTheDocument();
+        expect(
+            screen.getByRole('heading', { level: 1, name: 'Page not found' })
+        ).toBeInTheDocument();
+        expect(screen.getByText('The page you’re looking for doesn’t exist.')).toBeInTheDocument();
     });
 });
