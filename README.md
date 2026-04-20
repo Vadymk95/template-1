@@ -15,6 +15,7 @@ Production-ready React 19 + Vite 8 + TypeScript 6 template with routing, Zustand
 - [Build & Deployment](#-build--deployment)
 - [Security & Production](#-security--production)
 - [Optional Additions](#-optional-additions)
+- [Removed in v3.1.0 — Restore If Needed](#-removed-in-v310--restore-if-needed)
 
 ## 📋 Prerequisites
 
@@ -403,6 +404,38 @@ This template does not ship automatic CSP nonce injection. If your production en
 - **Deployment:** `vercel.json` or `netlify.toml` for security headers
 - **CSS-in-JS:** Emotion or Styled-Components for advanced runtime styling (Tailwind covers the majority of cases)
 - **File-based Routing:** TanStack Router for 100+ routes or micro-frontend architectures
+
+## 🧹 Removed in v3.1.0 — Restore If Needed
+
+Dropped to keep the template lean. Add back on demand.
+
+### SVG-as-React-component (`vite-plugin-svgr`)
+
+```bash
+npm i -D vite-plugin-svgr
+```
+
+Wire it in `vite.config.ts`:
+
+```ts
+import svgr from 'vite-plugin-svgr';
+// ...
+plugins: [svgr() /* existing plugins */];
+```
+
+Usage: `import { ReactComponent as Logo } from '@/assets/logo.svg?react';`
+
+### `axios` security override
+
+Previously pinned in `overrides` to mitigate a CVE while a transitive dep shipped a vulnerable `axios`. Re-add only if `npm audit` flags axios again:
+
+```json
+"overrides": {
+    "axios": ">=1.8.2"
+}
+```
+
+Bump the floor to whatever version `npm audit` currently recommends.
 
 ---
 
