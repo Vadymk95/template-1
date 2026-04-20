@@ -1,4 +1,5 @@
 import type { FunctionComponent } from 'react';
+import { ScrollRestoration } from 'react-router-dom';
 
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { Footer } from '@/components/layout/Footer';
@@ -12,6 +13,7 @@ export const App: FunctionComponent = () => {
 
     return (
         <ErrorBoundary>
+            <ScrollRestoration getKey={(location) => location.pathname} />
             <div className="flex min-h-screen flex-col">
                 <Header />
                 <Main />
