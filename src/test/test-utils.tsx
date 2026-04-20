@@ -11,10 +11,10 @@ import { createQueryClient } from '@/lib/queryClient';
 // Using direct JSON imports - Vitest/Vite handles these correctly
 // Dynamic imports are not possible with TypeScript, so we use static imports
 // mapped to namespace constants
-import authTranslations from '../../public/locales/en/auth.json';
-import commonTranslations from '../../public/locales/en/common.json';
-import errorsTranslations from '../../public/locales/en/errors.json';
-import homeTranslations from '../../public/locales/en/home.json';
+import authTranslations from '@locales/en/auth.json';
+import commonTranslations from '@locales/en/common.json';
+import errorsTranslations from '@locales/en/errors.json';
+import homeTranslations from '@locales/en/home.json';
 
 // Map namespaces to their translation objects
 const translationMap = {

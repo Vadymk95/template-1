@@ -28,7 +28,7 @@ export const createQueryClient = (options?: {
             queries: {
                 staleTime: options?.staleTime ?? DEFAULTS.STALE_TIME,
                 gcTime: options?.gcTime ?? DEFAULTS.GC_TIME,
-                retry: options?.retry !== undefined ? options.retry : shouldRetry,
+                retry: options?.retry ?? shouldRetry,
                 refetchOnWindowFocus: options?.refetchOnWindowFocus ?? true,
                 refetchOnReconnect: true,
                 refetchOnMount: true

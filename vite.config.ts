@@ -129,6 +129,7 @@ export default defineConfig(({ command }) => ({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),
+            '@locales': path.resolve(__dirname, './public/locales'),
             // i18next-http-backend pulls cross-fetch@4 (9.5kb polyfill).
             // All target browsers have native fetch — redirect to a thin shim.
             'cross-fetch': path.resolve(__dirname, './src/lib/cross-fetch-native.ts')

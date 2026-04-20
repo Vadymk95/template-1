@@ -126,5 +126,5 @@ export const useUserStore = createSelectors(useUserStoreBase);
 - `npm run build:analyze` — bundle visualizer (`ANALYZE=true`)
 - `npm run typecheck` — `tsc -b` only (also used in CI before lint)
 - `npm run test` — Vitest run
-- `npm run lint` — ESLint (flat config); `lint:oxlint` for standalone Oxlint
+- `npm run lint` — ESLint 9 flat: `typescript-eslint` **strict + stylistic** (type-aware), `import-x` (**order**, **no-cycle**), parent-relative imports under `src/**` restricted (use `@/` or `@locales/` for locale JSON); `vite-plugins/**` may use `../src/**` (loads before Vite resolves `@/`). `lint:oxlint` runs first in CI.
 - Staged commits: Oxlint fix → ESLint fix → Prettier (see `lint-staged` in package.json)

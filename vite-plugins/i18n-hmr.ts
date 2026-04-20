@@ -25,7 +25,7 @@ export const i18nHmr = (): Plugin => {
 
             const handleFileChange = (file: string) => {
                 if (file.includes(LOCALES_DIR) && file.endsWith('.json')) {
-                    const filename = file.split(`${LOCALES_DIR}/`).pop() || file;
+                    const filename = file.split(`${LOCALES_DIR}/`).pop() ?? file;
                     server.ws.send({
                         type: 'custom',
                         event: I18N_HMR_EVENT,

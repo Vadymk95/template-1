@@ -12,7 +12,7 @@ export const createSelectors = <S extends UseBoundStore<StoreApi<object>>>(store
     const storeWithSelectors = store as WithSelectors<S>;
     storeWithSelectors.use = {} as WithSelectors<S>['use'];
 
-    const keys = Object.keys(store.getState()) as Array<keyof StoreState<S>>;
+    const keys = Object.keys(store.getState()) as (keyof StoreState<S>)[];
 
     for (const key of keys) {
         storeWithSelectors.use[key] = () => store((state) => (state as StoreState<S>)[key]);

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 
-import { createSelectors } from '../utils/createSelectors';
+import { createSelectors } from '@/store/utils/createSelectors';
 
 interface UserState {
     isLoggedIn: boolean;

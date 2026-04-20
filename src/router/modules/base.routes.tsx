@@ -10,8 +10,7 @@ import { DevPlayground } from '@/pages/DevPlayground';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
-
-import { RoutesPath } from '../routes';
+import { RoutesPath } from '@/router/routes';
 
 const baseRoutes: RouteObject[] = [
     {

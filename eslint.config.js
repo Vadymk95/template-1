@@ -12,6 +12,19 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+const parentRelativeImportPatternGroup = {
+    group: [
+        '../*',
+        '../../*',
+        '../../../*',
+        '../../../../*',
+        '../../../../../*',
+        '../../../../../../*'
+    ],
+    message:
+        'Use the `@/` alias for code under `src/`, or `@locales/` for JSON under `public/locales/`, instead of parent-relative imports.'
+};
+
 export default defineConfig([
     globalIgnores(['dist', 'coverage', 'public/mockServiceWorker.js']),
     // ─── oxlint — disable ESLint rules that oxlint already covers ────────────
@@ -31,6 +44,7 @@ export default defineConfig([
             // no-misused-promises, require-await, no-unnecessary-type-assertion, etc.
             // Requires parserOptions.projectService below.
             tseslint.configs.strictTypeChecked,
+            ...tseslint.configs.stylisticTypeChecked,
             reactHooks.configs.flat['recommended-latest'],
             reactRefresh.configs.vite,
             queryPlugin.configs['flat/recommended'],
@@ -104,9 +118,11 @@ export default defineConfig([
                             message:
                                 "Use 'FunctionComponent' instead: const MyComponent: FunctionComponent<Props> = ({ ... }) => { ... }"
                         }
-                    ]
+                    ],
+                    patterns: [parentRelativeImportPatternGroup]
                 }
             ],
+            'import-x/no-cycle': 'error',
             // ─── Enforce arrow functions (no function declarations) ───────────
             // Components: const X: FunctionComponent = () => {}
             // Hooks/utils: const useX = () => {}
@@ -117,6 +133,12 @@ export default defineConfig([
             '@typescript-eslint/consistent-type-imports': [
                 'error',
                 { prefer: 'type-imports', fixStyle: 'inline-type-imports' }
+            ],
+            '@typescript-eslint/no-import-type-side-effects': 'error',
+            '@typescript-eslint/switch-exhaustiveness-check': 'error',
+            '@typescript-eslint/no-unused-vars': [
+                'error',
+                { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }
             ],
             // Note: prefer-nullish-coalescing + prefer-optional-chain require type-aware
             // linting (parserOptions.project). Enable by switching to tseslint.configs.strictTypeChecked
@@ -156,10 +178,30 @@ export default defineConfig([
             'func-style': 'off'
         }
     },
+    // Vite plugins load before Vite resolves `@/`; they may import `../src/**` explicitly.
+    {
+        files: ['vite-plugins/**/*.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    paths: [
+                        {
+                            name: 'react',
+                            importNames: ['FC'],
+                            message:
+                                "Use 'FunctionComponent' instead: const MyComponent: FunctionComponent<Props> = ({ ... }) => { ... }"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
     // ─── Test files — relaxed rules ──────────────────────────────────────────
     {
         files: ['**/*.test.{ts,tsx}', 'src/test/**/*.{ts,tsx}'],
         rules: {
+            '@typescript-eslint/no-empty-function': 'off',
             // Tests legitimately use non-null assertions for mocks
             '@typescript-eslint/no-non-null-assertion': 'off',
             // Test files can use inline types more freely

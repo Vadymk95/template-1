@@ -14,7 +14,7 @@ export const htmlOptimize = (): Plugin => {
         transformIndexHtml(html) {
             // Find all CSS stylesheet links
             const cssLinkRegex = /<link\s+[^>]*rel=["']stylesheet["'][^>]*>/gi;
-            const cssLinks = html.match(cssLinkRegex) || [];
+            const cssLinks = html.match(cssLinkRegex) ?? [];
 
             if (cssLinks.length === 0) {
                 return html;
@@ -24,11 +24,13 @@ export const htmlOptimize = (): Plugin => {
             let htmlWithoutCss = html.replace(cssLinkRegex, '');
 
             // Find position after </title> tag (critical meta tags should come first)
-            const titleMatch = htmlWithoutCss.match(/<title[^>]*>.*?<\/title>/i);
+            const titleRe = /<title[^>]*>.*?<\/title>/i;
+            const titleMatch = titleRe.exec(htmlWithoutCss);
             if (!titleMatch) {
                 // If no title found, insert after <head>
-                const headMatch = htmlWithoutCss.match(/<head[^>]*>/i);
-                if (headMatch && headMatch.index !== undefined) {
+                const headRe = /<head[^>]*>/i;
+                const headMatch = headRe.exec(htmlWithoutCss);
+                if (headMatch?.index !== undefined) {
                     const insertIndex = headMatch.index + headMatch[0].length;
                     const cssLinksHtml = '\n        ' + cssLinks.join('\n        ') + '\n';
                     htmlWithoutCss =
@@ -36,7 +38,7 @@ export const htmlOptimize = (): Plugin => {
                         cssLinksHtml +
                         htmlWithoutCss.substring(insertIndex);
                 }
-            } else if (titleMatch.index !== undefined) {
+            } else {
                 // Insert CSS links right after </title>, before any scripts
                 const insertIndex = titleMatch.index + titleMatch[0].length;
                 const cssLinksHtml = '\n        ' + cssLinks.join('\n        ') + '\n';
