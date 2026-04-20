@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { renderWithProviders } from '@/test/test-utils';
 
-import { HomePage } from './index';
+import { HomePage } from './HomePage';
 
 describe('HomePage', () => {
     it('renders heading', () => {
