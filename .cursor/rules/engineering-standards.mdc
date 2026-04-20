@@ -17,7 +17,10 @@ priority: 88
 ```typescript
 // Bad
 const STATUS: any = 'active';
-enum Direction { Up, Down }
+enum Direction {
+    Up,
+    Down
+}
 import type { FC } from 'react'; // FC is banned — use FunctionComponent
 
 // Good
@@ -32,7 +35,7 @@ type Direction = 'up' | 'down';
 - **Functions**: Arrow functions everywhere — components, hooks, utilities.
 - **Components**: `const X: FunctionComponent<Props> = ({ ... }) => { ... }` — `FunctionComponent` always explicit, never `FC`.
 - **Exports**: Named exports for everything. Default exports only for React Router lazy pages.
-- **Comments**: English only. Single-line `//` only — no JSDoc `/** */`. Write only when logic isn't self-evident.
+- **Comments**: Use `/** */` JSDoc for exported public contracts (API shapes, non-obvious behaviour, external data sources that need sync). Use `//` inside function bodies to explain _why_ or non-obvious constraints only. **NEVER** use JSDoc for local helpers or unexported code. **NEVER** restate the code.
 - **File size cap**: New files must not exceed ~200 LOC. Extract to hook or `lib/` when approaching limit.
 
 ```typescript
