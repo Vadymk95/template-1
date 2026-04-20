@@ -40,6 +40,7 @@ npm install && npm run dev
 ```
 
 > Open <http://localhost:3000> to see the app.
+> Open <http://localhost:3000/dev/ui> to see the UI Playground (DEV-only, template seed).
 
 **Next steps after installation:**
 
@@ -126,6 +127,7 @@ src/
     HomePage/              # Index route (eager)
     LoginPage/             # Form page (react-hook-form + zod + auth store)
     DashboardPage/         # Protected route example
+    DevPlayground/         # UI Kit showcase (DEV-only, template seed)
     NotFoundPage/          # 404 page
   router/
     index.tsx              # Router assembly
@@ -230,6 +232,16 @@ On pull requests and pushes to `master` (Node 24.x, `npm ci`):
 5. Playwright E2E against `vite preview`
 
 **Dependabot** (weekly): proposes npm dependency updates.
+
+### Dev Playground (template seed)
+
+Built-in UI showcase at `/dev/ui` (development only, tree-shaken out of production):
+
+- Visualize all UI components
+- Test component variants and states
+- Quick reference for design system
+
+This page is a **template seed** — see `.cursor/brain/TEMPLATE_SEEDS.md` before deleting.
 
 ## 🎯 Key Patterns
 

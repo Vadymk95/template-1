@@ -6,6 +6,7 @@ import { RouteSkeleton } from '@/components/common/RouteSkeleton';
 import { ProtectedRoute } from '@/hocs/ProtectedRoute';
 import { WithSuspense } from '@/hocs/WithSuspense';
 import { DashboardPage } from '@/pages/DashboardPage';
+import { DevPlayground } from '@/pages/DevPlayground';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -50,7 +51,23 @@ const baseRoutes: RouteObject[] = [
                         <NotFoundPage />
                     </WithSuspense>
                 )
-            }
+            },
+            // DEV-only: shadcn primitive showcase at /dev/ui.
+            // Tree-shaken out of production bundles — zero ship cost.
+            // See `src/pages/DevPlayground/DevPlayground.tsx` header for the
+            // template-seed contract, and `.cursor/brain/TEMPLATE_SEEDS.md`.
+            ...(import.meta.env.DEV
+                ? [
+                      {
+                          path: RoutesPath.DevPlayground,
+                          element: (
+                              <WithSuspense fallback={<RouteSkeleton />}>
+                                  <DevPlayground />
+                              </WithSuspense>
+                          )
+                      }
+                  ]
+                : [])
         ]
     }
 ];

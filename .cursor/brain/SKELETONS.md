@@ -20,6 +20,15 @@
 Lazy pages MUST be wrapped with `WithSuspense` in the route definition.
 Missing `WithSuspense` = uncaught Suspense boundary = blank screen.
 
+## DevPlayground — DEV-only by contract
+
+`src/pages/DevPlayground/` and its `/dev/ui` route are mounted only under
+`import.meta.env.DEV`. The env guard lives in `src/router/modules/base.routes.tsx`
+and must stay there — removing it leaks a shadcn kitchen-sink page into
+production bundles. This is a **template seed** (see
+`.cursor/brain/TEMPLATE_SEEDS.md`); do not delete it during "remove unused
+code" sweeps.
+
 ## createSelectors — no direct store subscription in tests
 
 Tests for stores use the base store directly (`useUserStoreBase`), not the selector wrapper.

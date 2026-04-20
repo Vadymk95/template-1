@@ -48,6 +48,7 @@ Local    →  component-only state (useState)
 /login       → LoginPage (lazy + WithSuspense)
 /dashboard   → DashboardPage (lazy + WithSuspense; parent layout ProtectedRoute → redirect to /login if unauthenticated)
 /*           → NotFoundPage (lazy + WithSuspense)
+/dev/ui      → DevPlayground (DEV only, lazy + WithSuspense; omitted in production build — template seed)
 ```
 
 ## i18n Flow
