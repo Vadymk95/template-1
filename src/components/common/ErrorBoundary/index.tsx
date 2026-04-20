@@ -1,4 +1,5 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type FunctionComponent, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui';
 import { logger } from '@/lib/logger';
@@ -11,6 +12,57 @@ interface ErrorBoundaryState {
     hasError: boolean;
     error?: Error;
 }
+
+interface ErrorFallbackProps {
+    isDev: boolean;
+    error?: Error;
+    onReset: () => void;
+    onReload: () => void;
+}
+
+const ErrorFallback: FunctionComponent<ErrorFallbackProps> = ({
+    isDev,
+    error,
+    onReset,
+    onReload
+}) => {
+    const { t } = useTranslation('errors');
+
+    return (
+        <section
+            role="alert"
+            aria-live="assertive"
+            className="flex min-h-screen flex-col items-center justify-center p-4"
+        >
+            <div className="max-w-md space-y-4 text-center">
+                <h1 className="text-2xl font-bold">{t('boundary.title')}</h1>
+                <p className="text-muted-foreground">{t('boundary.description')}</p>
+
+                {isDev && error && (
+                    <details className="mt-4 text-left">
+                        <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+                            {t('boundary.devDetails')}
+                        </summary>
+                        <pre className="mt-2 overflow-auto rounded-md bg-muted p-4 text-xs">
+                            {error.message}
+                            {'\n\n'}
+                            {error.stack}
+                        </pre>
+                    </details>
+                )}
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                    <Button onClick={onReset} variant="default">
+                        {t('boundary.tryAgain')}
+                    </Button>
+                    <Button onClick={onReload} variant="outline">
+                        {t('boundary.reload')}
+                    </Button>
+                </div>
+            </div>
+        </section>
+    );
+};
 
 class ErrorBoundaryComponent extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     constructor(props: ErrorBoundaryProps) {
@@ -41,44 +93,13 @@ class ErrorBoundaryComponent extends Component<ErrorBoundaryProps, ErrorBoundary
 
     render() {
         if (this.state.hasError) {
-            const isDev = import.meta.env.DEV;
-
             return (
-                <section
-                    role="alert"
-                    aria-live="assertive"
-                    className="flex min-h-screen flex-col items-center justify-center p-4"
-                >
-                    <div className="max-w-md space-y-4 text-center">
-                        <h1 className="text-2xl font-bold">Something went wrong</h1>
-                        <p className="text-muted-foreground">
-                            We encountered an unexpected error. Please try again or refresh the
-                            page.
-                        </p>
-
-                        {isDev && this.state.error && (
-                            <details className="mt-4 text-left">
-                                <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
-                                    Error details (dev only)
-                                </summary>
-                                <pre className="mt-2 overflow-auto rounded-md bg-muted p-4 text-xs">
-                                    {this.state.error.message}
-                                    {'\n\n'}
-                                    {this.state.error.stack}
-                                </pre>
-                            </details>
-                        )}
-
-                        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                            <Button onClick={this.handleReset} variant="default">
-                                Try again
-                            </Button>
-                            <Button onClick={this.handleReload} variant="outline">
-                                Reload page
-                            </Button>
-                        </div>
-                    </div>
-                </section>
+                <ErrorFallback
+                    isDev={import.meta.env.DEV}
+                    error={this.state.error}
+                    onReset={this.handleReset}
+                    onReload={this.handleReload}
+                />
             );
         }
 

@@ -1,6 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { renderWithProviders } from '@/test/test-utils';
 
 import { ErrorBoundary } from './index';
 
@@ -20,7 +22,7 @@ describe('ErrorBoundary', () => {
     });
 
     it('renders fallback UI when child throws', () => {
-        render(
+        renderWithProviders(
             <ErrorBoundary>
                 <Bomb />
             </ErrorBoundary>
@@ -40,7 +42,7 @@ describe('ErrorBoundary', () => {
         // jsdom marks location.reload as non-configurable — vi.stubGlobal is the correct escape hatch
         vi.stubGlobal('location', { reload: reloadMock });
 
-        render(
+        renderWithProviders(
             <ErrorBoundary>
                 <Bomb />
             </ErrorBoundary>

@@ -27,5 +27,12 @@
     "notFound": {
         "title": "Page not found",
         "description": "The page you’re looking for doesn’t exist."
+    },
+    "boundary": {
+        "title": "Something went wrong",
+        "description": "We encountered an unexpected error. Please try again or refresh the page.",
+        "tryAgain": "Try again",
+        "reload": "Reload page",
+        "devDetails": "Error details (dev only)"
     }
 }
