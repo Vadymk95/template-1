@@ -29,6 +29,8 @@ export default mergeConfig(
                     // Entry: i18n boot + providers — integration-tested manually; keeps thresholds honest vs untestable orchestration.
                     'src/main.tsx',
                     'src/components/ui/**',
+                    // Lazy-only barrels — real pages are covered via `*.tsx` modules and route tests.
+                    'src/pages/**/index.ts',
                     '**/*.d.ts',
                     '**/*.config.{ts,js}'
                 ],
