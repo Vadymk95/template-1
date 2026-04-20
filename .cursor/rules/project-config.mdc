@@ -11,13 +11,13 @@ alwaysApply: true
 |---|---|
 | UI | React 19 |
 | State | Zustand 5 (global) + TanStack Query 5 (server) |
-| Language | TypeScript 5.9 strict |
+| Language | TypeScript 6.0 strict |
 | Bundler | Vite 8 (Rolldown + Oxc — official `vite` package) |
 | Styling | Tailwind CSS **v4** (CSS-based config — no tailwind.config.ts) |
 | Components | shadcn/ui (new-york style) |
 | Routing | React Router v7 |
 | Forms | react-hook-form v7 + zod v4 |
-| i18n | i18next 25 + react-i18next |
+| i18n | i18next 26 + react-i18next 17 |
 | Testing | Vitest 4 + Testing Library |
 
 ## Tailwind v4 (CRITICAL)

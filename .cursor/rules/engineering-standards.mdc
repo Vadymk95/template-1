@@ -52,7 +52,6 @@ export const formatDate = (date: Date): string => { ... };
 ## 3. Constants & Magic Strings
 
 - **No magic strings or numbers** in logic or JSX.
-- **Global constants**: `src/lib/constants/` (or `src/lib/<domain>/constants.ts`).
 - **Component-level**: co-locate in the same file, above the component.
 
 ```typescript

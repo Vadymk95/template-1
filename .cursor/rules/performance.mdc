@@ -36,7 +36,7 @@ const sortedUsers = useMemo(() => [...users].sort(byName), [users]); // large ar
 
 ## 4. Bundle Optimization
 
-- **Chunk strategy**: Defined in `vite.config.ts` via `manualChunks`. Current chunks: `react-vendor`, `ui-vendor`, `state-vendor`, `i18n-vendor`.
+- **Chunk strategy**: Defined in `vite.config.ts` via `build.rolldownOptions.output.codeSplitting.groups`. Current chunks: `react-vendor`, `ui-vendor`, `state-vendor`, `i18n-vendor`.
 - **Adding new heavy libraries**: Always check `npm run build:analyze` after. Target: no chunk > 600kb.
 - **Tree-shaking**: Use named imports only (`import { thing } from 'lib'`). Avoid default-import-then-destruct.
 

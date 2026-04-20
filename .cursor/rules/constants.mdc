@@ -26,7 +26,6 @@ if (user.role === USER_ROLES.ADMIN) { ... }
 
 | Scope | Location |
 |---|---|
-| Global / cross-domain | `src/lib/constants/<domain>.ts` |
 | Single component | Co-locate above component in same file |
 | Store-level | `src/store/<domain>/constants.ts` |
 | Route paths | `src/router/routes.ts` |
