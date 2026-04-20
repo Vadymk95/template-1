@@ -64,7 +64,26 @@ const RootProviders = () => {
     );
 };
 
-createRoot(rootElement).render(
+createRoot(rootElement, {
+    onCaughtError: (error, errorInfo) => {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error('[react]', {
+            source: 'react-caught',
+            message,
+            stack: error instanceof Error ? error.stack : undefined,
+            componentStack: errorInfo.componentStack
+        });
+    },
+    onUncaughtError: (error, errorInfo) => {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error('[react]', {
+            source: 'react-uncaught',
+            message,
+            stack: error instanceof Error ? error.stack : undefined,
+            componentStack: errorInfo.componentStack
+        });
+    }
+}).render(
     <StrictMode>
         <RootProviders />
     </StrictMode>
