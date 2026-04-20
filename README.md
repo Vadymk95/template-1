@@ -49,7 +49,6 @@ npm install && npm run dev
 ```
 
 > Open <http://localhost:3000> to see the app.
-> Open <http://localhost:3000/dev/ui> to see the UI Playground.
 
 **Next steps after installation:**
 
@@ -122,7 +121,6 @@ src/
     queryClient.ts      # TanStack Query configuration
     utils.ts            # Utility functions (cn, etc.)
   pages/
-    DevPlayground/      # UI Kit showcase (Development only)
     HomePage/           # Home page with example
     NotFoundPage/       # 404 page
   router/
@@ -223,14 +221,6 @@ On **pull requests** and **pushes** to `master` (Node 24.x, `npm ci`):
 3. **`npm run build`** — type-check (`tsc -b`) + Vite production bundle
 
 **Dependabot** (weekly): proposes npm dependency updates; review and merge as fits your release cadence.
-
-### Dev Playground
-
-Built-in UI showcase at `/dev/ui` (development only):
-
-- Visualize all UI components
-- Test component variants and states
-- Quick reference for design system
 
 ## 🎯 Key Patterns
 

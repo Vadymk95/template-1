@@ -6,7 +6,6 @@ import { RouteSkeleton } from '@/components/common/RouteSkeleton';
 import { ProtectedRoute } from '@/hocs/ProtectedRoute';
 import { WithSuspense } from '@/hocs/WithSuspense';
 import { DashboardPage } from '@/pages/DashboardPage';
-import { DevPlayground } from '@/pages/DevPlayground';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -51,19 +50,7 @@ const baseRoutes: RouteObject[] = [
                         <NotFoundPage />
                     </WithSuspense>
                 )
-            },
-            ...(import.meta.env.DEV
-                ? [
-                      {
-                          path: RoutesPath.DevPlayground,
-                          element: (
-                              <WithSuspense fallback={<RouteSkeleton />}>
-                                  <DevPlayground />
-                              </WithSuspense>
-                          )
-                      }
-                  ]
-                : [])
+            }
         ]
     }
 ];

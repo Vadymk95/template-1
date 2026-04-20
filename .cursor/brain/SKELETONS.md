@@ -25,10 +25,6 @@ Missing `WithSuspense` = uncaught Suspense boundary = blank screen.
 Tests for stores use the base store directly (`useUserStoreBase`), not the selector wrapper.
 Selector wrapper relies on React context and will throw outside component tree.
 
-## DevPlayground
-
-`src/pages/DevPlayground/` is a dev sandbox. Remove before production or add a prod guard.
-
 ## Vite 8 + Rolldown
 
 Production builds use **Rolldown** via the official **`vite`** package (Vite 8+), not the legacy `rolldown-vite` npm alias.
