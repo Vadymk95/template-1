@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom';
 
 import { App } from '@/App';
+import { RouteErrorBoundary } from '@/components/common/RouteErrorBoundary';
 import { RouteSkeleton } from '@/components/common/RouteSkeleton';
 import { ProtectedRoute } from '@/hocs/ProtectedRoute';
 import { WithSuspense } from '@/hocs/WithSuspense';
@@ -16,6 +17,7 @@ const baseRoutes: RouteObject[] = [
     {
         path: RoutesPath.Root,
         element: <App />,
+        errorElement: <RouteErrorBoundary />,
         children: [
             {
                 index: true,
