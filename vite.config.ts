@@ -6,7 +6,6 @@ import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, type Plugin, type PluginOption } from 'vite';
 import compression from 'vite-plugin-compression';
-import svgr from 'vite-plugin-svgr';
 import { webfontDownload } from 'vite-plugin-webfont-dl';
 
 import { htmlOptimize } from './vite-plugins/html-optimize';
@@ -36,9 +35,6 @@ export default defineConfig(({ command }) => ({
         react({
             jsxRuntime: 'automatic'
         }),
-        // SVGR: automatically handles SVG imports as React components
-        // Only activates when .svg files are imported, so it's lightweight
-        svgr(),
         // Prevents FOUC by ensuring CSS loads before JavaScript
         htmlOptimize(),
         // Hot reload for i18n translation files in development
