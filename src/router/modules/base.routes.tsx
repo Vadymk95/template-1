@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom';
 
 import { App } from '@/App';
+import { RouteSkeleton } from '@/components/common/RouteSkeleton';
 import { ProtectedRoute } from '@/hocs/ProtectedRoute';
 import { WithSuspense } from '@/hocs/WithSuspense';
 import { DashboardPage } from '@/pages/DashboardPage';
@@ -22,7 +23,11 @@ const baseRoutes: RouteObject[] = [
             },
             {
                 path: RoutesPath.Login,
-                element: WithSuspense(<LoginPage />)
+                element: (
+                    <WithSuspense fallback={<RouteSkeleton />}>
+                        <LoginPage />
+                    </WithSuspense>
+                )
             },
             // Protected routes — redirects to /login when not authenticated
             {
@@ -30,19 +35,31 @@ const baseRoutes: RouteObject[] = [
                 children: [
                     {
                         path: RoutesPath.Dashboard,
-                        element: WithSuspense(<DashboardPage />)
+                        element: (
+                            <WithSuspense fallback={<RouteSkeleton />}>
+                                <DashboardPage />
+                            </WithSuspense>
+                        )
                     }
                 ]
             },
             {
                 path: RoutesPath.NotFound,
-                element: WithSuspense(<NotFoundPage />)
+                element: (
+                    <WithSuspense fallback={<RouteSkeleton />}>
+                        <NotFoundPage />
+                    </WithSuspense>
+                )
             },
             ...(import.meta.env.DEV
                 ? [
                       {
                           path: RoutesPath.DevPlayground,
-                          element: WithSuspense(<DevPlayground />)
+                          element: (
+                              <WithSuspense fallback={<RouteSkeleton />}>
+                                  <DevPlayground />
+                              </WithSuspense>
+                          )
                       }
                   ]
                 : [])
