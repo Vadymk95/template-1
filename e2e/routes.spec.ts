@@ -8,6 +8,8 @@ test.describe('Routes', () => {
 
     test('unknown path shows not-found content', async ({ page }) => {
         await page.goto('/e2e-unknown-route-xyz', { waitUntil: 'domcontentloaded' });
-        await expect(page.getByText('NotFoundPage')).toBeVisible();
+        await expect(
+            page.getByRole('heading', { level: 1, name: /page not found/i })
+        ).toBeVisible();
     });
 });
