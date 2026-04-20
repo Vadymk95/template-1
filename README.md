@@ -1,10 +1,6 @@
 # React Enterprise Foundation
 
-A **production-ready React/Vite/TypeScript foundation** optimized for rapid development and scalable frontend architecture. Battle-tested and optimized for speed, scalability, and developer experience. Perfect for SaaS applications, enterprise projects, and ready for micro-frontend architectures.
-
-Clone once, reuse for multiple projects—complete with state management, data fetching, routing, and enterprise workflows out of the box.
-
-> **📌 What is this?** This is an **enterprise-grade React foundation** designed as a solid base for modern web applications. Optimized for rapid development with clear migration paths for micro-frontend architectures. Clone it, customize for your specific needs, and start building immediately. No need to configure tooling, routing, or state management—it's all pre-configured with production-ready defaults.
+Production-ready React 19 + Vite 8 + TypeScript 6 template with routing, Zustand + TanStack Query, i18next, Tailwind v4, Vitest and Playwright pre-configured.
 
 ## 📑 Table of Contents
 
@@ -18,23 +14,17 @@ Clone once, reuse for multiple projects—complete with state management, data f
 - [Testing](#-testing)
 - [Build & Deployment](#-build--deployment)
 - [Security & Production](#-security--production)
-- [Enterprise Scalability](#-enterprise-scalability)
-- [Design Decisions](#design-decisions)
 - [Optional Additions](#-optional-additions)
 
 ## 📋 Prerequisites
-
-Before you begin, ensure you have:
 
 - **Node.js v24+** (use `nvm` for version management)
 - **npm** (comes with Node.js)
 - **Git**
 
-> **Note:** The project includes strict version management via `.nvmrc` and `package.json` engines to ensure consistency across all environments.
+Strict version pinning via `.nvmrc` and `package.json` engines.
 
 ## ⚡ Quick Start
-
-Get up and running in 3 commands:
 
 ```bash
 # Clone the repository
@@ -53,45 +43,46 @@ npm install && npm run dev
 **Next steps after installation:**
 
 1. Create a `.env` file only if your project needs environment variables
-2. Customize `index.html` meta tags for your SaaS project
-3. Review [Key Patterns](#-key-patterns) and start building using established conventions
+2. Customize `index.html` meta tags for your project
+3. Review [Key Patterns](#-key-patterns)
 
 ## 🚀 Tech Stack
 
 ### Core
 
-- **React 19** - Latest features, no React import needed for JSX
+- **React 19** — latest features, no React import needed for JSX
 - **Vite 8** — official `vite` package with **Rolldown** + **Oxc** for production builds ([migration from `rolldown-vite`](https://vite.dev/guide/migration))
-- **TypeScript 5.9** - Strict mode with `@/*` path aliases
-- **React Router v7** - Robust routing with automatic lazy loading
+- **TypeScript 6.0** — strict mode with `@/*` path aliases
+- **React Router v7** — automatic lazy loading
 
 ### State & Data
 
-- **Zustand 5.0** - Global state with devtools & auto-selectors
-- **TanStack Query v5** - Server state management with sensible defaults
-- **React Hook Form + Zod** - Type-safe form validation
+- **Zustand 5** — global state with devtools & auto-selectors
+- **TanStack Query v5** — server state management
+- **React Hook Form + Zod** — type-safe form validation
 
 ### Internationalization
 
-- **react-i18next** - i18next integration for React with lazy loading
-- **i18next-http-backend** - Loads translations from `/public/locales/{lng}/{ns}.json`
-- **i18next-browser-languagedetector** - Auto-detects language from localStorage → browser → fallback
+- **i18next 26 + react-i18next 17** — with lazy loading
+- **i18next-http-backend** — loads translations from `/public/locales/{lng}/{ns}.json`
+- **i18next-browser-languagedetector** — auto-detects language from localStorage → browser → fallback
 
 ### UI & Styling
 
-- **Tailwind CSS v4** - Utility-first with CSS-based design tokens
-- **Shadcn UI** - Accessible components with CVA (Class Variance Authority)
-- **Inter Font** - Self-hosted via `vite-plugin-webfont-dl` (zero external requests, privacy-friendly)
-- **Lucide React** - Icon library
-- **SVGR** - SVG imports as React components
+- **Tailwind CSS v4** — utility-first with CSS-based design tokens (`src/index.css` via `@theme inline {}`, no `tailwind.config.ts`)
+- **Shadcn UI** — accessible components with CVA (Class Variance Authority)
+- **Inter Font** — self-hosted via `vite-plugin-webfont-dl` (zero external requests)
+- **Lucide React** — icon library
 
 ### Developer Experience
 
-- **ESLint 9** - Flat Config with jsx-a11y accessibility rules
-- **Prettier** - Code formatting
-- **Husky + Lint Staged** - Git hooks for quality gates
-- **Commitlint** - Conventional commits enforcement
-- **Vitest** - Fast unit testing with Testing Library
+- **ESLint 9** — Flat Config with import-x + jsx-a11y rules
+- **Oxlint** — fast structural pre-pass in CI and lint-staged
+- **Prettier 3** — code formatting
+- **Husky + lint-staged** — git hooks for quality gates
+- **Commitlint** — conventional commits enforcement
+- **Vitest 4.1** — unit testing with Testing Library
+- **Playwright 1.59** — E2E tests
 
 ## 🛠 Project Structure
 
@@ -99,46 +90,57 @@ npm install && npm run dev
 src/
   components/
     common/
-      ErrorBoundary/    # Production-ready error handling with ARIA & recovery
+      ErrorBoundary/       # App-level ErrorBoundary with i18n fallback
+      I18nInitErrorFallback/ # i18n init failure shell (English-only)
+      RouteErrorBoundary/  # Router-level error element
+      RouteSkeleton/       # Suspense fallback for lazy routes
+      SkipLink/            # Accessibility skip-to-content link
     layout/
-      Header/           # App header component
-      Footer/           # App footer component
-      Main/             # Main content wrapper
-    ui/                 # Shadcn UI primitives (Button, Input, etc.)
+      Header/              # App header
+      Footer/              # App footer
+      Main/                # Main content wrapper
+    ui/                    # Shadcn UI primitives (Button, Input, etc.)
   hocs/
-    WithSuspense.tsx    # Suspense wrapper HOC for lazy-loaded pages
-  hooks/                # Custom React hooks (organized by domain)
+    ProtectedRoute/        # Auth gate for nested routes
+    WithSuspense/          # Suspense wrapper for lazy pages
+  hooks/
     i18n/
-      useI18nReload.ts       # i18n hot reload hook (dev-only, no tests)
+      useI18nReload.ts     # i18n hot reload hook (dev-only)
+    theme/
+      useTheme.ts          # light / dark / system theme toggle
   lib/
     api/
-      client.ts         # Base API client (optional - delete if using Supabase/Firebase SDK)
-      example.ts        # Example API module (replace/delete as needed)
+      client.ts            # Base API client (delete if using BaaS SDK)
+      auth.ts              # getAuthToken helper (avoids circular imports)
     i18n/
-      index.ts          # i18next configuration
-      constants.ts      # Language and namespace constants
-      types.ts          # TypeScript types for translations
-    queryClient.ts      # TanStack Query configuration
-    utils.ts            # Utility functions (cn, etc.)
+      index.ts             # i18next configuration
+      constants.ts         # Language and namespace constants
+      resources.ts         # TypeScript types for translations
+    webVitals/             # subscribeStandard / subscribeAttribution
+    env.ts                 # @t3-oss/env-core validated public env
+    queryClient.ts         # TanStack Query factory
+    vitals.ts              # Web Vitals lazy reporting
+    logger.ts, utils.ts    # observability + cn()
   pages/
-    HomePage/           # Home page with example
-    NotFoundPage/       # 404 page
+    HomePage/              # Index route (eager)
+    LoginPage/             # Form page (react-hook-form + zod + auth store)
+    DashboardPage/         # Protected route example
+    NotFoundPage/          # 404 page
   router/
-    index.tsx           # Router assembly (combines route modules)
-    routes.ts           # Route path constants
+    index.tsx              # Router assembly
+    routes.ts              # Route path constants
     modules/
-      base.routes.tsx   # Base routes module (home, 404, dev)
+      base.routes.tsx      # Base route module
   store/
-    user/
-      userStore.ts          # Zustand store example (user domain)
-      userStore.test.ts     # Store tests
+    user/                  # userStore (persist middleware) + tests
     utils/
-      createSelectors.ts    # Auto-selector utility
+      createSelectors.ts   # Auto-selector utility
   test/
-    setup.ts            # Vitest configuration
-    test-utils.tsx      # Testing utilities (renderWithProviders)
-  App.tsx               # Root app component
-  main.tsx              # Entry point
+    setup.ts               # Vitest config
+    server.ts, handlers.ts # MSW node adapter
+    test-utils.tsx         # renderWithProviders
+  App.tsx                  # Layout shell
+  main.tsx                 # Entry point
 ```
 
 ## ⚙️ Configuration
@@ -150,99 +152,89 @@ src/
 | `vite.config.ts`   | Build configuration, plugins, chunking strategy |
 | `tsconfig.json`    | TypeScript project references and path aliases  |
 | `eslint.config.js` | Linting rules (Flat Config) including jsx-a11y  |
+| `.oxlintrc.json`   | Oxlint rules for the fast pre-pass              |
 | `.nvmrc`           | Node.js version (v24)                           |
 | `.env`             | Optional local environment variables            |
 
 ### TypeScript Configuration
 
-- **Path Aliases:** `@/*` maps to `./src/*` (configured in `tsconfig.json`)
-- **Strict Mode:** Enabled across all configs (`tsconfig.app.json`, `tsconfig.node.json`, `tsconfig.vitest.json`)
-- **Project References:** Split configs for app, node scripts, and tests
+- **Path Aliases:** `@/*` → `./src/*`; `@locales/*` → `./public/locales/*`
+- **Strict Mode:** enabled across `tsconfig.app.json`, `tsconfig.node.json`, `tsconfig.vitest.json`
+- **Project References:** split configs for app, node scripts, and tests
 
 ### Vite Configuration
 
 Key optimizations configured in `vite.config.ts`:
 
 - **Minification:** Oxc (faster than Terser)
-- **Chunking:** Smart vendor splitting (`react-vendor`, `ui-vendor`, `state-vendor`)
+- **Chunking:** vendor splitting via `build.rolldownOptions.output.codeSplitting.groups` (`react-vendor`, `ui-vendor`, `state-vendor`, `i18n-vendor`)
 - **Compression:** Brotli (`.br`) files generated at build time
 - **Source Maps:** `hidden` mode (available for debugging, not exposed)
-- **Fonts:** Auto-downloaded and self-hosted via `vite-plugin-webfont-dl`
-- **FOUC Prevention:** Custom `htmlOptimize` plugin ensures CSS loads before JavaScript (see `vite-plugins/html-optimize.ts`)
-- **Bundle Analysis:** Report generated in `dist/bundle-analysis.html`
+- **Fonts:** auto-downloaded and self-hosted via `vite-plugin-webfont-dl`
+- **FOUC Prevention:** custom `htmlOptimize` plugin (`vite-plugins/html-optimize.ts`)
+- **Bundle Analysis:** `ANALYZE=true npm run build` → `dist/bundle-analysis.html`
 
 ### Environment Variables
 
-- **Public variables:** Must be prefixed with `VITE_*` (exposed to browser)
-- **Private variables:** No prefix (server-side only, not exposed)
-- **Template:** Create `.env` only when your app actually uses environment variables
+- **Public variables:** prefixed with `VITE_*` (exposed to browser); validated in `src/env.ts`
+- **Private variables:** no prefix (server-side only)
+- **Template:** see `.env.example`
 
 ## 🔄 Development Workflow
 
 ### Available Scripts
 
-| Command                 | Description                          |
-| ----------------------- | ------------------------------------ |
-| `npm run dev`           | Start Vite dev server (port 3000)    |
-| `npm run build`         | Type-check & Build with Oxc + Brotli |
-| `npm run preview`       | Serve production build locally       |
-| `npm run lint`          | Run ESLint                           |
-| `npm run format`        | Format codebase with Prettier        |
-| `npm run format:check`  | Check code formatting                |
-| `npm test`              | Run unit tests (Vitest)              |
-| `npm run test:watch`    | Run tests in watch mode              |
-| `npm run test:coverage` | Run tests with coverage report       |
+| Command                            | Description                                        |
+| ---------------------------------- | -------------------------------------------------- |
+| `npm run dev`                      | Start Vite dev server (port 3000)                  |
+| `npm run build`                    | `tsc -b` + Vite production build (Oxc + Brotli)    |
+| `npm run preview`                  | Serve production build locally                     |
+| `npm run typecheck`                | Runs `tsc -b` (no emit)                            |
+| `npm run lint`                     | Run ESLint                                         |
+| `npm run lint:oxlint`              | Fast Oxc-based lint pass (pre-ESLint)              |
+| `npm run format`                   | Format codebase with Prettier                      |
+| `npm run format:check`             | Check code formatting                              |
+| `npm test`                         | Run unit tests (Vitest)                            |
+| `npm run test:watch`               | Run tests in watch mode                            |
+| `npm run test:coverage`            | Run tests with coverage report                     |
+| `npm run test:e2e`                 | Playwright E2E tests                               |
+| `npm run test:e2e:ui`              | Playwright UI mode                                 |
+| `npm run ci:local`                 | Full local CI (mirrors `.github/workflows/ci.yml`) |
+| `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks   |
+| `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                 |
 
 ### Git Hooks
 
-**Pre-commit** (via Husky + Lint Staged):
+**Pre-commit** (via Husky + lint-staged):
 
-- Runs ESLint with auto-fix on staged files
-- Formats code with Prettier
+- Oxlint `--fix` → ESLint `--fix` → Prettier on staged files
 - Blocks commit if errors remain
 
 **Commit message** (via Commitlint):
 
-- Enforces conventional commit format: `type(scope): subject`
-- Validates message length and format
-- Blocks commit if message doesn't comply
+- Enforces `type(scope): subject`, max 96 chars
 
-**Pre-push**:
+**Pre-push:**
 
-- Runs `npm run format:check`, `npm run lint`, and `npx tsc -b --noEmit`
-- Does not run tests automatically
+- Runs `npx tsc -b --force --noEmit`
 
 ### CI (GitHub Actions)
 
-On **pull requests** and **pushes** to `master` (Node 24.x, `npm ci`):
+On pull requests and pushes to `master` (Node 24.x, `npm ci`):
 
 1. `npm audit --audit-level=moderate`
-2. `npm run lint` / `npm run format:check` / `npm run test`
-3. **`npm run build`** — type-check (`tsc -b`) + Vite production bundle
+2. `typecheck` → `lint:oxlint` → `lint` → `format:check`
+3. `test:coverage`
+4. `build` + `scripts/check-web-vitals-chunks.mjs`
+5. Playwright E2E against `vite preview`
 
-**Dependabot** (weekly): proposes npm dependency updates; review and merge as fits your release cadence.
+**Dependabot** (weekly): proposes npm dependency updates.
 
 ## 🎯 Key Patterns
 
 ### Zustand Store with Auto-Selectors
 
-**Example:** `userStore.ts` demonstrates the modular store pattern with Zustand and auto-selectors. Each domain (user, settings, cart, etc.) should have its own store folder with tests.
-
-**Recommended modular structure:**
-
-```
-src/store/
-  ├── user/
-  │   ├── userStore.ts
-  │   └── userStore.test.ts
-  ├── settings/
-  │   ├── settingsStore.ts
-  │   └── settingsStore.test.ts
-  └── utils/
-      └── createSelectors.ts  # Reuse this utility in each store
-```
-
-**Example usage:**
+Each domain has its own store folder with tests alongside (`src/store/<domain>/`):
 
 ```typescript
 // src/store/user/userStore.ts
@@ -252,154 +244,73 @@ import { createSelectors } from '../utils/createSelectors';
 const useUserStoreBase = create(...);
 export const useUserStore = createSelectors(useUserStoreBase);
 
-// Import directly (no index.ts re-exports for better tree-shaking)
+// Usage
 import { useUserStore } from '@/store/user/userStore';
+const username = useUserStore.use.username(); // auto-selector
 ```
 
 **Guidelines:**
 
-- ✅ Each store in its own folder with tests alongside
-- ✅ Tests next to store files (`storeName.test.ts`)
-- ✅ Direct imports (no `index.ts` re-exports) for optimal tree-shaking
-- ✅ Store-related files (types, utils) can be added to the same folder when needed
+- Each store in its own folder with tests alongside
+- Direct imports (no `index.ts` re-exports) for optimal tree-shaking
 
-### TanStack Query Configuration
+### TanStack Query — `queryOptions()` + key factories
 
-Configure in `src/lib/queryClient.ts`:
-
-```typescript
-export const queryClient = createQueryClient({
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: false
-});
-```
+New features add a `<domain>.queries.ts` next to the feature under `src/lib/api/`. It exports a stable **key factory** and **per-query** `queryOptions()` objects. Components call `useQuery(detailOptions(id))` directly.
 
 ### API Requests Pattern
 
-The template uses **native `fetch` API** with **TanStack Query** for server state management. This approach is lightweight, modern, and works with any backend (REST, GraphQL, tRPC, Supabase, Firebase, etc.).
-
-**Pre-configured structure:**
-
-The template includes a ready-to-use API client structure in `src/lib/api/`:
-
-```
-src/lib/api/
-  ├── client.ts      # Base API client with fetch wrapper
-  └── example.ts     # Example API module (replace/delete as needed)
-```
-
-**Using the API client:**
-
-```typescript
-import { useQuery } from '@tanstack/react-query';
-import { exampleApi } from '@/lib/api/example';
-
-export const MyComponent: FC = () => {
-    const { data, isLoading, error } = useQuery({
-        queryKey: ['example'],
-        queryFn: exampleApi.getData
-    });
-
-    if (isLoading) return <div>Loading...</div>;
-    if (error) return <div>Error: {error.message}</div>;
-
-    return <div>{data?.message}</div>;
-};
-```
-
-**⚠️ Important: If using Supabase/Firebase SDK:**
-
-If you're using BaaS solutions like Supabase or Firebase, you can **delete the `src/lib/api/` folder** and use their SDKs directly with TanStack Query. The template's API client is optional and designed for custom REST APIs.
+The template uses native `fetch` with TanStack Query. A minimal `apiClient` wrapper lives in `src/lib/api/client.ts`.
 
 **Guidelines:**
 
-- ✅ Use native `fetch` API (built-in, no extra dependencies)
-- ✅ Wrap `fetch` in a reusable `apiClient` function (see `src/lib/api/client.ts`)
-- ✅ Create domain-specific API modules (e.g., `usersApi`, `productsApi`)
-- ✅ Use TanStack Query for all server state (queries and mutations)
-- ✅ Type all API responses with TypeScript interfaces
-- ✅ Handle loading and error states in components
-- 🔄 Replace or remove `src/lib/api/` if using Supabase/Firebase SDK
-- ⚠️ For complex needs (interceptors, automatic retries), consider adding Axios or Ky library per-project
+- Use native `fetch` (built-in, no extra dependencies)
+- Type all API responses with TypeScript interfaces
+- Handle loading and error states in components
+- If using Supabase/Firebase SDK, delete `src/lib/api/` and wire the SDK directly into TanStack Query
 
 ### Lazy Loading Routes
 
-Pages are automatically lazy loaded with Suspense wrapper:
+Pages are lazy-loaded with a `WithSuspense` wrapper:
 
 ```typescript
-// In router configuration
-element: WithSuspense(<PageComponent />)
+// router/modules/base.routes.tsx
+element: (
+    <WithSuspense fallback={<RouteSkeleton />}>
+        <DashboardPage />
+    </WithSuspense>
+);
 ```
 
-**Routing Strategy:**
+`HomePage` is eager (index route); other pages are lazy (`PageName.tsx` + `index.ts` barrel calling `lazy()`).
 
-| Route Count         | Recommended Approach                                | Notes                                                                                          |
-| ------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **1-50 routes**     | React Router v7 (current setup)                     | Optimal for most SaaS applications. Modular structure: `router/index.tsx` + `router/modules/`  |
-| **50-100 routes**   | React Router v7 (with route modules)                | Organize routes by domain in `router/modules/` (e.g., `user.routes.tsx`, `billing.routes.tsx`) |
-| **100+ routes**     | File-based routing (TanStack Router, Next.js/Remix) | Recommended from the beginning to avoid manual route management overhead                       |
-| **Micro-frontends** | File-based routing (TanStack Router)                | Better for complex route permissions and team autonomy                                         |
+### Modular Route Organization
 
-**Modular Route Organization:**
-
-The template uses a modular route structure from day one:
+The router is split across modules:
 
 ```
 router/
-  ├── index.tsx          # Router assembly (combines route modules)
+  ├── index.tsx          # Router assembly
   ├── routes.ts          # Route path constants
   └── modules/
-      └── base.routes.tsx  # Base routes (home, 404, dev playground)
+      └── base.routes.tsx
 ```
 
-When adding new domains, create new route modules:
-
-```
-router/modules/
-  ├── base.routes.tsx      # Base routes
-  ├── user.routes.tsx      # User management routes
-  ├── billing.routes.tsx   # Billing routes
-  └── admin.routes.tsx     # Admin routes
-```
-
-Then combine them in `router/index.tsx`:
-
-```typescript
-const router = createBrowserRouter([
-    ...baseRoutes,
-    ...userRoutes,
-    ...billingRoutes,
-    ...adminRoutes
-]);
-```
-
-**Migration path:** If you reach 50+ routes or require complex server-side data loading/permission checks before rendering, we recommend migrating to TanStack Router. This template is structured to minimize refactoring costs—the component architecture remains the same; only the router initialization and route definition files need replacing. TanStack Router is recommended as the primary file-based migration target.
+Add new domains as new route modules (`user.routes.tsx`, `billing.routes.tsx`) and combine in `index.tsx`.
 
 ### ErrorBoundary Usage
 
-Wrap components that may throw errors:
-
-```typescript
-<ErrorBoundary>
-  <YourComponent />
-</ErrorBoundary>
-```
-
-**Features:**
-
-- ARIA attributes (`role="alert"`, `aria-live="assertive"`)
-- Recovery buttons (Try again, Reload page)
-- Error monitoring hooks (Sentry, LogRocket ready)
-- Technical details only visible in development
+`ErrorBoundary` is wired at the `App` layout level. The fallback copy is i18n-backed (`errors.boundary.*`) and includes recovery buttons (Try again, Reload page). `RouteErrorBoundary` handles router-level errors; `I18nInitErrorFallback` covers i18n init failures with English-only copy (no `t()` available).
 
 ## 🧪 Testing
 
 ### Test Structure
 
-- **Location:** Tests next to components/stores (`ComponentName.test.tsx`)
+- **Location:** tests next to components/stores (`ComponentName.test.tsx`)
 - **Framework:** Vitest + Testing Library
-- **Utilities:** `renderWithProviders` from `src/test/test-utils.tsx` for QueryClient provider
-- **Coverage:** Run `npm run test:coverage` for coverage report
+- **Utilities:** `renderWithProviders` from `src/test/test-utils.tsx`
+- **Coverage:** `npm run test:coverage`
+- **MSW:** node adapter (`src/test/server.ts`) for unit/integration; browser worker (`public/mockServiceWorker.js`) for dev
 
 ### Writing Tests
 
@@ -415,6 +326,10 @@ describe('Component', () => {
 });
 ```
 
+### E2E
+
+Playwright specs in `e2e/` run against Chromium. Local default: `npm run test:e2e` starts `vite dev` on port 3000. CI / `PLAYWRIGHT_USE_PREVIEW=1` uses `vite preview` on 4173 after `build`.
+
 ## 🏗️ Build & Deployment
 
 ### Production Build
@@ -428,61 +343,37 @@ npm run build
 - Type-checks with TypeScript
 - Optimizes and minifies with Oxc
 - Generates Brotli-compressed assets (`.br`)
-- Prevents FOUC by ensuring CSS loads before JavaScript (via `htmlOptimize` plugin)
-- Creates bundle analysis report (`dist/bundle-analysis.html`)
+- Prevents FOUC via the `htmlOptimize` plugin
 - Source maps in `hidden` mode (available for debugging, not exposed)
 
 ### Bundle Analysis
 
-After build, open `dist/bundle-analysis.html` to:
-
-- Visualize chunk sizes
-- Identify large dependencies
-- Optimize bundle splitting
-
-**Chunk Size Warning:** Build fails if any chunk exceeds 600kb (configured in `vite.config.ts`).
+`ANALYZE=true npm run build` writes `dist/bundle-analysis.html`. The build fails if any chunk exceeds 600kb.
 
 ### Deployment
 
-**Static hosting ready:**
-
-- Output in `dist/` directory
-- Works with Vercel, Netlify, AWS S3, or any static host
+- Output in `dist/` — works with Vercel, Netlify, AWS S3, or any static host
 - Configure security headers on your CDN/server (see [Security & Production](#-security--production))
 
-**Brotli precompression:**
+### Brotli Precompression
 
-The build emits `.br` siblings for every JS/CSS/HTML asset via `vite-plugin-compression`. Your hosting layer must be configured to serve them — otherwise browsers fall back to uncompressed bytes and the precompression is wasted work.
+The build emits `.br` siblings for every JS/CSS/HTML asset via `vite-plugin-compression`. Your hosting layer must be configured to serve them — otherwise browsers fall back to uncompressed bytes.
 
 Minimum contract: when the request has `Accept-Encoding: br` **and** `file.br` exists, serve it with `Content-Encoding: br` and the original file's `Content-Type`; otherwise serve the uncompressed file.
 
-- **nginx:** enable `brotli_static on;` (requires `ngx_brotli` module). CDNs like Cloudflare/Fastly handle the header dance automatically when you upload `.br` files.
-- **Vercel/Netlify:** brotli is applied at the edge — the emitted `.br` files are unused. Keep the plugin only if you push the same `dist/` to a second nginx/S3-backed host.
-- **AWS S3 + CloudFront:** upload `.br` with `Content-Encoding: br` metadata and a routing rule (Lambda@Edge or CloudFront Functions) to pick the encoded object when the client supports it.
+- **nginx:** enable `brotli_static on;` (requires `ngx_brotli`).
+- **Vercel/Netlify:** brotli applied at the edge — the emitted `.br` files are unused; keep the plugin only if you also push `dist/` to a second nginx/S3 host.
+- **AWS S3 + CloudFront:** upload `.br` with `Content-Encoding: br` metadata and a routing rule (Lambda@Edge / CloudFront Functions).
 
-If your target does none of the above, remove `vite-plugin-compression` from `vite.config.ts` to save ~300ms of build time.
+If none of the above applies, remove `vite-plugin-compression` from `vite.config.ts`.
 
 ## 🔒 Security & Production
 
-### Security Headers
+Security headers (CSP, X-Frame-Options, etc.) must be configured on your production server/CDN. See [`SECURITY_REQUIREMENTS.md`](./SECURITY_REQUIREMENTS.md) for the complete deployment checklist.
 
-Security headers (CSP, X-Frame-Options, etc.) must be configured on your production server/CDN.
+**⚠️ IMPORTANT:** `'unsafe-inline'` in CSP is NOT acceptable for production. Use CSP nonces or hashes.
 
-> **📋 Deployment Security:** Critical security headers and CSP nonce injection are **mandatory** for production. Refer to **[`SECURITY_REQUIREMENTS.md`](./SECURITY_REQUIREMENTS.md)** in the repository root for the complete deployment checklist and platform-specific implementation examples.
-
-**⚠️ IMPORTANT:** The example below uses `'unsafe-inline'` for simplicity. **This is NOT acceptable for production** due to security and compliance requirements. You MUST use CSP nonces or hashes in production environments.
-
-**Development example (for reference only):**
-
-```nginx
-add_header X-Frame-Options "SAMEORIGIN" always;
-add_header X-Content-Type-Options "nosniff" always;
-add_header X-XSS-Protection "1; mode=block" always;
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';" always;
-```
-
-**Production example (secure - REQUIRED):**
+**Reference nginx snippet (production):**
 
 ```nginx
 add_header X-Frame-Options "SAMEORIGIN" always;
@@ -490,208 +381,33 @@ add_header X-Content-Type-Options "nosniff" always;
 add_header X-XSS-Protection "1; mode=block" always;
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 # Generate nonce per request and inject into index.html
-# Your DevOps/CDN must be configured to generate and pass nonce
 add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'nonce-$request_id'; style-src 'self' 'nonce-$request_id';" always;
 ```
 
 **Template CSP Nonce Support:**
 
-This template does **not** ship automatic CSP nonce injection, a `postbuild` hook, or nonce placeholders in `index.html`.
-
-**Implementation:**
-
-If your production environment requires nonce-based CSP, your hosting or delivery layer must:
-
-1. Generate a unique nonce per request or per build artifact
-2. Inject that nonce into the delivered HTML and matching CSP header
-3. Keep the nonce strategy in sync with your deployment platform
-
-If you do not add nonce injection, use a different strict CSP strategy such as hashes and document it in your deployment setup.
-
-**Example for Vercel/Netlify:**
-Configure via `vercel.json` or `netlify.toml` headers section.
-
-### Build Configuration
-
-- **Source Maps:** `hidden` mode (available for debugging but not exposed)
-- **Chunk Size Warning:** 600kb limit for performance monitoring
-- **Compression:** Brotli (`.br`) files generated automatically
-- **CORS:** Enabled in dev server (configure on production server)
+This template does not ship automatic CSP nonce injection. If your production environment requires nonce-based CSP, your hosting or delivery layer must generate and inject the nonce into the delivered HTML and matching CSP header, and keep the nonce strategy in sync.
 
 ### Error Monitoring
 
-ErrorBoundary includes hooks for error monitoring services (Sentry, LogRocket, etc.). See `src/components/common/ErrorBoundary/index.tsx` for integration examples.
-
-## 🏢 Enterprise Scalability
-
-### Design Decisions
-
-This template prioritizes **pragmatic defaults** that work for the majority of SaaS applications, while maintaining clear migration paths for scale.
-
-**Routing Strategy:**
-
-React Router v7 is chosen as the default because:
-
-- **Optimal for typical SaaS apps:** Most SaaS applications start with 10-50 routes and stay within this range
-- **Simpler learning curve:** Easier onboarding for teams familiar with React Router ecosystem
-- **Lower initial complexity:** No need to learn file-based routing conventions if not required
-- **Modular structure ready:** Routes are organized in modules (`router/modules/`) from day one, enabling clean scaling
-
-**Modular Route Organization:**
-
-The template uses modular route structure (`router/modules/base.routes.tsx`) to demonstrate scalability:
-
-- `router/index.tsx` is a clean assembly point that combines route modules
-- Each domain can have its own route module (e.g., `user.routes.tsx`, `billing.routes.tsx`)
-- This prevents monolithic route configuration files and reduces merge conflicts
-- Easy to scale: simply create new modules and combine them in `index.tsx`
-
-**Module Federation Ready:**
-
-The modular route structure (`router/modules/`) is designed for micro-frontend architectures using Module Federation:
-
-- **Route modules are exportable:** Each route module (e.g., `base.routes.tsx`, `user.routes.tsx`) can be exported and consumed by a Host application
-- **React Router stays in Host:** The Host application manages the router instance; micro-frontends export route configurations as `RouteObject[]` arrays
-- **Seamless integration:** Route modules from this template can be imported into the Host's router configuration without modification
-- **Example:** In a Module Federation setup, export `baseRoutes` from `router/modules/base.routes.tsx` and import it in the Host app's router configuration
-
-This architecture demonstrates full readiness for micro-frontend deployments, allowing B2B clients to use this template as a standalone app or integrate it as a micro-frontend module.
-
-**When to choose file-based routing from the start:**
-
-- You expect 50+ routes with complex server-side data loading requirements
-- You need route-level permissions/guards before rendering
-- You're building a micro-frontend architecture
-- Multiple teams will manage different route sections independently
-
-**Migration path:** If you reach 50+ routes or require complex server-side data loading/permission checks before rendering, we recommend migrating to TanStack Router. This template is structured to minimize refactoring costs—the component architecture remains the same; only the router initialization and route definition files need replacing. TanStack Router is recommended as the primary file-based migration target.
-
-**State Management Pattern:**
-
-The template includes `userStore.ts` as a **production-ready example** demonstrating:
-
-- Modular store structure (each domain in its own folder)
-- Zustand with auto-selectors for optimal re-render performance
-- Testing patterns (tests alongside store files)
-- Integration with Redux DevTools for debugging
-
-This pattern enforces modularity from day one, preventing the anti-pattern of monolithic stores that cause performance and dependency issues in large codebases. Create additional stores following the same structure for other domains (settings, cart, etc.).
-
-**Custom Hooks Organization:**
-
-Hooks are organized by domain in `src/hooks/` for better scalability:
-
-```
-src/hooks/
-  ├── i18n/
-  │   └── useI18nReload.ts       # Dev-only HMR hook (no tests - difficult to mock import.meta.hot)
-  ├── user/
-  │   ├── useUserProfile.ts
-  │   └── useUserProfile.test.ts
-  └── api/
-      ├── useApiQuery.ts
-      └── useApiQuery.test.ts
-```
-
-**Guidelines:**
-
-- ✅ Each hook in its domain folder with tests alongside
-- ✅ Tests next to hook files (`hookName.test.ts`) - **except dev-only utilities** (e.g., HMR hooks)
-- ✅ Direct imports (no `index.ts` re-exports) for optimal tree-shaking
-- ✅ Group related hooks by domain (i18n, user, api, etc.)
-- ⚠️ Dev-only hooks (HMR, dev utilities) may skip tests if mocking is impractical
-
-**Internationalization (i18n):**
-
-i18n is **included by default** with production-ready configuration:
-
-- **Lazy Loading:** Translations loaded from `/public/locales/{lng}/{ns}.json` via HTTP
-- **Caching:** Built-in i18next caching prevents redundant downloads
-- **Language Detection:** Automatically detects language from localStorage → browser → fallback 'en'
-- **Namespace Structure:** `common` (UI elements), `errors` (API/HTTP errors), and page-specific namespaces (e.g., `home`)
-- **Initial Load:** Loads `common`, `errors`, and current page namespace on mount
-- **Hot Module Replacement:** Automatic translation reload in development mode when files in `public/locales/` are modified
-
-**Structure:**
-
-```
-public/locales/
-  en/
-    common.json    # UI elements, buttons, general phrases
-    errors.json    # API/HTTP/validation errors
-    home.json      # HomePage-specific content
-```
-
-**Usage in Components:**
-
-```typescript
-import { useTranslation } from 'react-i18next';
-
-const { t } = useTranslation(['common', 'home']);
-return <h1>{t('home:title')}</h1>;
-```
-
-**Development Workflow:**
-
-When editing translation files in `public/locales/`, changes are automatically detected and applied to the UI without page reload. The HMR system uses Vite's built-in file watcher to monitor translation files and triggers i18next's `reloadResources` API to update components in real-time.
-
-**Adding a New Language:**
-
-1. Create `public/locales/{lng}/` directory (e.g., `public/locales/uk/`)
-2. Copy JSON files from `en/` and translate
-3. Add language to `SUPPORTED_LANGUAGES` in `src/lib/i18n/constants.ts`
-
-**Adding a New Namespace:**
-
-1. Create `public/locales/en/{namespace}.json`
-2. Load namespace when needed: `useTranslation(['common', 'namespace'])`
-
-**Styling Approach:**
-
-Tailwind CSS is the default because it covers 95% of styling needs. CSS-in-JS (Emotion, Styled-Components) is only recommended when you need:
-
-- Advanced runtime theme switching (user-customizable themes)
-- Complex dynamic styles that can't be achieved with Tailwind
-- Styling libraries that require CSS-in-JS
-
-### State Management
-
-- ✅ **Modular stores pattern:** Each domain has its own store folder (e.g., `src/store/user/userStore.ts`, `src/store/settings/settingsStore.ts`) with tests alongside. The `userStore.ts` demonstrates this pattern—create additional stores following the same structure.
-
-### Routing
-
-- React Router v7 is optimal for 1-50 routes. For 100+ routes or micro-frontends, consider file-based routing (TanStack Router, Next.js/Remix) from the beginning. See [Routing Strategy](#-key-patterns) table above.
-
-### Styling
-
-- Tailwind CSS handles 95% of styling needs. For advanced runtime styling (user-customizable themes, complex dynamic styles), add CSS-in-JS (Emotion/Styled-Components) as a complement.
-
-### Security
-
-- ⚠️ **Critical:** `'unsafe-inline'` in CSP is NOT acceptable for production. You MUST use CSP nonces or hashes. This is mandatory for secure production environments and compliance standards, not optional.
+`ErrorBoundary` logs with `logger.error` and includes hooks for error monitoring services (Sentry, LogRocket, etc.). See `src/components/common/ErrorBoundary/index.tsx`.
 
 ## 🔧 Optional Additions
 
-This template is intentionally generic. Add based on your specific SaaS needs:
-
 - **Auth:** Supabase Auth, Firebase Auth, or Auth0 based on your backend
 - **Backend:** Supabase/Firebase SDK, or custom API client wrapper
-- **Analytics:** Sentry for error monitoring (hooks ready in ErrorBoundary), Plausible/Google Analytics
+- **Analytics:** Sentry for error monitoring (hooks ready in ErrorBoundary), Plausible/GA
 - **Payments:** Stripe or Paddle for subscriptions
-- **SEO:** Add Open Graph/Twitter meta tags in `index.html` or use `react-helmet-async`
-- **PWA:** Add `manifest.json` and service worker if needed
-- **Deployment:** Add `vercel.json` or `netlify.toml` for security headers configuration
-- **CSS-in-JS:** Add Emotion or Styled-Components only if you need advanced runtime styling (custom themes, complex dynamic styles). Tailwind covers 95% of cases.
-- **File-based Routing:** Consider TanStack Router for very large apps with hundreds of routes or micro-frontend architecture
+- **SEO:** Open Graph / Twitter meta tags in `index.html` or `react-helmet-async`
+- **PWA:** `manifest.json` and service worker
+- **Deployment:** `vercel.json` or `netlify.toml` for security headers
+- **CSS-in-JS:** Emotion or Styled-Components for advanced runtime styling (Tailwind covers the majority of cases)
+- **File-based Routing:** TanStack Router for 100+ routes or micro-frontend architectures
 
 ---
 
 ## 📝 Additional Notes
 
-- **Meta Tags:** Add description and robots meta tags in `index.html` for your SaaS project
-- **Language:** `lang` attribute in `index.html` can be changed dynamically when i18n is added
-- **Accessibility:** ESLint automatically checks A11y with jsx-a11y plugin. Fix errors during development for WCAG compliance
-
----
-
-**Built with ❤️ for modern web applications.**
+- **Meta Tags:** add description and robots meta tags in `index.html`
+- **Language:** `lang` attribute in `index.html` is updated dynamically by i18next
+- **Accessibility:** `eslint-plugin-jsx-a11y` enforces A11y rules during linting
