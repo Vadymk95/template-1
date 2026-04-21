@@ -33,7 +33,7 @@ A plan must include:
 3. **Approve** — Get approval if > 10 lines or store/API touched.
 4. **Execute** — TDD for logic. Max 1–2 files per iteration.
 5. **Verify** — Full loop: `npm run lint && npm run format:check && npx tsc -b --noEmit && npm test`.
-6. **Brain Sync** — Update MAP/DECISIONS/SKELETONS/DICTIONARY as needed.
+6. **Brain Sync** — Update brain docs in `.cursor/brain/` (`MAP.md`, `DECISIONS.md`, `SKELETONS.md`, `DICTIONARY.md`) as needed.
 7. **Confidence** — Declare HIGH | MEDIUM | LOW.
 
 ## Hook vs Utility Extraction Policy (MANDATORY)

@@ -28,23 +28,26 @@ Production-ready React SPA template. Copy, rename, start building. Includes all 
 ```
 src/
   components/
-    common/      # App-level: ErrorBoundary, I18nInitErrorFallback (i18n boot failure)
-    layout/      # Header, Footer, Main
+    common/      # App-level: ErrorBoundary, RouteErrorBoundary, RouteSkeleton, SkipLink, I18nInitErrorFallback, ThemeToggle, LanguageSwitcher
+    layout/      # Header, Footer, Main (`#main` landmark + route-focus hook)
     ui/          # shadcn/ui primitives
   hocs/          # WithSuspense, ProtectedRoute (auth gate for nested routes)
   hooks/
+    a11y/        # useRouteFocus — focus `#main` on client navigations (skips first paint)
     i18n/        # useI18nReload (dev HMR)
     theme/       # useTheme (light / dark / system)
     <domain>/    # Feature hooks with tests alongside
+  mocks/
+    browser.ts   # DEV-only MSW `setupWorker` (handlers from `test/handlers`)
   lib/
-    api/         # client, auth helpers; `_example.queries.ts` = query key + queryOptions() reference (not wired)
+    api/         # client, auth; `greeting.*` = minimal wired Query + transport (HomePage); `_example.*` = unwired pattern seeds
     i18n/        # i18next setup, constants, resources
     webVitals/   # subscribeStandard / subscribeAttribution (loaded from vitals.ts)
     queryClient.ts  # TanStack Query client factory
     env.ts       # @t3-oss/env-core validated public env
     vitals.ts, logger, utils  # observability + cn()
   pages/
-    HomePage/       # Index route (not lazy); page exported from index.tsx
+    HomePage/       # Index route (not lazy); `index.ts` re-exports `HomePage.tsx`
     LoginPage/      # Auth UI (lazy)
     DashboardPage/  # Behind ProtectedRoute (lazy)
     NotFoundPage/   # Catch-all (lazy)
@@ -64,7 +67,7 @@ src/
 
 ### TanStack Query — `queryOptions()` + key factories
 
-New features add a `queries.ts` (or `*.queries.ts`) next to the feature under `src/lib/api/`. It exports a stable **key factory** (`exampleKeys`) and **per-query** `queryOptions()` objects (`exampleDetailOptions`). Components call `useQuery(exampleDetailOptions(id))` directly; add a thin custom hook only when it wraps real logic (not for every fetch). See `src/lib/api/_example.queries.ts`.
+New features add a `queries.ts` (or `*.queries.ts`) under `src/lib/api/`: a stable **key factory** and **per-query** `queryOptions()` factories. Components call `useQuery(...)` with those options directly; add a thin custom hook only when it wraps real logic (not for every fetch). Unwired pattern reference: `_example.queries.ts`; minimal wired example used on the home route: `greeting.queries.ts`.
 
 ### Tailwind v4 (IMPORTANT — no tailwind.config.ts)
 
@@ -73,30 +76,17 @@ New features add a `queries.ts` (or `*.queries.ts`) next to the feature under `s
 - Animations via `tw-animate-css` (import in CSS, not a JS plugin)
 - Custom animations defined as `@keyframes` + `--animate-*` in `@theme`
 
-### Components: always presentational + hook
+### Components: presentational + hook
 
-```
-ComponentName/
-  ComponentName.tsx    # UI only, imports hook
-  useComponentName.ts  # All logic here
-  ComponentName.test.tsx
-```
+Feature components use a folder per component: UI in `ComponentName.tsx`, logic in `useComponentName.ts`, tests alongside. Layout and shared pieces follow the same idea where it applies.
 
 ### Stores: Zustand + createSelectors
 
-```typescript
-// Usage: useUserStore.use.username() — auto-selector
-// Or: useUserStore((s) => s.username) — standard selector
-export const useUserStore = createSelectors(useUserStoreBase);
-```
+`createSelectors` enables `useStore.use.field()` auto-selectors; the standard callback selector remains available. See `src/store/user/` for the persisted user store pattern.
 
 ### Pages: lazy by default
 
-```typescript
-// PageName.tsx — component
-// index.ts — lazy(() => import('./PageName'))
-// Router uses WithSuspense HOC
-```
+Non-index routes use `PageName.tsx` plus `index.ts` with `lazy(() => import('./PageName'))`; the router wraps lazy pages in `WithSuspense`. The home index route stays eager.
 
 ### i18n namespace strategy
 
@@ -104,6 +94,10 @@ export const useUserStore = createSelectors(useUserStoreBase);
 - `errors` — always loaded (API/validation errors)
 - `home` — loaded with HomePage
 - Feature namespaces — lazy loaded on demand
+
+### Route focus (a11y)
+
+- `useRouteFocus` in `App` receives a ref to `Main` (`#main`, `tabIndex={-1}`); on pathname change (not initial mount) focus moves to the landmark for WCAG 2.4.1; `data-route-focus` gates focus-ring styling in CSS.
 
 ### Web Vitals
 

@@ -64,7 +64,7 @@ const RootProviders = () => {
     );
 };
 
-createRoot(rootElement, {
+const root = createRoot(rootElement, {
     onCaughtError: (error, errorInfo) => {
         const message = error instanceof Error ? error.message : String(error);
         logger.error('[react]', {
@@ -83,11 +83,32 @@ createRoot(rootElement, {
             componentStack: errorInfo.componentStack
         });
     }
-}).render(
-    <StrictMode>
-        <RootProviders />
-    </StrictMode>
-);
+});
 
-// Load lazily — runs after paint, no startup impact
-reportWebVitals();
+const startApp = async () => {
+    const isMswEnabled = import.meta.env.VITE_ENABLE_MSW !== 'false';
+
+    if (import.meta.env.DEV && isMswEnabled) {
+        try {
+            const { worker } = await import('@/mocks/browser');
+            await worker.start({
+                onUnhandledRequest: 'bypass'
+            });
+        } catch (error: unknown) {
+            logger.error('[msw] Failed to start browser worker', {
+                reason: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined
+            });
+        }
+    }
+
+    root.render(
+        <StrictMode>
+            <RootProviders />
+        </StrictMode>
+    );
+
+    reportWebVitals();
+};
+
+void startApp();

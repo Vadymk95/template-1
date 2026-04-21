@@ -6,7 +6,7 @@
  *   `import.meta.env.DEV`, so the entire page tree is tree-shaken out of
  *   production bundles — the ship cost is zero while onboarding and design
  *   system visual checks stay on hand. `.cursor/brain/MAP.md`,
- *   `SKELETONS.md` and `TEMPLATE_SEEDS.md` all point here by route name.
+ *   `.cursor/brain/SKELETONS.md` and `.cursor/brain/TEMPLATE_SEEDS.md` all point here by route name.
  *
  * What it demonstrates:
  *   - Button variants / sizes / states

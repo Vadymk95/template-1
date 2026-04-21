@@ -5,13 +5,13 @@
 | File                   | Role                                                |
 | ---------------------- | --------------------------------------------------- |
 | `index.html`           | HTML shell — `i18n-loading` FOUC guard + `#i18n-boot` decorative spinner until i18n ready |
-| `src/main.tsx`         | Root: i18n ready gate (or `I18nInitErrorFallback` on init failure) → `I18nextProvider` → QueryClient → Router; `reportWebVitals()` after mount |
+| `src/main.tsx`         | Async bootstrap: optional DEV MSW worker (`src/mocks/browser.ts`, opt-out `VITE_ENABLE_MSW=false`) → root: i18n ready gate (or `I18nInitErrorFallback` on init failure) → `I18nextProvider` → QueryClient → Router; `reportWebVitals()` after mount |
 | `src/App.tsx`          | Layout shell: ErrorBoundary → Header/Main/Footer    |
 | `src/router/index.tsx` | Router assembly, merge route modules here           |
 
 ## Adding a New Page
 
-1. Create page files: lazy routes use `FooPage.tsx` + `index.ts` with `lazy()`; the index route (`HomePage`) is eager and may use `index.tsx` as the page module (see `pages/HomePage/`)
+1. Create page files: lazy routes use `FooPage.tsx` + `index.ts` with `lazy()`; the index route (`HomePage`) is eager — export the page from `index.ts` (re-exporting `HomePage.tsx`; see `pages/HomePage/`)
 2. Add route to `src/router/modules/base.routes.tsx` (or new module)
 3. Wrap with `WithSuspense` in route element
 4. Add translations: `public/locales/en/foo.json`
@@ -22,8 +22,8 @@
 1. New store → `src/store/<domain>/store.ts` + `store.test.ts`
 2. Hooks → `src/hooks/<domain>/useHook.ts` + `useHook.test.ts`
 3. Components → `src/components/<domain>/Component/` (tsx + hook + test)
-4. Server state → `src/lib/api/<domain>.queries.ts`: export a **key factory** + `queryOptions()` factories; `useQuery(detailOptions(id))` in UI, or a thin hook only when wrapping adds value (template: `src/lib/api/_example.queries.ts`)
-5. API transport / client calls → `src/lib/api/<domain>.ts` (template: `src/lib/api/_example.ts`)
+4. Server state → `src/lib/api/<domain>.queries.ts`: export a **key factory** + `queryOptions()` factories; `useQuery(detailOptions(id))` in UI, or a thin hook only when wrapping adds value (pattern seeds: `src/lib/api/_example.queries.ts`; minimal wired pair in app: `greeting.queries.ts` / `greeting.ts` on HomePage)
+5. API transport / client calls → `src/lib/api/<domain>.ts` (template: `src/lib/api/_example.ts`; wired transport alongside: `greeting.ts`)
 
 > All files prefixed `_` under `src/lib/api/` are **template seeds** — kept as canonical pattern references, not wired into the app. See [`TEMPLATE_SEEDS.md`](./TEMPLATE_SEEDS.md) before deleting any.
 
@@ -90,10 +90,10 @@ MSW runs in two modes — same handlers, different adapter:
 | Mode | Where | Adapter | When to use |
 |------|-------|---------|-------------|
 | **Node** | `src/test/server.ts` | `msw/node` | Unit + integration tests (Vitest). No browser needed. |
-| **Browser** | `public/mockServiceWorker.js` | `msw/browser` | Dev without a real backend, Storybook, Playwright in-browser. |
+| **Browser** | `public/mockServiceWorker.js` | `msw/browser` via `src/mocks/browser.ts` | Dev without a real backend (worker started from `main.tsx` unless `VITE_ENABLE_MSW` is `'false'`); Storybook / Playwright can reuse the same handlers. |
 
 `public/mockServiceWorker.js` is a generated Service Worker — do not edit it manually.
-To enable browser mode: call `setupWorker(...handlers)` in `src/main.tsx` under `import.meta.env.DEV`.
+Browser adapter: `setupWorker(...handlers)` lives in `src/mocks/browser.ts`; `main.tsx` imports it only in DEV.
 To update after MSW upgrade: `npx msw init public/`.
 
 ## CI / Supply chain

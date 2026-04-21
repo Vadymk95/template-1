@@ -15,6 +15,7 @@ Full reference: `.github/workflows/ci.yml`. One-command mirror: `npm run ci:loca
 | **TS/TSX / tests** (logic, components, hooks, stores) | `npm run lint && npm run typecheck && npm test` |
 | **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing/flows) | `npm run build && PLAYWRIGHT_USE_PREVIEW=1 npm run test:e2e` (needs `npx playwright install chromium` once) |
 | **Touches `src/env.ts`, `vite.config.ts`, `src/lib/vitals.ts`, `src/lib/webVitals/`** | Above + `npm run build && node scripts/check-web-vitals-chunks.mjs` |
+| **MSW** (`src/mocks/**`, `test/handlers.ts`, MSW wiring in `main.tsx`) | `npm run lint && npm run typecheck && npm test` (smoke dev manually if handlers changed) |
 | **Suspected bundle size / duplicate deps** | `npm run build:analyze` → open `dist/bundle-analysis.html` (do not commit HTML) |
 | **Regressions in standard vs attribution web-vitals chunks** | `npm run verify:web-vitals-chunks` (two full builds — use sparingly) |
 
@@ -22,11 +23,7 @@ Full reference: `.github/workflows/ci.yml`. One-command mirror: `npm run ci:loca
 
 ## Full local CI (same order as GitHub Actions)
 
-```bash
-npm run ci:local
-```
-
-Runs: `npm audit --audit-level=moderate` → `typecheck` → `lint:oxlint` → `lint` → `format:check` → `test:coverage` → `build` → `node scripts/check-web-vitals-chunks.mjs` → `npx playwright install --with-deps chromium` → `PLAYWRIGHT_USE_PREVIEW=1 npm run test:e2e` (Chromium E2E against `vite preview`).
+Run **`npm run ci:local`**. Step order and tooling mirror `.github/workflows/ci.yml` (audit at moderate+ → typecheck → Oxlint → ESLint → format check → Vitest coverage → production build → web-vitals chunk script → Playwright Chromium install → E2E against `vite preview`). Inspect `package.json` if you need the exact chain.
 
 Use **before push** or when impact is unclear. **Do not** run as default for one-line fixes or copy edits in Brain.
 
@@ -44,4 +41,4 @@ Use **before push** or when impact is unclear. **Do not** run as default for one
 
 ## Brain / MAP sync
 
-If you add new scripts or CI steps, update this file and `PROJECT_CONTEXT.md` → Dev Tooling. If entry points, routes, or `src/lib` layout change, align `MAP.md` (and `SKELETONS.md` if new hazard).
+If you add new scripts or CI steps, update this file and `.cursor/brain/PROJECT_CONTEXT.md` → Dev Tooling. If entry points, routes, or `src/lib` layout change, align `.cursor/brain/MAP.md` (and `.cursor/brain/SKELETONS.md` if new hazard).

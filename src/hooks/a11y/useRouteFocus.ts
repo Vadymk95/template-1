@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 
 /**
@@ -9,11 +9,28 @@ export const useRouteFocus = (mainRef: RefObject<HTMLElement | null>) => {
     const location = useLocation();
     const isInitialMount = useRef(true);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (isInitialMount.current) {
             isInitialMount.current = false;
             return;
         }
-        mainRef.current?.focus({ preventScroll: true });
+
+        const el = mainRef.current;
+        if (!el) return;
+
+        // Suppress the huge focus ring only for programmatic route focus. Browsers
+        // may still set :focus-visible here; skip-link / hash focus has no attribute.
+        el.setAttribute('data-route-focus', '');
+        el.focus({ preventScroll: true });
+
+        const onBlur = () => {
+            el.removeAttribute('data-route-focus');
+        };
+        el.addEventListener('blur', onBlur);
+
+        return () => {
+            el.removeEventListener('blur', onBlur);
+            el.removeAttribute('data-route-focus');
+        };
     }, [location.pathname, mainRef]);
 };

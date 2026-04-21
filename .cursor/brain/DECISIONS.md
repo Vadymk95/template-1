@@ -1,6 +1,14 @@
 # Architectural Decisions
 
-## [2026-04] Verification guide (`VERIFICATION.md`) + `ci:local`
+## [2026-04] MSW browser worker — `src/mocks/browser.ts` + dev opt-out
+
+**Decision**: DEV-only MSW uses `setupWorker` in `src/mocks/browser.ts` (handlers shared with Vitest via `test/handlers`). `main.tsx` starts the worker when `import.meta.env.DEV` and `import.meta.env.VITE_ENABLE_MSW !== 'false'` (opt-out; default-on in dev).
+
+**Why**: Keeps the worker setup out of the root file, reuses one handler list for Node and browser, and allows turning mocks off without removing code.
+
+---
+
+## [2026-04] Verification guide (`.cursor/brain/VERIFICATION.md`) + `ci:local`
 
 **Decision**: `.cursor/brain/VERIFICATION.md` defines minimal checks per task type; `npm run ci:local` mirrors CI. Agents should read it and avoid running audit/build/vitals-analyze for every trivial edit.
 

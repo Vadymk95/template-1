@@ -134,7 +134,7 @@ Re-read every changed file and verify:
 
 Before marking task complete:
 
-| Brain File | Update Trigger |
+| Brain file (under `.cursor/brain/`) | Update trigger |
 |---|---|
 | `MAP.md` | New/changed stores, routes, data flows, component wiring |
 | `DECISIONS.md` | New architectural pattern, deviation from existing, trade-off made |
@@ -184,7 +184,7 @@ START
   │
   ▼
 [Phase 5: Brain Auto-Sync]
-  │ MAP / DECISIONS / SKELETONS / DICTIONARY
+  │ `.cursor/brain/` → MAP / DECISIONS / SKELETONS / DICTIONARY
   │
   ▼
 [Phase 6: Confidence Declaration]

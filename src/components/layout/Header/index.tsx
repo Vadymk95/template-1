@@ -5,7 +5,7 @@
  *   Canonical composition of `useTheme`, `useTranslation`, `useUserStore` and
  *   router `NavLink` — the single place a new engineer (or an agent) sees all
  *   the cross-cutting hooks meeting in one layout shell. `.cursor/brain/MAP.md`
- *   and `TEMPLATE_SEEDS.md` point to this file by name; emptying it back to an
+ *   and `.cursor/brain/TEMPLATE_SEEDS.md` point to this file by name; emptying it back to an
  *   empty `<header />` silently breaks the agent contract for how pages,
  *   theming and auth compose together.
  *

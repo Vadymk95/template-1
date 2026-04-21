@@ -45,6 +45,8 @@ and design-system sanity-check cost savings compound every sprint.
 
 ## Related
 
+From repo root the paths are `.cursor/brain/MAP.md`, `.cursor/brain/PROJECT_CONTEXT.md`, `.cursor/brain/SKELETONS.md` (same folder as this file). Links below use filenames relative to `.cursor/brain/`.
+
 - [`MAP.md`](./MAP.md) — references the queries seed in the "Adding a New Feature" flow
 - [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md) — mentions the same seed by name in the stack section
 - [`SKELETONS.md`](./SKELETONS.md) — danger-zones including DevPlayground's DEV-only contract

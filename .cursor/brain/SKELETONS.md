@@ -20,6 +20,10 @@
 Lazy pages MUST be wrapped with `WithSuspense` in the route definition.
 Missing `WithSuspense` = uncaught Suspense boundary = blank screen.
 
+## Main landmark + route focus
+
+`Main` exposes `#main` with `tabIndex={-1}`; `App` passes its ref to `useRouteFocus`. Do not drop the pairing or strip `data-route-focus` handling in CSS without an accessibility review — programmatic focus after navigation is intentional.
+
 ## DevPlayground — DEV-only by contract
 
 `src/pages/DevPlayground/` and its `/dev/ui` route are mounted only under

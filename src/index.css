@@ -175,3 +175,18 @@ html:not(.i18n-loading) .i18n-boot {
         @apply bg-background text-foreground min-h-screen antialiased;
     }
 }
+
+/*
+ * Main landmark: `useRouteFocus` sets `data-route-focus` while moving focus after
+ * SPA navigation — hide the full-width ring there. Skip-link / in-page `#main`
+ * focus has no attribute, so keep a visible indicator (WCAG 2.4.7).
+ */
+#main[data-route-focus]:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+#main:focus-visible:not([data-route-focus]) {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}

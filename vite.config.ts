@@ -87,7 +87,8 @@ export default defineConfig(({ command }) => ({
         target: 'baseline-widely-available',
         cssCodeSplit: true,
         reportCompressedSize: false,
-        sourcemap: command === 'build' ? 'hidden' : true,
+        // Keep source maps off in production artifacts to reduce output size.
+        sourcemap: command === 'build' ? false : true,
         assetsInlineLimit: 4096,
         rolldownOptions: {
             treeshake: {

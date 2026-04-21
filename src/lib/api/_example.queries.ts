@@ -3,7 +3,7 @@
  *
  * Why it exists:
  *   Canonical reference for the TanStack Query pattern in this stack.
- *   `.cursor/brain/MAP.md` and `PROJECT_CONTEXT.md` point here by name —
+ *   `.cursor/brain/MAP.md` and `.cursor/brain/PROJECT_CONTEXT.md` point here by name —
  *   removing it silently breaks the agent contract for "how to add a new feature".
  *
  * What it demonstrates:
@@ -13,7 +13,7 @@
  *
  * When to delete:
  *   Only when this repo graduates from "template" to a real MVP AND
- *   at least one real `<domain>.queries.ts` exists. Update `TEMPLATE_SEEDS.md`
+ *   at least one real `<domain>.queries.ts` exists. Update `.cursor/brain/TEMPLATE_SEEDS.md`
  *   in the same commit.
  *
  * Leading underscore signals "reference, not wired into routes".

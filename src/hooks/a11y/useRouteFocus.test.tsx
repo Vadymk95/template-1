@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { useEffect, useRef, type FunctionComponent } from 'react';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -45,5 +45,24 @@ describe('useRouteFocus', () => {
         );
 
         expect(document.activeElement).toBe(document.querySelector('[data-testid="main"]'));
+    });
+
+    it('marks programmatic route focus and clears the mark on blur', () => {
+        render(
+            <MemoryRouter initialEntries={['/']}>
+                <Routes>
+                    <Route path="/" element={<Harness navigateTo="/next" />} />
+                    <Route path="/next" element={<Harness />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        const main = document.querySelector('[data-testid="main"]');
+        expect(main).toHaveAttribute('data-route-focus');
+
+        if (main) {
+            fireEvent.blur(main);
+        }
+        expect(main).not.toHaveAttribute('data-route-focus');
     });
 });

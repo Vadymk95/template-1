@@ -13,9 +13,15 @@ priority: 95
 - The pipeline (Priority 100) orchestrates all phases: Discovery → Simulation → TDD Execution → Verification → Brain Sync → Confidence.
 - Domain standards live in their respective rules. The pipeline enforces them — never bypass it.
 
+## Language (chat vs codebase)
+
+- **Chat with the user:** Russian by default unless the user switches language.
+- **New agent/session default:** First and all subsequent chat replies must be in Russian unless the user explicitly requests another language.
+- **Codebase:** English only — source, identifiers, comments, JSDoc, tests, and Git messages (`type(scope): subject`). Brain/docs under `.cursor/brain/` may be English for template consistency; do not mix Russian into production code or commits.
+
 ## Intelligence & Context
 
-- **Reasoning**: Use `sequential-thinking` for logic and `context7` for docs lookups. Russian for chat, English for code/comments.
+- **Reasoning**: Use `sequential-thinking` for logic and `context7` for docs lookups.
 - **Authority**: `.cursor/brain/` (MAP, DECISIONS, SKELETONS, DICTIONARY) is the Source of Truth. Sync drifts immediately.
 - **Stack**: Strict **TypeScript**. React 19. Prioritize existing libs over custom logic.
 - **Quality**: Minimalist code. No magic strings — use constants or i18n keys.

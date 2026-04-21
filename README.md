@@ -172,7 +172,7 @@ Key optimizations configured in `vite.config.ts`:
 - **Minification:** Oxc (faster than Terser)
 - **Chunking:** vendor splitting via `build.rolldownOptions.output.codeSplitting.groups` (`react-vendor`, `ui-vendor`, `state-vendor`, `i18n-vendor`)
 - **Compression:** Brotli (`.br`) files generated at build time
-- **Source Maps:** `hidden` mode (available for debugging, not exposed)
+- **Source Maps:** disabled in production output (`sourcemap: false`)
 - **Fonts:** auto-downloaded and self-hosted via `vite-plugin-webfont-dl`
 - **FOUC Prevention:** custom `htmlOptimize` plugin (`vite-plugins/html-optimize.ts`)
 - **Bundle Analysis:** `ANALYZE=true npm run build` → `dist/bundle-analysis.html`
@@ -181,7 +181,13 @@ Key optimizations configured in `vite.config.ts`:
 
 - **Public variables:** prefixed with `VITE_*` (exposed to browser); validated in `src/env.ts`
 - **Private variables:** no prefix (server-side only)
-- **Template:** see `.env.example`
+- **Template:** add values to local `.env` as needed, for example:
+
+```bash
+VITE_API_URL=http://localhost:3001/api
+VITE_WEB_VITALS_ATTRIBUTION=false
+VITE_ENABLE_MSW=false
+```
 
 ## 🔄 Development Workflow
 
@@ -323,7 +329,7 @@ Add new domains as new route modules (`user.routes.tsx`, `billing.routes.tsx`) a
 - **Framework:** Vitest + Testing Library
 - **Utilities:** `renderWithProviders` from `src/test/test-utils.tsx`
 - **Coverage:** `npm run test:coverage`
-- **MSW:** node adapter (`src/test/server.ts`) for unit/integration; browser worker (`public/mockServiceWorker.js`) for dev
+- **MSW:** node adapter (`src/test/server.ts`) for unit/integration; browser worker (`public/mockServiceWorker.js`) starts in dev only when `VITE_ENABLE_MSW=true`
 
 ### Writing Tests
 
@@ -357,7 +363,7 @@ npm run build
 - Optimizes and minifies with Oxc
 - Generates Brotli-compressed assets (`.br`)
 - Prevents FOUC via the `htmlOptimize` plugin
-- Source maps in `hidden` mode (available for debugging, not exposed)
+- Source maps disabled in production output (`sourcemap: false`)
 
 ### Bundle Analysis
 
