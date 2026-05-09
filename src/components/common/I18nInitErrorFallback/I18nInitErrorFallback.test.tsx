@@ -6,7 +6,7 @@ import { I18nInitErrorFallback } from '@/components/common/I18nInitErrorFallback
 describe('I18nInitErrorFallback', () => {
     it('renders an accessible alert with title and reload control', () => {
         const reload = vi.fn();
-        vi.stubGlobal('location', { reload } as unknown as Location);
+        vi.stubGlobal('location', { reload });
 
         render(<I18nInitErrorFallback />);
 
