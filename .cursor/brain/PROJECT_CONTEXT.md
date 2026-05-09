@@ -90,10 +90,19 @@ Non-index routes use `PageName.tsx` plus `index.ts` with `lazy(() => import('./P
 
 ### i18n namespace strategy
 
-- `common` — always loaded (buttons, labels)
-- `errors` — always loaded (API/validation errors)
-- `home` — loaded with HomePage
-- Feature namespaces — lazy loaded on demand
+Current (`src/lib/i18n/constants.ts`): all four scaffolded namespaces are
+**eager** — `DEFAULT_NAMESPACES = ['common', 'errors', 'home', 'auth']`,
+`LAZY_NAMESPACES = []`. They preload alongside the i18n init promise the app
+gates on. To add a lazy feature namespace:
+
+1. Move it from `DEFAULT_NAMESPACES` (or add fresh) to `LAZY_NAMESPACES`.
+2. Inside the consuming feature: `useTranslation('feature-namespace')` triggers
+   the lazy fetch via `i18next-http-backend` on mount.
+3. Wrap in `<WithSuspense>` if you want a fallback during the fetch.
+
+The eager-by-default posture is intentional for a small (<10 KB) JSON tree —
+predictable LCP, no double waterfall, no "translation flash" on lazy mount.
+Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
 
 ### Route focus (a11y)
 
