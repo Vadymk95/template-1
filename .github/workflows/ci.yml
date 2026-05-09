@@ -31,15 +31,21 @@ jobs:
                   node-version: ${{ matrix.node-version }}
                   cache: 'npm'
 
-            # `npm install --include=optional` instead of `npm ci`:
-            # npm 10/11 only locks current-platform optional binaries (e.g. lightningcss,
-            # @unrs/resolver-binding) at install time. A lock generated on macOS arm64
-            # is missing linux/win/android binaries → `npm ci` errors with EUSAGE on a
-            # Linux runner ("Missing: lightningcss-linux-x64-gnu... from lock file").
-            # `npm install` is lenient and fetches the runner's missing platform deps
-            # while still respecting versions pinned in the lockfile.
+            # Node 24.15.0 (current LTS) bundles npm 11.12.1, which regressed
+            # peerOptional handling (npm/cli#9249, 2026-04-17) — peerOptional deps
+            # marked extraneous and removed. Combined with the long-standing
+            # cross-platform optional-binaries bug (npm/cli#4828) this means lock
+            # files generated on macOS arm64 fail Linux CI with EUSAGE
+            # "Missing: <pkg>-linux-x64-gnu from lock file" for native bindings
+            # (lightningcss, @unrs/resolver-binding). Both issues are fully
+            # restored in npm 11.14.0 (2026-05-06) via arborist 9.5.0. Pin to
+            # ^11.14.0 explicitly — npm@latest would track future majors that
+            # may regress again.
+            - name: Upgrade npm to ^11.14 (cross-platform optional binaries fix)
+              run: npm install -g npm@^11.14.0
+
             - name: Install dependencies
-              run: npm install --include=optional --ignore-scripts --no-audit --no-fund
+              run: npm ci --ignore-scripts
 
             - name: Audit dependencies
               run: npm audit --audit-level=moderate
