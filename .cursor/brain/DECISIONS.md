@@ -70,9 +70,9 @@
 
 ## [2026-04] TypeScript 6 — upgraded
 
-**Decision**: Running **TypeScript 6.0.x** (`~6.0.2`).
+**Decision**: Running **TypeScript 6.0.x** (`~6.0.3`).
 
-**Why**: `typescript-eslint` 8.58.1 supports TypeScript 6. One breaking change affected our config: `baseUrl` is deprecated in TS6. Fixed by removing `"baseUrl"` from both `tsconfig.json` and `tsconfig.app.json` — `paths` works without it in TS6.
+**Why**: `typescript-eslint` 8.58.1+ supports TypeScript 6 (peer relaxed to `<6.1.0`). One breaking change affected our config: `baseUrl` is deprecated in TS6. Fixed by removing `"baseUrl"` from both `tsconfig.json` and `tsconfig.app.json` — `paths` works without it in TS6.
 
 ---
 
