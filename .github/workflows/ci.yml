@@ -31,8 +31,15 @@ jobs:
                   node-version: ${{ matrix.node-version }}
                   cache: 'npm'
 
+            # `npm install --include=optional` instead of `npm ci`:
+            # npm 10/11 only locks current-platform optional binaries (e.g. lightningcss,
+            # @unrs/resolver-binding) at install time. A lock generated on macOS arm64
+            # is missing linux/win/android binaries → `npm ci` errors with EUSAGE on a
+            # Linux runner ("Missing: lightningcss-linux-x64-gnu... from lock file").
+            # `npm install` is lenient and fetches the runner's missing platform deps
+            # while still respecting versions pinned in the lockfile.
             - name: Install dependencies
-              run: npm ci --ignore-scripts
+              run: npm install --include=optional --ignore-scripts --no-audit --no-fund
 
             - name: Audit dependencies
               run: npm audit --audit-level=moderate
