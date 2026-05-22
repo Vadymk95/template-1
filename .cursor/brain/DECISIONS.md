@@ -56,7 +56,14 @@
 
 **Decision**: Holding on ESLint **9.x**. Not upgrading to ESLint **10** yet.
 
-**Why**: `eslint-plugin-react` **7.x** uses `context.getFilename()` which was **removed in ESLint 10**. Runtime crash, not a peer-dep warning. No v8 of the plugin exists. Revisit when `eslint-plugin-react` releases ESLint 10 support.
+**Snapshot (2026-05-22)**: ESLint 10.0.0 shipped 2026-02-09; latest 10.4.0 shipped 2026-05-15. ESLint 9.x EOL is 2026-08-06. The 9.x line is on `maintenance` dist-tag (currently `9.39.4`).
+
+**Why**: `eslint-plugin-react@7.37.5` uses `context.getFilename()` + `sourceCode.isSpaceBetweenTokens` + `sourceCode.getAllComments` + RuleTester `type` field — all removed in ESLint 10 (runtime crash, not peer-warn). PR #3979 blocked transitively by `import-js/eslint-plugin-import#3230`. `eslint-plugin-jsx-a11y@6.10.2` peer caps `^9`, PR #1081 awaiting `ljharb` review since Mar 2026.
+
+**Revisit when**: monthly review starting 2026-07-01 (1-month buffer pre-EOL). Either (a) `eslint-plugin-react` ships release widening peer to `^10`, OR (b) `eslint-plugin-jsx-a11y@7.x` ships, OR (c) we adopt forks:
+
+- `@eslint-react/eslint-plugin@5.8.4+` (peer `eslint ^10.3.0`, requires Node ≥22, NOT drop-in — rule rewrite)
+- `eslint-plugin-jsx-a11y-x@0.2.0+` (es-tooling org, peer `^9 || ^10`, drop-in)
 
 ---
 
