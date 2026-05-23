@@ -1,5 +1,66 @@
 # Architectural Decisions
 
+## [2026-05] `size-limit` per-chunk brotli budget — `ci:local` gate
+
+**Decision**: add `size-limit@^12.1.0` + `@size-limit/preset-app@^12.1.0` devDeps + `npm run size:check` script + `.size-limit.json` config with per-chunk brotli budgets. Wired into `ci:local` AFTER `verify:web-vitals-chunks` (asserts size, not composition — orthogonal to existing script). Per /consilium 2026-05-23 APPLY Item 6 (5/6 YES, 1 COND satisfied by pre-flight overlap check).
+
+**Why**: `scripts/check-web-vitals-chunks.mjs` asserts chunk *composition* (subscribeStandard vs subscribeAttribution split correctness), NOT chunk *size*. `chunkSizeWarningLimit: 600` (KB raw) in `vite.config.ts` is a Vite *warning*, not a CI fail. No per-chunk byte-budget gate currently exists. `size-limit` 868K weekly DLs is ~10× over `bundlesize@85K` (May 2026 npm registry direct) — clear winner.
+
+**Initial budgets (brotli)** — set at current size + ~20% headroom so first-fork CI passes:
+
+- `react-vendor`: 90 KB (current ~75 KB)
+- `i18n-vendor`: 22 KB (current ~18 KB)
+- `state-vendor`: 15 KB (current ~12 KB)
+- `ui-vendor`: 12 KB (current ~9 KB)
+- `index` entry: 25 KB (current ~20 KB)
+
+**Conditions** (Pragma + Mini /consilium): budgets live in standalone `.size-limit.json` (not `package.json` `"size-limit"` key) to keep diff noise low and isolate budget changes from dep-bump churn. Pre-flight verified zero overlap with `verify:web-vitals-chunks.mjs` (different verification axis).
+
+**Revisit trigger (60-day, 2026-07-23)**: if a fork hits ≥3 false-positive budget bumps from legitimate feature work in 60 days, recalibrate budgets to p75 of fork-distribution OR move size-limit out of `ci:local` into PR-comment-only (size-limit GH Action). If size-limit `--why` flag reports same vendor exceeding budget across 3 forks, raise the budget structurally.
+
+## [2026-05] REJECT list — explicit non-adoption (2026-05-23 /consilium)
+
+**Decision**: explicit DO-NOT-ADOPT register so future agents + forks don't re-litigate. Per /consilium 2026-05-23 APPLY Item 14 (6/6 voters YES). Sibling templates carry equivalent sections.
+
+### React Compiler enable in template-1 (VETOED)
+
+**Status**: skip. **Why**: /consilium 2026-05-23 Item 2 (`babel-plugin-react-compiler@1.0.0` + `@rolldown/plugin-babel`) — 1 YES / 3 NO / 2 COND + **Adversarial killer Q VETO** ("Name one Compiler-enabled production app at >100K MAU where #35105 or #35644 reproducers have been ruled out as of 2026-05-23" — unanswerable) + **ADR conflict**: reverses `[2026-03] @vitejs/plugin-react v6` Oxc-no-Babel decision. [Vite team Mar 2026 blog](https://vite.dev/blog/announcing-vite8) warns "adding babel-loader will eliminate most Oxc gains" — build-speed regression is concrete, Compiler benefit (Makarevich N=1 mixed-positive: 1-2 of 8-10 re-renders fixed) is workload-dependent. Open silent-bailout bugs: [facebook/react#35105](https://github.com/facebook/react/issues/35105), [#35644](https://github.com/facebook/react/issues/35644) (`Status: Unconfirmed`, no assignees, May 2026).
+**Revisit (quarterly, 2026-08-23)**: if either bug closes AND ≥1 named >100K-MAU Compiler-enabled Vite app publishes "ruled out" retro AND Vite team blesses Babel-Compiler-Vite path explicitly, re-evaluate. `eslint-plugin-react-hooks@7.1.1` already loaded in `eslint.config.js` (`flat['recommended-latest']`) — Compiler correctness rules already fire as lint-only signal (no Compiler runtime needed for lint).
+
+### Lighthouse CI in template-1 (not currently proposed, deferred)
+
+**Status**: skip. **Why**: template-1 is enterprise SPA without PWA contract — synthetic Lighthouse perf gate adds CI-time cost (see sibling `template-spa-pwa` LHCI for cost profile) without proportional signal. Sibling `template-spa-pwa` ships LHCI because PWA install + offline contracts depend on it.
+**Revisit (60-day, 2026-07-23)**: if a fork ships perf-critical SLA AND consumer requests LHCI gate, lift sibling template-spa-pwa lighthouserc as starting point.
+
+### React Doctor `lint-staged --staged --fail-on warning` PR-gate (REJECTED)
+
+**Status**: skip. **Why**: /consilium 2026-05-23 Item 1 — 0 YES / 4 NO / 2 COND. Pragma+Mini gang-of-two NO + Ergo category error ("Doctor is project-level scan, not staged-file linter") + Adversarial flagged [typicode/husky#1462](https://github.com/typicode/husky/issues/1462) Windows-path issues on cross-platform forks.
+**Revisit (60-day, 2026-07-23)**: if React Doctor 1.0 ships AND ≥1 dated bug observed in a fork that Doctor would have caught, re-evaluate scoped to ad-hoc `npm run doctor` + GitHub Action `millionco/react-doctor@<commit-sha>` (NOT `@main`) with `--offline` + PR comment only (NOT lint-staged blocking).
+
+### memlab (Meta heap-snapshot leak detector)
+
+**Status**: skip by default. **Why**: 158K weekly DLs (May 2026), ZERO published GitHub releases ([facebook/memlab/releases](https://github.com/facebook/memlab/releases)), 0 of 8 React Doctor leaderboard flagship repos use in CI.
+**Revisit (90-day, 2026-08-23)**: if memlab ships v2.0+ with formal releases AND ≥1 named React app at >10K MAU publishes a memlab-CI case study, re-evaluate.
+
+### why-did-you-render (WDYR)
+
+**Status**: skip as template default; consumer choice. **Why**: WDYR README declares "completely incompatible with React Compiler" — but template-1 doesn't ship Compiler, so WDYR is technically usable here for consumer forks. Template stays minimal; consumer adds WDYR if needed for re-render audit. Replacement for Compiler-on stacks: React DevTools Profiler "Memo ✨" badge.
+**Revisit (no trigger needed)**: consumer-choice category.
+
+### `react-native-flipper`
+
+**Status**: not applicable (template-1 is web, not RN). Sunset since RN 0.74.
+
+### Zstd compression plugin
+
+**Status**: skip. **Why**: Safari Zstd landed 26.3 Feb 11, 2026 ([WebKit blog](https://webkit.org/blog/17798/webkit-features-for-safari-26-3/)), caniuse global compat 45/100 — pre-26.3 long-tail huge, Brotli still mandatory. Existing `vite-plugin-compression@brotliCompress` covers requirement.
+**Revisit (no trigger needed)**: revisit only when caniuse Zstd global crosses 80/100 AND CDN/edge config supports automatic encoding negotiation.
+
+### `vite-plugin-bundlesize`
+
+**Status**: skip (use `size-limit` instead). **Why**: `size-limit@^12.1.0` adopted per /consilium Item 6. `vite-plugin-bundlesize` is a separate Vite-native gate (single-vendor) — size-limit has 10× wider adoption + ecosystem-shared config shape.
+**Revisit (no trigger needed)**: re-evaluate only if size-limit deprecates or becomes unmaintained.
+
 ## [2026-04] MSW browser worker — `src/mocks/browser.ts` + dev opt-out
 
 **Decision**: DEV-only MSW uses `setupWorker` in `src/mocks/browser.ts` (handlers shared with Vitest via `test/handlers`). `main.tsx` starts the worker when `import.meta.env.DEV` and `import.meta.env.VITE_ENABLE_MSW !== 'false'` (opt-out; default-on in dev).

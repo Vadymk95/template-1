@@ -1,0 +1,32 @@
+[
+    {
+        "name": "react-vendor (brotli)",
+        "path": "dist/assets/react-vendor.*.js",
+        "limit": "90 KB",
+        "brotli": true
+    },
+    {
+        "name": "i18n-vendor (brotli)",
+        "path": "dist/assets/i18n-vendor.*.js",
+        "limit": "22 KB",
+        "brotli": true
+    },
+    {
+        "name": "state-vendor (brotli)",
+        "path": "dist/assets/state-vendor.*.js",
+        "limit": "15 KB",
+        "brotli": true
+    },
+    {
+        "name": "ui-vendor (brotli)",
+        "path": "dist/assets/ui-vendor.*.js",
+        "limit": "12 KB",
+        "brotli": true
+    },
+    {
+        "name": "index entry (brotli)",
+        "path": "dist/assets/index.*.js",
+        "limit": "25 KB",
+        "brotli": true
+    }
+]

@@ -18,12 +18,13 @@ Full reference: `.github/workflows/ci.yml`. One-command mirror: `npm run ci:loca
 | **MSW** (`src/mocks/**`, `test/handlers.ts`, MSW wiring in `main.tsx`) | `npm run lint && npm run typecheck && npm test` (smoke dev manually if handlers changed) |
 | **Suspected bundle size / duplicate deps** | `npm run build:analyze` → open `dist/bundle-analysis.html` (do not commit HTML) |
 | **Regressions in standard vs attribution web-vitals chunks** | `npm run verify:web-vitals-chunks` (two full builds — use sparingly) |
+| **Vendor chunk byte budget** (touched `vite.config.ts` `codeSplitting.groups`, added a vendor dep, or `npm run build` output looks heavier) | `npm run build && npm run size:check` (reads `.size-limit.json` per-chunk brotli budgets) |
 
 ---
 
 ## Full local CI (same order as GitHub Actions)
 
-Run **`npm run ci:local`**. Step order and tooling mirror `.github/workflows/ci.yml` (audit at moderate+ → typecheck → Oxlint → ESLint → format check → Vitest coverage → production build → web-vitals chunk script → Playwright Chromium install → E2E against `vite preview`). Inspect `package.json` if you need the exact chain.
+Run **`npm run ci:local`**. Step order and tooling **mostly mirror** `.github/workflows/ci.yml` (audit at moderate+ → typecheck → Oxlint → ESLint → format check → Vitest coverage → production build → web-vitals chunk script → Playwright Chromium install → E2E against `vite preview`). **`ci:local` is stricter**: after `verify:web-vitals-chunks` it adds **`npm run size:check`** (size-limit per-chunk brotli budgets from `.size-limit.json`) — this step is NOT in the GitHub workflow today (see `[2026-05] size-limit per-chunk brotli budget` in DECISIONS for the cost/benefit gap). Inspect `package.json` if you need the exact chain.
 
 Use **before push** or when impact is unclear. **Do not** run as default for one-line fixes or copy edits in Brain.
 

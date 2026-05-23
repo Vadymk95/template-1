@@ -84,7 +84,7 @@ npm install && npm run dev
 - **Husky + lint-staged** — git hooks for quality gates
 - **Commitlint** — conventional commits enforcement
 - **Vitest 4.1** — unit testing with Testing Library
-- **Playwright 1.59** — E2E tests
+- **Playwright 1.60** — E2E tests
 
 ## 🛠 Project Structure
 
