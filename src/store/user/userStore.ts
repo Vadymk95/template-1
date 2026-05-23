@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 
+import { DEVTOOLS_NAMES, STORAGE_KEYS, USER_STORE_ACTIONS } from '@/store/keys';
 import { createSelectors } from '@/store/utils/createSelectors';
 
 interface UserState {
@@ -27,18 +28,18 @@ const useUserStoreBase = create<UserState>()(
                 token: null,
                 setUser: (username: string, token: string) => {
                     set({ isLoggedIn: true, username, token }, false, {
-                        type: 'user-store/user/setUser'
+                        type: USER_STORE_ACTIONS.SET_USER
                     });
                 },
                 logout: () => {
                     set({ isLoggedIn: false, username: null, token: null }, false, {
-                        type: 'user-store/user/logout'
+                        type: USER_STORE_ACTIONS.LOGOUT
                     });
                 }
             }),
-            { name: 'user-store' }
+            { name: STORAGE_KEYS.USER_STORE }
         ),
-        { name: 'user-store' }
+        { name: DEVTOOLS_NAMES.USER_STORE }
     )
 );
 

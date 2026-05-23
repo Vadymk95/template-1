@@ -1,5 +1,29 @@
 # Architectural Decisions
 
+## [2026-05] Magic strings → constants (Zustand keys + devtools labels)
+
+**Decision**: extract magic strings used in 2+ places OR carrying external contract to named constants. Apply selectively per framework below. NOT a blanket "extract everything" — single-use strings stay inline (Ghost Principle).
+
+**Extraction sites added this commit**:
+- `src/store/keys.ts` — `STORAGE_KEYS` (Zustand `persist({ name })` + plain `localStorage.setItem(key)` keys — external contract: renaming breaks persisted user data), `DEVTOOLS_NAMES` (Zustand `devtools({ name })` labels — Redux DevTools panel grouping), `USER_STORE_ACTIONS` (per-store `set(..., false, { type })` labels — refactor safety + DevTools discoverability). Per-store ACTION constants keep namespaces short; do NOT roll into one mega-object as more stores land.
+
+**Pattern**: `as const` objects, NOT `enum`. Type via `typeof OBJ[keyof typeof OBJ]`. Reasons:
+- Zero runtime overhead vs enum (~150 bytes per enum compiled)
+- Tree-shakeable (numeric enums have reverse-mapping bloat)
+- Plays better with structural type matching
+- Modern TS consensus (`const enum` known broken in bundlers per TS docs)
+
+**TanStack Query keys — INTENTIONALLY NOT centralized**: existing `greetingKeys` / `exampleKeys` factories stay **colocated** with their `queryOptions()` factories in `src/lib/api/<domain>.queries.ts`. This matches Dominik Dorfmeister's "Effective React Query Keys" recommendation (TkDodo blog, 2021; still current as of TanStack Query v5) — colocated factories scale better than a central `queryKeys.ts` registry because (a) one file owns one feature's cache surface, (b) deleting a feature deletes its keys with it, (c) no central import-fan-out hotspot. A centralized `src/lib/queryKeys.ts` would have been a regression here.
+
+**When NOT to extract** (do NOT pile in cosmetic refactors):
+- Single-use strings (logger source tags like `'[i18n]'`, one-off event names, test selectors)
+- Self-documenting at use site (`aria-label` on a close button)
+- i18n keys (handled by i18next)
+- Throwaway prototype scope
+- Already-extracted constants (`API_BASE_URL`, `I18N_HMR_EVENT`, `I18N_STORAGE_KEY` already live in their respective module's `constants.ts` — no second-mover refactor needed)
+
+**Revisit trigger**: if consumer fork adds >3 stores or grows `USER_STORE_ACTIONS` past ~6 entries, reassess the per-store-ACTIONS-object split (may want code-gen or a tighter naming convention). If a fork centralizes TanStack Query keys into one registry file and the codebase stays maintainable for >3 months, the Dorfmeister-colocated recommendation in this ADR is the one to revisit — not the other way around.
+
 ## [2026-05] Boundary validation via Zod safeFetch wrapper
 
 **Decision**: validate ALL API responses at boundary using Zod schemas via `src/lib/api/safeFetch.ts`. Reference example: `src/lib/api/greeting.queries.ts`. Pattern is opt-in for consumer forks — copy + extend per endpoint.

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { STORAGE_KEYS } from '@/store/keys';
+
 type Theme = 'light' | 'dark' | 'system';
 
-const STORAGE_KEY = 'theme';
+const STORAGE_KEY = STORAGE_KEYS.THEME;
 
 const getResolved = (theme: Theme): 'light' | 'dark' =>
     theme === 'system'
