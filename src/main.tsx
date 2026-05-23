@@ -5,12 +5,15 @@ import { I18nextProvider } from 'react-i18next';
 import { RouterProvider } from 'react-router-dom';
 
 import { I18nInitErrorFallback } from '@/components/common/I18nInitErrorFallback';
+import { installDevGuards } from '@/lib/devGuards';
 import i18n, { i18nInitPromise } from '@/lib/i18n';
 import { logger } from '@/lib/logger';
 import { queryClient } from '@/lib/queryClient';
 import { reportWebVitals } from '@/lib/vitals';
 import { router } from '@/router';
 import './index.css';
+
+installDevGuards();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
