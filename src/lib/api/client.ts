@@ -13,7 +13,7 @@ import { env } from '@/env';
 import { getAuthToken } from '@/store/user/userStore';
 
 // Backend API URL — configure VITE_API_URL in .env (validated by src/env.ts via t3-env + zod)
-const API_BASE_URL = env.VITE_API_URL ?? 'http://localhost:3001/api';
+export const API_BASE_URL = env.VITE_API_URL ?? 'http://localhost:3001/api';
 
 // Proper Error subclass so instanceof checks and only-throw-error rule work correctly
 export class ApiError extends Error {

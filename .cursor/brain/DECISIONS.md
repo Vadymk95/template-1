@@ -1,5 +1,27 @@
 # Architectural Decisions
 
+## [2026-05] Boundary validation via Zod safeFetch wrapper
+
+**Decision**: validate ALL API responses at boundary using Zod schemas via `src/lib/api/safeFetch.ts`. Reference example: `src/lib/api/greeting.queries.ts`. Pattern is opt-in for consumer forks — copy + extend per endpoint.
+
+**Why**: catches BE shape drift at receive time (HTTP boundary) instead of buried in render. Removes "undefined → NaN → blank UI" class of bugs. Provides `z.infer<typeof Schema>` types for free (single source of truth).
+
+**Scope**:
+- TanStack Query `queryFn` (use `safeFetchQueryFn(url, schema)`)
+- Direct fetch calls (use `safeFetch(url, schema)`)
+- localStorage / sessionStorage reads (use `Schema.safeParse(JSON.parse(raw))`)
+
+**When NOT to use**: tRPC / GraphQL with codegen (other pattern handles it); throwaway prototypes; high-frequency polling where ~50-200μs parse matters.
+
+**Trade-offs**:
+- +0 KB bundle (Zod already in deps for forms)
+- ~50-200μs parse per response (negligible)
+- Schemas duplicate BE types — acceptable for solo/small-team. For multi-team scale, consider codegen (openapi-zod-client, @ts-rest) later.
+
+**AbortError pairing**: `safeFetchQueryFn` re-throws `AbortError` unchanged so TanStack Query treats it as cancellation (not error). Pairs with `src/lib/devGuards.ts` `installDevGuards()` which preventDefault's leaked AbortError unhandledrejection events in dev.
+
+**Revisit trigger**: if consumer fork ships ≥5 endpoints without using safeFetch pattern within 60 days of starting product, drop pattern from template seed (consumer can copy-paste from past commits).
+
 ## [2026-05] `size-limit` per-chunk brotli budget — `ci:local` gate
 
 **Decision**: add `size-limit@^12.1.0` + `@size-limit/preset-app@^12.1.0` devDeps + `npm run size:check` script + `.size-limit.json` config with per-chunk brotli budgets. Wired into `ci:local` AFTER `verify:web-vitals-chunks` (asserts size, not composition — orthogonal to existing script). Per /consilium 2026-05-23 APPLY Item 6 (5/6 YES, 1 COND satisfied by pre-flight overlap check).
