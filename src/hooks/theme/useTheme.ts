@@ -17,7 +17,7 @@ const applyTheme = (theme: Theme): void => {
     document.documentElement.classList.toggle('dark', getResolved(theme) === 'dark');
 };
 
-export const useTheme = () => {
+export const useTheme = (): { theme: Theme; setTheme: (next: Theme) => void } => {
     const [theme, setThemeState] = useState<Theme>(
         () => (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'system'
     );
@@ -30,7 +30,7 @@ export const useTheme = () => {
     useEffect(() => {
         if (theme !== 'system') return;
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
-        const handler = () => {
+        const handler = (): void => {
             applyTheme('system');
         };
         mq.addEventListener('change', handler);

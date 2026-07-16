@@ -22,7 +22,7 @@ export const createQueryClient = (options?: {
     gcTime?: number;
     refetchOnWindowFocus?: boolean;
     retry?: number | false;
-}) => {
+}): QueryClient => {
     return new QueryClient({
         defaultOptions: {
             queries: {

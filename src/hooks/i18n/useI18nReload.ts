@@ -9,7 +9,7 @@ import { I18N_ERROR_MESSAGE, I18N_HMR_EVENT } from '@/lib/i18n/constants';
  * Listens for Vite HMR custom events and reloads translations when files in public/locales/ are modified.
  * Uses i18next's built-in reloadResources API for proper cache busting and component updates.
  */
-export const useI18nReload = () => {
+export const useI18nReload = (): void => {
     const { i18n } = useTranslation();
 
     useEffect(() => {
@@ -17,7 +17,7 @@ export const useI18nReload = () => {
             return;
         }
 
-        const handleTranslationUpdate = async () => {
+        const handleTranslationUpdate = async (): Promise<void> => {
             const resolvedLng = i18n.resolvedLanguage ?? i18n.language;
             const loadedNamespacesSet = new Set<string>();
 
@@ -54,7 +54,7 @@ export const useI18nReload = () => {
         };
 
         // Wrap async handler: Vite's hot.on expects () => void, not () => Promise<void>
-        const handleUpdate = () => {
+        const handleUpdate = (): void => {
             void handleTranslationUpdate();
         };
 

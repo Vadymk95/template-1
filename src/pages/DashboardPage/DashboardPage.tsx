@@ -12,7 +12,7 @@ export const DashboardPage: FunctionComponent = () => {
     const username = useUserStore.use.username();
     const logout = useUserStore.use.logout();
 
-    const handleLogout = () => {
+    const handleLogout = (): void => {
         logout();
         void navigate(RoutesPath.Login);
     };

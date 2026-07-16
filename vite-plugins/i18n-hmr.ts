@@ -23,7 +23,7 @@ export const i18nHmr = (): Plugin => {
 
             server.watcher.add(localesDir);
 
-            const handleFileChange = (file: string) => {
+            const handleFileChange = (file: string): void => {
                 if (file.includes(LOCALES_DIR) && file.endsWith('.json')) {
                     const filename = file.split(`${LOCALES_DIR}/`).pop() ?? file;
                     server.ws.send({

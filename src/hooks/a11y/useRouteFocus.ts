@@ -5,7 +5,7 @@ import { useLocation } from 'react-router-dom';
  * Moves focus to the main landmark on client-side navigations (WCAG 2.4.1).
  * Skips the initial mount so hydration / first paint is unchanged.
  */
-export const useRouteFocus = (mainRef: RefObject<HTMLElement | null>) => {
+export const useRouteFocus = (mainRef: RefObject<HTMLElement | null>): void => {
     const location = useLocation();
     const isInitialMount = useRef(true);
 
@@ -23,7 +23,7 @@ export const useRouteFocus = (mainRef: RefObject<HTMLElement | null>) => {
         el.setAttribute('data-route-focus', '');
         el.focus({ preventScroll: true });
 
-        const onBlur = () => {
+        const onBlur = (): void => {
             el.removeAttribute('data-route-focus');
         };
         el.addEventListener('blur', onBlur);

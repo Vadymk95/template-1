@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { BaseSyntheticEvent } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type UseFormReturn } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -22,7 +22,10 @@ const loginSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
-export const useLoginForm = () => {
+export const useLoginForm = (): {
+    form: UseFormReturn<LoginFormData>;
+    onSubmit: (e?: BaseSyntheticEvent) => void;
+} => {
     const { t } = useTranslation(['auth', 'errors']);
     const navigate = useNavigate();
     const setUser = useUserStore.use.setUser();

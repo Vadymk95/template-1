@@ -8,7 +8,9 @@ type WithSelectors<S extends UseBoundStore<StoreApi<object>>> = S & {
     };
 };
 
-export const createSelectors = <S extends UseBoundStore<StoreApi<object>>>(store: S) => {
+export const createSelectors = <S extends UseBoundStore<StoreApi<object>>>(
+    store: S
+): WithSelectors<S> => {
     const storeWithSelectors = store as WithSelectors<S>;
     storeWithSelectors.use = {} as WithSelectors<S>['use'];
 

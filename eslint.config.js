@@ -154,6 +154,26 @@ export default defineConfig([
                 'error',
                 { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }
             ],
+            // ─── Explicit in/out contracts ───────────────────────────────────
+            // Every named function declares its output: either a variable type
+            // annotation (const X: FunctionComponent<Props> = () => …) or an
+            // explicit return type (const useX = (): UseXResult => …). Inline
+            // callbacks passed as arguments/JSX props stay free (allowExpressions).
+            // Inputs are covered by TS strict itself: noImplicitAny forces every
+            // props/param type to be declared.
+            '@typescript-eslint/explicit-function-return-type': [
+                'error',
+                {
+                    allowExpressions: true,
+                    allowTypedFunctionExpressions: true,
+                    allowHigherOrderFunctions: true,
+                    allowIIFEs: true
+                }
+            ],
+            // Property-style signatures (`onSelect: (id: string) => void`) get
+            // strict contravariant parameter checks; method style (`onSelect(id)`)
+            // is checked bivariantly — looser, can hide unsound narrowing.
+            '@typescript-eslint/method-signature-style': ['error', 'property'],
             // Note: prefer-nullish-coalescing + prefer-optional-chain require type-aware
             // linting (parserOptions.project). Enable by switching to tseslint.configs.strictTypeChecked
             // + adding languageOptions.parserOptions.project. Slows linting but catches more issues.
@@ -184,12 +204,24 @@ export default defineConfig([
         }
     },
     // ─── shadcn/ui generated components — relaxed rules ─────────────────────
-    // shadcn generates function declarations. Don't fight the generator.
-    // When running `npx shadcn@latest add`, components land here as-is.
+    // shadcn generates function declarations without return annotations. Don't
+    // fight the generator. When running `npx shadcn@latest add`, components
+    // land here as-is.
     {
         files: ['src/components/ui/**/*.{ts,tsx}'],
         rules: {
-            'func-style': 'off'
+            'func-style': 'off',
+            '@typescript-eslint/explicit-function-return-type': 'off'
+        }
+    },
+    // ─── TanStack Query option factories — inference is the API design ───────
+    // queryOptions() derives queryKey/queryFn types from the options object;
+    // spelling out its return type would be brittle noise. The options object
+    // itself is the declared contract.
+    {
+        files: ['src/lib/api/**/*.queries.ts'],
+        rules: {
+            '@typescript-eslint/explicit-function-return-type': 'off'
         }
     },
     // Vite plugins load before Vite resolves `@/`; they may import `../src/**` explicitly.
@@ -215,6 +247,8 @@ export default defineConfig([
     {
         files: ['**/*.test.{ts,tsx}', 'src/test/**/*.{ts,tsx}'],
         rules: {
+            // Test helpers/fixtures don't need declared return contracts.
+            '@typescript-eslint/explicit-function-return-type': 'off',
             '@typescript-eslint/no-empty-function': 'off',
             // Tests legitimately use non-null assertions for mocks
             '@typescript-eslint/no-non-null-assertion': 'off',
@@ -236,6 +270,7 @@ export default defineConfig([
         },
         rules: {
             ...tseslint.configs.disableTypeChecked.rules,
+            '@typescript-eslint/explicit-function-return-type': 'off',
             'import-x/no-cycle': 'off',
             'import-x/order': 'off',
             'func-style': 'off',

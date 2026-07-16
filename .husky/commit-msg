@@ -1,4 +1,12 @@
+# Optional nvm version switch (.nvmrc). Fenced with set +e: husky runs hooks
+# under `sh -e`, and nvm re-arms errexit internally before returning non-zero —
+# without the fence a missing nvm version kills the hook before its real work.
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use --silent 2>/dev/null || true
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    set +e
+    . "$NVM_DIR/nvm.sh" > /dev/null 2>&1
+    nvm use --silent > /dev/null 2>&1
+    set -e
+fi
 
 npx --no-install commitlint --edit "$1"

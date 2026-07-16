@@ -56,6 +56,21 @@ const { t } = useTranslation(['common', 'home']);
 return <h1>{t('home:title')}</h1>;
 ```
 
+## UI Quality — avoid the "AI aesthetic"
+
+AI-generated UI has recognizable tells. For any UI work reject the framework default in favour of this repo's tokens (`src/index.css` → `@theme inline {}` + `:root`/`.dark`):
+
+- **Brand colour**: the palette is **Google Blue** (`--primary: 221.2 83.2% 53.3%`, dark `217.2 91.2% 59.8%`) — never the default purple/indigo. Use `bg-primary`/`text-primary`, never hard-coded hex.
+- **Radius scale**: respect the hierarchy — `--radius-sm` / `--radius-md` / `--radius-lg`, all derived from `--radius: 0.5rem`. Don't round everything to the max; vary radius by element weight.
+- **Gradients**: none ship by default. Flat fills only; add a gradient only when a real design sanctions it.
+- **Spacing & shadows**: use Tailwind's spacing scale and shadcn's subtle elevation — no uniform oversized padding, no shadow-heavy depth.
+- **Charts**: use the five `--chart-1`…`--chart-5` tokens, not ad-hoc colours.
+- **Layout**: content-first and priority-driven, not a generic hero + uniform card grid. LCP-critical content first.
+- **Copy**: realistic strings via `t()` (see i18n above), never lorem-ipsum — placeholder copy hides real wrapping / overflow / length.
+- **Components**: shadcn/ui (new-york) primitives are the source of truth for variants — check `/dev/ui` (DevPlayground seed) for the sanctioned Button / Input states before inventing new ones.
+- **Dark mode**: verify both themes via the `.dark` class — don't tune light only.
+- **Baseline APIs only**: stick to "Widely available" CSS/JS (Container Queries, `:has()`, `<dialog>`, view-transitions, `scroll-snap`). Avoid "Newly available" (e.g. `scheduler.yield()`).
+
 ## Accessibility
 
 - Semantic HTML first: prefer `<button>`, `<nav>`, `<main>` over `<div role="...">`.
@@ -63,6 +78,7 @@ return <h1>{t('home:title')}</h1>;
 - Loading states: `role="status"` + `aria-live="polite"`.
 - Error states: `role="alert"` + `aria-live="assertive"`.
 - Keyboard navigation: all interactive elements must be keyboard-reachable.
+- Respect `prefers-reduced-motion`: gate non-essential motion (`tw-animate-css` animations, transitions) behind the query — the global `@media (prefers-reduced-motion: reduce)` reset lives in `src/index.css`.
 - shadcn/ui components include accessibility by default — don't override without reason.
 
 ## Path Aliases

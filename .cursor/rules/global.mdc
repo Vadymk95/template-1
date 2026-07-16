@@ -13,6 +13,20 @@ priority: 95
 - The pipeline (Priority 100) orchestrates all phases: Discovery → Simulation → TDD Execution → Verification → Brain Sync → Confidence.
 - Domain standards live in their respective rules. The pipeline enforces them — never bypass it.
 
+## 0.1 Conditional Rule Routing
+
+Do NOT assume Cursor auto-attaches every rule. The always-on rules (`alwaysApply: true`) — this file, `agent-pipeline.mdc`, `workflow.mdc`, `project-config.mdc` — load automatically. The glob-scoped conditional rules (`alwaysApply: false`) often do NOT attach reliably. Before planning/editing in a task area, **explicitly read the matching conditional rules**:
+
+- **React / UI / component / hook / page / HOC work** → `react-patterns.mdc`, `engineering-standards.mdc`, `performance.mdc`
+- **New behavioral component / changed component behavior** → also `test-driven-development.mdc` before implementation
+- **Tests / fixtures / mocks / coverage** → `test-driven-development.mdc`
+- **API client / TanStack Query hooks / data-fetching / payload contracts** → `api.mdc`, `state-management.mdc`, `resilience.mdc`
+- **Zustand stores / TanStack Query state / `createSelectors`** → `state-management.mdc`, `resilience.mdc`, `test-driven-development.mdc`
+- **Routing / route organization / lazy pages** → `routing.mdc`, `react-patterns.mdc`
+- **Async / error handling / debugging** → `resilience.mdc`
+- **Styling / render-perf / memo / list keys / bundle budgets** → `performance.mdc` + `react-patterns.mdc`
+- **Constants / magic strings / config values** → `constants.mdc`, `engineering-standards.mdc`
+
 ## Language (chat vs codebase)
 
 - **Chat with the user:** Russian by default unless the user switches language.

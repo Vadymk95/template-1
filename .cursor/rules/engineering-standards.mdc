@@ -68,3 +68,12 @@ if (status === STATUS.PENDING) { ... }
 - **One-Way Loyalty**: If a file contradicts these rules, the rules win. Files > 300 LOC are not valid style references for new code.
 - **Legacy Maintenance**: When editing existing files — preserve their style. Never replicate legacy patterns in new files.
 - **Explicit Dependencies**: Functions that need data from another module must accept it via typed params. Avoid implicit cross-module coupling.
+
+## 5. DANGER ZONE — Template Seeds (NEVER strip as "dead code")
+
+This is a forkable template: some code exists ONLY to demonstrate the stack's patterns and is intentionally not wired into the runtime, so it looks unused to lint / tree-shake / "remove dead code" sweeps. **It is NOT dead code — leaving it is the contract.**
+
+- The canonical registry is `.cursor/brain/TEMPLATE_SEEDS.md`. Files marked `🌱 TEMPLATE SEED` and `_`-prefixed modules in `src/lib/api/` (e.g. `_example.queries.ts`, `_example.ts`), `src/pages/DevPlayground/*` (the DEV-only `/dev/ui` route), `ThemeToggle`, `LanguageSwitcher`, and the `Header`/`Footer` demo wiring are ALL seeds.
+- **NEVER** delete, "clean up", or strip a seed during refactor / unused-export / dead-code passes — even if asked to "remove unused code" broadly. A seed is removed ONLY by its explicit "When to delete" clause in the registry (when it graduates into a real module), never opportunistically.
+- The `/dev/ui` route MUST stay guarded by `import.meta.env.DEV` in `src/router/modules/base.routes.tsx` — removing the guard leaks the shadcn kitchen-sink page into production bundles (see `.cursor/brain/SKELETONS.md`).
+- New reference-only modules: keep the `_` prefix and add a row to the registry so the signal stays consistent.

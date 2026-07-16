@@ -15,7 +15,7 @@ priority: 100
 
 ### Phase 1 Fast-Track
 
-If the task targets **only** files matching `*.styled.ts`, `*.styled.tsx`, `*.scss`, `*.css`, `*.i18n.*`, `*.spec.ts`, `*.test.ts`, or `*.md` — skip Brain reads and proceed directly to Phase 3. State: `"Phase 1 skipped — styling/i18n/test/docs task."` When in doubt → run full Phase 1.
+If the task targets **only** files matching `*.styled.ts`, `*.styled.tsx`, `*.scss`, `*.css`, `*.i18n.*`, `*.spec.ts`, `*.test.ts`, or `*.md` — skip Brain reads and proceed directly to Phase 3. State: `"Phase 1 skipped — styling/i18n/test/docs task."` Still emit the **Rule Receipt** (step 7 below) for the conditional rules the task area maps to. When in doubt → run full Phase 1.
 
 ---
 
@@ -25,7 +25,9 @@ Before any reasoning about implementation:
 2. **Risk Detection**: Read `.cursor/brain/SKELETONS.md` — check if task touches any danger zone.
 3. **Context Gathering**: Identify affected files (components, hooks, stores, API). Search codebase for existing implementations of similar logic.
 4. **Scope Declaration**: Produce clear **In-scope / Out-of-scope** list.
-5. **Explicit declaration**: State in one message: scope + SKELETONS zones touched (or "none"). Do not code before this.
+5. **Rule Routing**: Load the matching conditional rules using `global.mdc` §0.1 before planning edits.
+6. **Rule Receipt**: List the conditional `.mdc` rules actually loaded (e.g. `Rules loaded: react-patterns, performance, engineering-standards`). If none apply, state `"Rules loaded: none (always-on only)."`
+7. **Explicit declaration**: State in one message: scope + SKELETONS zones touched (or "none"). Do not code before this.
 
 > **Gate**: If task touches a SKELETONS zone — flag the risk and propose mitigation before Phase 2.
 
@@ -56,7 +58,7 @@ After the critique, generate **1–2 mental test cases** per non-trivial functio
 - Trace execution: "Given X, step 1 does A, step 2 does B, result is Y."
 - If trace reveals unexpected result — revise plan **before writing code**.
 
-> **Gate**: Present Architectural Critique. For tasks > 10 lines or touching stores/API: wait for approval (**The Approval Law** from `workflow.mdc`). Minor fixes (< 10 lines) proceed with brief notification.
+> **Gate**: Present Architectural Critique. Gate by **risk, not LOC** — if the task touches a SKELETONS danger zone, a Zustand store / TanStack Query contract, an API payload contract, or the router: wait for approval (**The Approval Law** from `workflow.mdc`). Trivial leaf edits proceed with brief notification.
 
 ---
 
@@ -100,7 +102,7 @@ Implement directly → write integration tests via `renderWithProviders`.
 ```bash
 npm run lint          # must exit 0
 npm run format:check  # Prettier compliance
-npx tsc -b --noEmit   # solution / project references — aligns with package.json `tsc -b`
+npm run typecheck     # tsc -b — solution / project references (package.json script)
 npm test              # all tests green
 ```
 
@@ -170,7 +172,7 @@ START
   ▼
 [Phase 2: Architectural Simulation + Solver-Verifier]
   │ sequential-thinking → Critique → Mental test cases
-  │ ── Gate: Approval if > 10 lines or stores/API touched ──
+  │ ── Gate: Approval by RISK — SKELETONS / store / API contract / router touched ──
   │
   ▼
 [Phase 3: TDD-First Execution]

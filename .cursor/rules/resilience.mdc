@@ -22,7 +22,7 @@ logger.error('[UserStore] setUser: failed to update user state', error, { userId
 ```
 
 - **Silent catch**: FORBIDDEN. Every `catch` must either log with context or rethrow.
-- **API errors**: Use the `ApiError` interface from `src/lib/api/client.ts`. Never expose raw stack traces to the UI.
+- **API errors**: Use the `ApiError` class from `src/lib/api/client.ts`. Never expose raw stack traces to the UI.
 
 ## 2. TanStack Query Error Handling
 

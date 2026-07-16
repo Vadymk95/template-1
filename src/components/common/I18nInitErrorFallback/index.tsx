@@ -1,9 +1,11 @@
 /**
  * Rendered when i18next fails before translations load. `t()` is unavailable — copy is fixed English.
  */
+import type { ReactElement } from 'react';
+
 import { Button } from '@/components/ui';
 
-export const I18nInitErrorFallback = () => (
+export const I18nInitErrorFallback = (): ReactElement => (
     <section
         role="alert"
         aria-live="assertive"

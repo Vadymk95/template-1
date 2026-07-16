@@ -12,6 +12,8 @@ priority: 80
 - **Lazy pages by default**: Use `React.lazy` + `WithSuspense` HOC for all pages except the entry route.
 - **Dynamic imports**: Heavy UI (modals, charts, rich editors) that is below-the-fold must be lazily imported.
 - **Suspense boundaries**: Use to prevent slow data-fetching from blocking the full page render.
+- **Below-fold rendering**: apply `content-visibility: auto` (+ `contain-intrinsic-size` to reserve space) to long off-screen sections so the browser skips their layout/paint until scrolled near. Baseline "Widely available".
+- **bfcache-safe teardown**: never register `unload` handlers — they disable the back/forward cache. Use `pagehide` / `visibilitychange` for cleanup so back/forward navigations restore instantly.
 
 ## 2. React Memoization (Strict Thresholds)
 
@@ -37,7 +39,7 @@ const sortedUsers = useMemo(() => [...users].sort(byName), [users]); // large ar
 ## 4. Bundle Optimization
 
 - **Chunk strategy**: Defined in `vite.config.ts` via `build.rolldownOptions.output.codeSplitting.groups`. Current chunks: `react-vendor`, `ui-vendor`, `state-vendor`, `i18n-vendor`.
-- **Adding new heavy libraries**: Always check `npm run build:analyze` after. Target: no chunk > 600kb.
+- **DANGER ZONE — bundle budgets are a HARD gate, not a guideline**: `.size-limit.json` (brotli) caps `react-vendor` 90 KB, `i18n-vendor` 22 KB, `state-vendor` 15 KB, `ui-vendor` 12 KB, `index` entry 25 KB. `npm run size:check` runs inside `npm run ci:local` (and GitHub Actions) — **blowing any budget FAILS CI**. Before adding ANY new dependency: run `npm run build:analyze` to see where it lands, then `npm run size:check`. NEVER raise a budget in `.size-limit.json` to make a heavy import fit — dynamic-import the heavy code or pick a lighter library instead; bumping the cap requires explicit sign-off.
 - **Tree-shaking**: Use named imports only (`import { thing } from 'lib'`). Avoid default-import-then-destruct.
 
 ## 5. Audit Guard

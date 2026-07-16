@@ -6,6 +6,7 @@ Production-ready React 19 + Vite 8 + TypeScript 6 template with routing, Zustand
 
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
+- [Make it yours (fork checklist)](#-make-it-yours-fork-checklist)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
 - [Configuration](#-configuration)
@@ -47,6 +48,16 @@ npm install && npm run dev
 1. Create a `.env` file only if your project needs environment variables
 2. Customize `index.html` meta tags for your project
 3. Review [Key Patterns](#-key-patterns)
+
+## 🧬 Make it yours (fork checklist)
+
+After cloning, these are the exact files / symbols to edit to make the template your own:
+
+- **`index.html`** — `<title>` (currently `React Enterprise Foundation`) and the commented-out `<meta name="description">` / `<meta name="robots">` tags.
+- **`package.json`** — the `"name"` field (currently `react-enterprise-foundation`).
+- **`src/lib/i18n/constants.ts`** — `SUPPORTED_LANGUAGES` (add locales beyond `'en'`), `DEFAULT_LANGUAGE`, and the namespace lists `DEFAULT_NAMESPACES` / `LAZY_NAMESPACES` (each must match a folder under `public/locales/{lng}/{ns}.json`).
+- **`src/index.css`** — brand theme tokens in `:root` and `.dark`: the HSL triples `--primary`, `--secondary`, `--accent`, `--ring`, `--chart-1`…`--chart-5`, plus the `--radius` scale. Currently Google Blue.
+- **Template seeds** — when you outgrow the demo modules, follow [`.cursor/brain/TEMPLATE_SEEDS.md`](.cursor/brain/TEMPLATE_SEEDS.md) to graduate or remove them.
 
 ## 🚀 Tech Stack
 

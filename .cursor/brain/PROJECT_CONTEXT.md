@@ -112,7 +112,7 @@ Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
 
 - `src/lib/vitals.ts` — lazy reporting after hydration; optional `VITE_WEB_VITALS_ATTRIBUTION=true` loads `web-vitals/attribution` via `subscribeAttribution.ts` (flag also in `src/env.ts` for Zod/docs; **branch uses `import.meta.env`** so Vite drops the unused chunk). Load failures: `logger.warn` with context.
 - Custom backend: pass `reportWebVitals(yourReporter)`.
-- **Re-verify chunk split:** after `npm run build`, `node scripts/check-web-vitals-chunks.mjs` (CI runs this on `dist/`). Full regression (two builds: default + attribution): `npm run verify:web-vitals-chunks`.
+- **Re-verify chunk split:** after `npm run build`, `npm run verify:web-vitals-chunks` (checks existing `dist/`; CI runs it after build). Full regression (two builds: default + attribution): `npm run verify:web-vitals-chunks:full`.
 
 ### Pre-i18n shell
 
@@ -124,7 +124,7 @@ Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
 - `npm run ci:local` — mirrors `.github/workflows/ci.yml` locally (audit → typecheck → oxlint → eslint → format → test:coverage → build → web-vitals chunk check).
 - `npm run dev` — Vite dev server (`vite.config.ts` pins port 3000). ESLint runs via the IDE extension (recommended in `.vscode/extensions.json`) and as a pre-commit gate in `lint-staged` — no in-Vite linter.
 - `npm run build` — `tsc -b` then Vite production build (Rolldown)
-- `npm run verify:web-vitals-chunks` — asserts standard vs attribution web-vitals chunks (two production builds; use after changing `src/lib/vitals.ts` or env wiring)
+- `npm run verify:web-vitals-chunks` — asserts chunk split on the current `dist/` (run after `build`); `verify:web-vitals-chunks:full` — two production builds asserting standard vs attribution variants (use after changing `src/lib/vitals.ts` or env wiring)
 - `npm run build:analyze` — bundle visualizer (`ANALYZE=true`)
 - `npm run typecheck` — `tsc -b` only (also used in CI before lint)
 - `npm run test` — Vitest run

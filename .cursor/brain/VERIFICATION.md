@@ -17,7 +17,7 @@ Full reference: `.github/workflows/ci.yml`. One-command mirror: `npm run ci:loca
 | **Touches `src/env.ts`, `vite.config.ts`, `src/lib/vitals.ts`, `src/lib/webVitals/`** | Above + `npm run build && node scripts/check-web-vitals-chunks.mjs` |
 | **MSW** (`src/mocks/**`, `test/handlers.ts`, MSW wiring in `main.tsx`) | `npm run lint && npm run typecheck && npm test` (smoke dev manually if handlers changed) |
 | **Suspected bundle size / duplicate deps** | `npm run build:analyze` → open `dist/bundle-analysis.html` (do not commit HTML) |
-| **Regressions in standard vs attribution web-vitals chunks** | `npm run verify:web-vitals-chunks` (two full builds — use sparingly) |
+| **Regressions in standard vs attribution web-vitals chunks** | `npm run verify:web-vitals-chunks:full` (two full builds — use sparingly) |
 | **Vendor chunk byte budget** (touched `vite.config.ts` `codeSplitting.groups`, added a vendor dep, or `npm run build` output looks heavier) | `npm run build && npm run size:check` (reads `.size-limit.json` per-chunk brotli budgets) |
 
 ---
@@ -34,7 +34,7 @@ Use **before push** or when impact is unclear. **Do not** run as default for one
 
 | Command | Why |
 |---------|-----|
-| `npm run verify:web-vitals-chunks` | Two production builds; only for vitals/env/chunk work |
+| `npm run verify:web-vitals-chunks:full` | Two production builds; only for vitals/env/chunk work (plain `verify:web-vitals-chunks` is a cheap `dist/` check) |
 | `ANALYZE=true` / `build:analyze` | Heavy; only for bundle investigation |
 | `npm ci` | Reinstalls deps; CI uses it on clean runners — locally use when lockfile changes |
 

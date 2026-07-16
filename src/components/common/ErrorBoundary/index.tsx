@@ -74,7 +74,7 @@ class ErrorBoundaryComponent extends Component<ErrorBoundaryProps, ErrorBoundary
         return { hasError: true, error };
     }
 
-    componentDidCatch(error: Error, info: ErrorInfo) {
+    componentDidCatch(error: Error, info: ErrorInfo): void {
         logger.error('React ErrorBoundary caught an error', {
             message: error.message,
             stack: error.stack,
@@ -83,15 +83,15 @@ class ErrorBoundaryComponent extends Component<ErrorBoundaryProps, ErrorBoundary
         // To add Sentry: Sentry.captureException(error, { contexts: { react: { componentStack: info.componentStack } } });
     }
 
-    handleReset = () => {
+    handleReset = (): void => {
         this.setState({ hasError: false, error: undefined });
     };
 
-    handleReload = () => {
+    handleReload = (): void => {
         window.location.reload();
     };
 
-    render() {
+    render(): ReactNode {
         if (this.state.hasError) {
             return (
                 <ErrorFallback

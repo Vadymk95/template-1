@@ -50,3 +50,4 @@ From repo root the paths are `.cursor/brain/MAP.md`, `.cursor/brain/PROJECT_CONT
 - [`MAP.md`](./MAP.md) — references the queries seed in the "Adding a New Feature" flow
 - [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md) — mentions the same seed by name in the stack section
 - [`SKELETONS.md`](./SKELETONS.md) — danger-zones including DevPlayground's DEV-only contract
+- [`README.md` → Make it yours (fork checklist)](../../README.md#-make-it-yours-fork-checklist) — the exact brand / i18n / theme-token symbols a forker edits first (graduating seeds is step 5 there)

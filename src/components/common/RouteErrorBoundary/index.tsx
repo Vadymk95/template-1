@@ -22,7 +22,7 @@ export const RouteErrorBoundary: FunctionComponent = () => {
         statusText
     });
 
-    const handleRetry = () => {
+    const handleRetry = (): void => {
         window.location.reload();
     };
 

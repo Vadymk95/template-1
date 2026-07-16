@@ -45,7 +45,7 @@ import { WithSuspense } from '@/hocs/WithSuspense';
 
 ```typescript
 // FooPage.tsx — the component
-export function FooPage() { ... }
+export const FooPage: FunctionComponent = () => { ... };
 
 // index.ts — lazy export (used in router)
 import { lazy } from 'react';

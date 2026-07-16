@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, useEffect, useState, type ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
 import { RouterProvider } from 'react-router-dom';
@@ -21,7 +21,7 @@ if (!rootElement) {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-const RootProviders = () => {
+const RootProviders = (): ReactElement | null => {
     const [isI18nReady, setIsI18nReady] = useState(i18n.isInitialized);
     const [i18nInitError, setI18nInitError] = useState<Error | null>(null);
 
@@ -88,7 +88,7 @@ const root = createRoot(rootElement, {
     }
 });
 
-const startApp = async () => {
+const startApp = async (): Promise<void> => {
     const isMswEnabled = import.meta.env.VITE_ENABLE_MSW !== 'false';
 
     if (import.meta.env.DEV && isMswEnabled) {
