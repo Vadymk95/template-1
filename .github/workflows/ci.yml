@@ -6,6 +6,9 @@ on:
     push:
         branches: [master]
 
+permissions:
+    contents: read
+
 # Cancel in-progress runs on the same branch when a new commit is pushed.
 # Master pushes are never cancelled (allow full pipeline to finish).
 concurrency:

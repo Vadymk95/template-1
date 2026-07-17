@@ -42,6 +42,12 @@ npm run verify       # typecheck → oxlint → eslint → prettier check → te
 npm run ci:local     # full local CI (adds audit, build, chunk/size checks, e2e)
 ```
 
+**Bootstrap after clone**: `npm run prepare` (once) — `.npmrc` disables lifecycle
+scripts as a supply-chain guard, so husky hooks don't install themselves; the
+verify gate fails loudly if hooks are missing. Dependency cooldown is also on
+(`.npmrc` `min-release-age=3`, DAYS): a brand-new package or urgent patch needs
+`npm install <pkg> --min-release-age=0`.
+
 The gate is **zero-warnings**: `eslint --max-warnings 0`, `oxlint --deny-warnings`. If it fails, fix the cause — do **not** downgrade rules, silence warnings, or sprinkle `eslint-disable`. If a rule is genuinely wrong for a class of files, add a documented file-scoped override in `eslint.config.js` stating why (see the shadcn/ui and `*.queries.ts` overrides for the pattern).
 
 ## Version holds (do not "fix" by bumping)
