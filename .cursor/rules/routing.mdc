@@ -27,18 +27,18 @@ src/router/
 5. Assemble in `src/router/index.tsx` if new module.
 
 ```typescript
-// routes.ts — path constants
-export const ROUTES = {
-    HOME: '/',
-    FOO: '/foo',
-    NOT_FOUND: '*',
+// routes.ts — path constants (actual export: RoutesPath — keys Root, Login, Dashboard, DevPlayground, NotFound)
+export const RoutesPath = {
+    Root: '/',
+    Foo: '/foo',
+    NotFound: '*'
 } as const;
 
 // base.routes.tsx
 import { FooPage } from '@/pages/FooPage';
 import { WithSuspense } from '@/hocs/WithSuspense';
 
-{ path: ROUTES.FOO, element: WithSuspense(<FooPage />) }
+{ path: RoutesPath.Foo, element: WithSuspense(<FooPage />) }
 ```
 
 ## Page Pattern
@@ -60,16 +60,16 @@ export const FooPage = lazy(() => import('./FooPage'));
 // Programmatic navigation
 import { useNavigate } from 'react-router-dom';
 const navigate = useNavigate();
-navigate(ROUTES.FOO);
+navigate(RoutesPath.Foo);
 
 // Declarative
 import { Link } from 'react-router-dom';
-<Link to={ROUTES.FOO}>Go to Foo</Link>
+<Link to={RoutesPath.Foo}>Go to Foo</Link>
 ```
 
 ## Anti-Patterns (FORBIDDEN)
 
-- ❌ Hardcoded path strings in `<Link to="/foo">` — use `ROUTES.FOO`.
+- ❌ Hardcoded path strings in `<Link to="/foo">` — use `RoutesPath.Foo`.
 - ❌ Lazy pages without `WithSuspense` — causes blank screen on load.
 - ❌ Route logic (guards, redirects) in components — belongs in route module.
 - ❌ Adding routes directly to `index.tsx` — always use a module file.

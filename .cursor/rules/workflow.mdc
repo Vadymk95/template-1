@@ -34,7 +34,7 @@ A plan must include:
 2. **Simulate** — `sequential-thinking` for tasks > 3 steps. Architectural critique.
 3. **Approve** — Get approval by risk: SKELETONS zone, store / Query contract, API payload contract, or router touched.
 4. **Execute** — TDD for logic. Max 1–2 files per iteration.
-5. **Verify** — Full loop: `npm run lint && npm run format:check && npm run typecheck && npm test`.
+5. **Verify** — Canonical gate: `npm run verify` (check-hooks → typecheck → oxlint → eslint → format:check → tests + coverage).
 6. **Brain Sync** — Update brain docs in `.cursor/brain/` (`MAP.md`, `DECISIONS.md`, `SKELETONS.md`, `DICTIONARY.md`) as needed.
 7. **Confidence** — Declare HIGH | MEDIUM | LOW.
 
@@ -50,11 +50,10 @@ A plan must include:
 Always run after code changes:
 
 ```bash
-npm run lint          # ESLint (exit 0 required)
-npm run format:check  # Prettier check
-npm run typecheck     # tsc -b — TypeScript solution (project references)
-npm test              # All tests green
+npm run verify  # canonical gate: check-hooks → typecheck → oxlint --deny-warnings → eslint --max-warnings 0 → format:check → test:coverage
 ```
+
+Individual commands (`npm run typecheck`, `npm run lint`, `npm run lint:oxlint`, `npm run format:check`, `npm test`) are targeted checks during iteration only — the gate before done is `npm run verify`.
 
 ## Git Commits
 
@@ -71,9 +70,7 @@ type(scope): description
 
 ### Before Committing
 
-- [ ] `npm run lint` — clean
-- [ ] `npm run typecheck` — no errors
-- [ ] `npm test` — all green
+- [ ] `npm run verify` — full gate green (check-hooks, typecheck, oxlint, eslint, format, tests + coverage)
 - [ ] `git diff` reviewed — no unintended changes
 - [ ] No `console.log` left in production code
 

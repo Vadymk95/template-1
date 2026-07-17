@@ -11,17 +11,19 @@ priority: 83
 
 ```
 src/lib/api/
-  client.ts        # Base fetch wrapper (configured)
-  <domain>.ts      # Domain-specific API functions (getUser, updateUser, ...)
+  client.ts             # Base fetch wrapper + ApiError (configured)
+  safeFetch.ts          # Zod boundary-validation wrapper for queryFn
+  <domain>.ts           # Domain-specific API functions (getUser, updateUser, ...)
+  <domain>.queries.ts   # queryOptions() factories + query key factory (reference: greeting.queries.ts)
 
-src/hooks/<domain>/
-  use<Domain>Query.ts   # TanStack Query hooks wrapping API functions
-  use<Domain>Mutation.ts
+src/pages/<Page>/
+  use<Page>.ts          # Page-local hook consuming the factory via useQuery(...)
 ```
 
-- **API functions** (`lib/api/`): pure async functions returning typed data. No React, no hooks.
-- **Query hooks** (`hooks/`): TanStack Query wrappers. No raw `fetch` here.
-- **Components**: consume query hooks only. Never call `apiClient` directly in components.
+- **API functions** (`lib/api/<domain>.ts`): pure async functions returning typed data. No React, no hooks.
+- **Query factories** (`lib/api/<domain>.queries.ts`): `queryOptions()` factories wrapping API functions or `safeFetchQueryFn`. No React here either. No raw `fetch`.
+- **Page-local hooks** (`src/pages/<Page>/use<Page>.ts`): consume factories via `useQuery(...)` and expose a typed result — with an **explicit return type** (see §2).
+- **Components**: consume the page-local hook only. Never call `apiClient` directly in components.
 
 ## 2. Implementation Rules
 
@@ -30,28 +32,42 @@ src/hooks/<domain>/
 - **Logging**: API errors logged via `logger.error('[api/<domain>] operation: reason', error)`.
 
 ```typescript
-// src/lib/api/users.ts
+// src/lib/api/users.ts — pure async API function
 export interface User { id: string; name: string; email: string; }
 
 export const getUser = async (id: string): Promise<User> => {
     return apiClient<User>(`/users/${id}`);
 };
 
-// src/hooks/user/useUserQuery.ts
-export const useUserQuery = (id: string) => {
-    return useQuery({
-        queryKey: ['user', id],
+// src/lib/api/users.queries.ts — queryOptions factory
+// `*.queries.ts` files are EXEMPT from explicit-function-return-type
+// (eslint.config.js override): queryOptions() infers the contract — do not
+// spell out its return type.
+export const userOptions = (id: string) =>
+    queryOptions({
+        queryKey: userKeys.detail(id),
         queryFn: () => getUser(id),
-        staleTime: 5 * 60 * 1000,
+        staleTime: 5 * 60 * 1000
     });
+
+// src/pages/UserPage/useUserPage.ts — page-local hook (reference: useHomePage.ts)
+// Hooks are NOT exempt — an explicit return type is mandatory.
+export const useUserPage = (id: string): {
+    user: User | undefined;
+    isLoading: boolean;
+    isError: boolean;
+} => {
+    const { data, isLoading, isError } = useQuery(userOptions(id));
+
+    return { user: data, isLoading, isError };
 };
 ```
 
 ## 3. TanStack Query Config
 
 - **`staleTime`**: Set per-query based on data volatility. Default: 5 min for user data, 0 for real-time.
-- **`gcTime`**: 10 min default. Adjust for memory-sensitive data.
-- **`retry`**: `false` for 4xx errors. Default retry (3x) for 5xx.
+- **`gcTime`**: 30 min default (`src/lib/queryClient.ts`). Adjust for memory-sensitive data.
+- **`retry`**: default is `shouldRetry` in `src/lib/queryClient.ts` — never retries `ApiError` with status < 500 (4xx), otherwise retries while `failureCount < 2`.
 - **Query key factory**: Use array keys `['resource', id, params]` — never string keys.
 
 ```typescript

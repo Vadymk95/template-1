@@ -44,10 +44,17 @@ import type { FunctionComponent } from 'react';
 // Component — arrow function + FunctionComponent type
 export const UserCard: FunctionComponent<UserCardProps> = ({ name }) => { ... };
 
-// Hook / utility — arrow function (no FunctionComponent type)
-export const useUserData = () => { ... };
+// Hook / utility — arrow function (no FunctionComponent type), explicit return type
+export const useUserData = (): UseUserDataResult => { ... };
 export const formatDate = (date: Date): string => { ... };
 ```
+
+### 2.1 Explicit In/Out Contracts (ESLint-enforced)
+
+Two binding rules from `eslint.config.js`:
+
+- **`@typescript-eslint/explicit-function-return-type`**: every named function declares its output — either a variable type annotation (`const X: FunctionComponent<Props> = () => …`) or an explicit return type (`const useX = (): UseXResult => …`). Inline callbacks passed as arguments/JSX props are exempt.
+- **`@typescript-eslint/method-signature-style: property`**: interface callbacks use property style (`onSelect: (id: string) => void`), never method style (`onSelect(id: string): void`) — property style gets strict contravariant parameter checks.
 
 ## 3. Constants & Magic Strings
 

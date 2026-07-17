@@ -35,7 +35,7 @@ Do NOT assume Cursor auto-attaches every rule. The always-on rules (`alwaysApply
 
 ## Intelligence & Context
 
-- **Reasoning**: Use `sequential-thinking` for logic and `context7` for docs lookups.
+- **Reasoning**: Use `sequential-thinking` (if available in your environment) for logic and `context7` for docs lookups.
 - **Authority**: `.cursor/brain/` (MAP, DECISIONS, SKELETONS, DICTIONARY) is the Source of Truth. Sync drifts immediately.
 - **Stack**: Strict **TypeScript**. React 19. Prioritize existing libs over custom logic.
 - **Quality**: Minimalist code. No magic strings — use constants or i18n keys.

@@ -33,7 +33,7 @@ const sortedUsers = useMemo(() => [...users].sort(byName), [users]); // large ar
 ## 3. Data Fetching & Caching
 
 - **TanStack Query `staleTime`**: Tune per query. Prevents redundant background refetches.
-- **`gcTime`**: 10 min default. Lower for transient data, higher for static data.
+- **`gcTime`**: 30 min default (`src/lib/queryClient.ts`). Lower for transient data, higher for static data.
 - **Prefetching**: Use `queryClient.prefetchQuery` for predictable navigation (e.g., hover-to-prefetch).
 
 ## 4. Bundle Optimization

@@ -83,7 +83,7 @@ AI-generated UI has recognizable tells. For any UI work reject the framework def
 
 ## Path Aliases
 
-`@/` maps to `src/`. **Only use `@/` aliases — never relative `../../`.**
+`@/` maps to `src/`; `@locales/` maps to `public/locales/` (for importing locale JSON — see `vite.config.ts` + `eslint.config.js`). **Only use these aliases — never relative `../../`.**
 
 ```typescript
 import { useUserStore } from '@/store/user/userStore';

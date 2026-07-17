@@ -15,7 +15,7 @@ priority: 100
 
 ### Phase 1 Fast-Track
 
-If the task targets **only** files matching `*.styled.ts`, `*.styled.tsx`, `*.scss`, `*.css`, `*.i18n.*`, `*.spec.ts`, `*.test.ts`, or `*.md` — skip Brain reads and proceed directly to Phase 3. State: `"Phase 1 skipped — styling/i18n/test/docs task."` Still emit the **Rule Receipt** (step 7 below) for the conditional rules the task area maps to. When in doubt → run full Phase 1.
+If the task targets **only** files matching `*.css`, `*.i18n.*`, `*.spec.ts`, `*.test.ts`, or `*.md` — skip Brain reads and proceed directly to Phase 3. State: `"Phase 1 skipped — styling/i18n/test/docs task."` Still emit the **Rule Receipt** (step 7 below) for the conditional rules the task area maps to. When in doubt → run full Phase 1.
 
 ---
 
@@ -39,7 +39,7 @@ Before any reasoning about implementation:
 
 Before simulating changes:
 
-- Activate `sequential-thinking` with `totalThoughts >= 3` for any task > 3 steps.
+- Activate `sequential-thinking` (if available in your environment) with `totalThoughts >= 3` for any task > 3 steps.
 - Dedicate at least one thought to **adversarial analysis**: "What could go wrong? What existing behavior might break?"
 
 ### Architectural Critique
@@ -99,11 +99,20 @@ Implement directly → write integration tests via `renderWithProviders`.
 
 ### 4.1 Automated Checks
 
+Canonical gate — must pass before declaring the task done:
+
 ```bash
-npm run lint          # must exit 0
+npm run verify  # check-hooks → typecheck → oxlint --deny-warnings → eslint --max-warnings 0 → format:check → test:coverage
+```
+
+Individual commands are targeted checks during iteration only — never a substitute for the gate:
+
+```bash
+npm run typecheck     # tsc -b — solution / project references
+npm run lint          # eslint . --max-warnings 0
+npm run lint:oxlint   # oxlint --deny-warnings
 npm run format:check  # Prettier compliance
-npm run typecheck     # tsc -b — solution / project references (package.json script)
-npm test              # all tests green
+npm test              # vitest run
 ```
 
 ### 4.2 Self-Correction with Root Cause Analysis

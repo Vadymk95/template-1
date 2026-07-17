@@ -11,6 +11,7 @@ priority: 87
 
 - **Arrow functions + `FunctionComponent` type** — no `FC` (alias), no function declarations.
 - **Type**: `interface Props { ... }` — always explicit. No inline anonymous types for props.
+- **Output contract**: the `FunctionComponent<Props>` variable annotation declares the output; where it is absent, use an explicit `(): ReactElement` return type — enforced by `@typescript-eslint/explicit-function-return-type` (inline callbacks exempt).
 - **Ref**: In React 19, refs are passed as **regular props**. **NEW or touched code: ALWAYS ref-as-prop, NEVER `forwardRef`.** `forwardRef` is deprecated but still functional (not removed) — the ONLY sanctioned usage is the legacy `src/components/layout/Main` shell; leave it as-is, do NOT migrate it and do NOT introduce `forwardRef` anywhere else.
 - **Named exports only**: Default exports only for lazy-loaded pages (React Router lazy).
 
@@ -51,17 +52,18 @@ UserCard/
 ## 3. Hooks
 
 - **Arrow functions** for hooks.
+- **Explicit return type**: hooks declare their output (`(): UseXResult`) — enforced by `@typescript-eslint/explicit-function-return-type`.
 - **Domain grouping**: `src/hooks/<domain>/hookName.ts` + `hookName.test.ts` alongside.
 - **Direct imports** — no `index.ts` barrel re-exports.
 - **Rules of Hooks**: Hooks only in React components or other hooks. Never in callbacks, loops, or conditions.
 
 ```typescript
 // Bad — hook in callback
-const handleClick = () => { const data = useQuery(...); };
+const handleClick = (): void => { const data = useQuery(...); };
 
 // Good — hook at top level
 const { data } = useUserQuery(id);
-const handleClick = () => doSomethingWith(data);
+const handleClick = (): void => doSomethingWith(data);
 ```
 
 ## 4. Pages

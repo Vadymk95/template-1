@@ -47,6 +47,7 @@ it('displays user name after login', async () => {
 - **Edge cases**: Always include error boundary tests, empty state, and network failure scenarios.
 - **Behavior over internals**: Test public API and user behavior — not implementation details.
 - **BDD naming**: `describe('UserStore')` → `it('sets username and marks as logged in on setUser()')`.
+- **Return types**: test files (`**/*.test.{ts,tsx}`, `src/test/**`) are exempt from `@typescript-eslint/explicit-function-return-type` (file-scoped override in `eslint.config.js`) — helpers/fixtures don't need declared return contracts.
 
 ```typescript
 describe('userStore', () => {
