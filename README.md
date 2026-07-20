@@ -54,10 +54,13 @@ npm install && npm run prepare && npm run dev
 
 After cloning, these are the exact files / symbols to edit to make the template your own:
 
+- **`package.json`** — the `"name"` field (currently `react-enterprise-foundation`); run `npm install` afterwards so `package-lock.json` records the same name.
 - **`index.html`** — `<title>` (currently `React Enterprise Foundation`) and the commented-out `<meta name="description">` / `<meta name="robots">` tags.
-- **`package.json`** — the `"name"` field (currently `react-enterprise-foundation`).
+- **`public/locales/en/common.json`** — `appName` (currently `React Enterprise Foundation`): the brand rendered in the Header and Footer copyright via `t('appName')`. Repeat in every locale file you add.
+- **`e2e/smoke.spec.ts`** — the `toHaveTitle(/React Enterprise Foundation/)` assertion must match the new `<title>`, or the E2E smoke test fails.
 - **`src/lib/i18n/constants.ts`** — `SUPPORTED_LANGUAGES` (add locales beyond `'en'`), `DEFAULT_LANGUAGE`, and the namespace lists `DEFAULT_NAMESPACES` / `LAZY_NAMESPACES` (each must match a folder under `public/locales/{lng}/{ns}.json`).
 - **`src/index.css`** — brand theme tokens in `:root` and `.dark`: the HSL triples `--primary`, `--secondary`, `--accent`, `--ring`, `--chart-1`…`--chart-5`, plus the `--radius` scale. Currently Google Blue.
+- **`LICENSE`** + **`README.md`** — replace the copyright holder (currently `Vadym Kononenko`) and the `# React Enterprise Foundation` heading / intro. MIT suits an open-source fork; for a proprietary app, swap the MIT text for a proprietary or `UNLICENSED` notice.
 - **Template seeds** — when you outgrow the demo modules, follow [`.cursor/brain/TEMPLATE_SEEDS.md`](.cursor/brain/TEMPLATE_SEEDS.md) to graduate or remove them.
 
 ## 🚀 Tech Stack
@@ -96,7 +99,7 @@ After cloning, these are the exact files / symbols to edit to make the template 
 - **Husky + lint-staged** — git hooks for quality gates
 - **Commitlint** — conventional commits enforcement
 - **Vitest 4.1** — unit testing with Testing Library
-- **Playwright 1.60** — E2E tests
+- **Playwright 1.61** — E2E tests
 
 ## 🛠 Project Structure
 
@@ -379,7 +382,7 @@ npm run build
 
 ### Bundle Analysis
 
-`ANALYZE=true npm run build` writes `dist/bundle-analysis.html`. The build fails if any chunk exceeds 600kb.
+`ANALYZE=true npm run build` writes `dist/bundle-analysis.html`. Vite warns when a chunk exceeds 600 kB (`chunkSizeWarningLimit` in `vite.config.ts`); the enforced per-chunk size budget lives in `.size-limit.json` (`npm run size:check`).
 
 ### Deployment
 
