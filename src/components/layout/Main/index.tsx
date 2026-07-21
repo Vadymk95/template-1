@@ -7,7 +7,7 @@ export const Main = forwardRef<HTMLElement>(function Main(_props, ref) {
             ref={ref}
             id="main"
             tabIndex={-1}
-            className="container mx-auto flex w-full min-h-0 flex-1 items-center justify-center py-12"
+            className="container mx-auto flex min-h-0 w-full flex-1 items-center justify-center py-12"
         >
             <Outlet />
         </main>

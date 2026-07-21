@@ -78,7 +78,7 @@ export const DevPlayground: FunctionComponent = () => {
                         <div className="space-y-2">
                             <label
                                 htmlFor="default-input"
-                                className="text-sm font-medium leading-none"
+                                className="text-sm leading-none font-medium"
                             >
                                 Default Input
                             </label>
@@ -87,7 +87,7 @@ export const DevPlayground: FunctionComponent = () => {
                         <div className="space-y-2">
                             <label
                                 htmlFor="disabled-input"
-                                className="text-sm font-medium leading-none"
+                                className="text-sm leading-none font-medium"
                             >
                                 Disabled Input
                             </label>
@@ -96,7 +96,7 @@ export const DevPlayground: FunctionComponent = () => {
                         <div className="space-y-2">
                             <label
                                 htmlFor="file-input"
-                                className="text-sm font-medium leading-none"
+                                className="text-sm leading-none font-medium"
                             >
                                 File Input
                             </label>
@@ -105,7 +105,7 @@ export const DevPlayground: FunctionComponent = () => {
                         <div className="space-y-2">
                             <label
                                 htmlFor="password-input"
-                                className="text-sm font-medium leading-none"
+                                className="text-sm leading-none font-medium"
                             >
                                 Password Input
                             </label>

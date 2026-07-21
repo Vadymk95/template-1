@@ -32,7 +32,7 @@ export const LanguageSwitcher: FunctionComponent = () => {
     if (locales.length <= 1) {
         return (
             <span
-                className="rounded-md border border-border px-2 py-1 text-xs uppercase text-muted-foreground"
+                className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground uppercase"
                 aria-label={t('language.label')}
             >
                 {current}

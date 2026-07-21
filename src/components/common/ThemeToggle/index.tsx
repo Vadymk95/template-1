@@ -52,7 +52,7 @@ export const ThemeToggle: FunctionComponent = () => {
                 setTheme(nextTheme(theme));
             }}
         >
-            <Icon className="h-4 w-4" />
+            <Icon className="size-4" />
         </Button>
     );
 };

@@ -27,7 +27,7 @@ export const Footer: FunctionComponent = () => {
 
     return (
         <footer className="border-t bg-card">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-muted-foreground">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 p-4 text-xs text-muted-foreground">
                 <span>{t('footer.copyright', { year, appName: t('appName') })}</span>
                 <span className="font-mono">
                     {t('footer.version', { version: __APP_VERSION__ })}

@@ -8,6 +8,7 @@ import prettierRecommended from 'eslint-plugin-prettier/recommended';
 import pluginReact from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import tailwind from 'eslint-plugin-tailwindcss';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -203,6 +204,44 @@ export default defineConfig([
             ...jsxA11y.configs.recommended.rules
         }
     },
+    // ─── No raw hex colors in UI code — use design tokens ───────────────────
+    // Components and pages must reference semantic tokens (defined in
+    // src/index.css @theme), never literal hex. Matches string + template
+    // literals; tests are exempt (see the test override below).
+    {
+        files: ['src/components/**/*.{ts,tsx}', 'src/pages/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector:
+                        'Literal[value=/#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b/]',
+                    message: 'No raw hex colors in components; use a design token.'
+                },
+                {
+                    selector:
+                        'TemplateElement[value.raw=/#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b/]',
+                    message: 'No raw hex colors in components; use a design token.'
+                }
+            ]
+        }
+    },
+    // ─── Tailwind class hygiene (v4, CSS-config) ─────────────────────────────
+    // Reads the theme from src/index.css (@import 'tailwindcss' + @theme).
+    // Ordering + shorthand are autofixable; contradictions are a hard error.
+    {
+        files: ['**/*.tsx'],
+        plugins: { tailwindcss: tailwind },
+        settings: {
+            tailwindcss: { cssConfigPath: './src/index.css' }
+        },
+        rules: {
+            'tailwindcss/no-contradicting-classname': 'error',
+            'tailwindcss/classnames-order': 'error',
+            'tailwindcss/enforces-shorthand': 'error',
+            'tailwindcss/no-unnecessary-arbitrary-value': 'error'
+        }
+    },
     // ─── shadcn/ui generated components — relaxed rules ─────────────────────
     // shadcn generates function declarations without return annotations. Don't
     // fight the generator. When running `npx shadcn@latest add`, components
@@ -257,7 +296,9 @@ export default defineConfig([
             // vi.spyOn returns types that flow through `any` for console methods
             '@typescript-eslint/no-unsafe-call': 'off',
             '@typescript-eslint/no-unsafe-member-access': 'off',
-            '@typescript-eslint/no-unsafe-assignment': 'off'
+            '@typescript-eslint/no-unsafe-assignment': 'off',
+            // Test fixtures may reference raw hex freely.
+            'no-restricted-syntax': 'off'
         }
     },
     // Playwright — not part of app tsconfig project references; disable type-aware TS rules.
