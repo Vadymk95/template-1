@@ -2,41 +2,41 @@
 
 **Goal:** match checks to the change. Do **not** run the full CI stack for every tiny edit.
 
-Full reference: `.github/workflows/ci.yml`. One-command mirror: `npm run ci:local`.
+Full reference: `.github/workflows/ci.yml`.
+
+- **Default commit/push gate:** `npm run verify` (typecheck → lint → format → coverage → build → e2e). Husky **pre-push** runs this.
+- **Stricter local CI:** `npm run ci:local` (adds audit + web-vitals chunk check + size-limit on top of the same path).
 
 ---
 
 ## Minimal check by task type
 
-| What you changed | Suggested commands |
-|------------------|-------------------|
-| **Docs only** (`*.md` in repo root / `README`, brain markdown) | `npm run format:check` |
-| **Styling only** (`*.css`, `*.scss`, `*.styled.*`) | `npm run format:check` + `npm run lint` (if CSS is in ESLint scope) |
-| **TS/TSX / tests** (logic, components, hooks, stores) | `npm run lint && npm run typecheck && npm test` |
-| **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing/flows) | `npm run build && PLAYWRIGHT_USE_PREVIEW=1 npm run test:e2e` (needs `npx playwright install chromium` once) |
-| **Touches `src/env.ts`, `vite.config.ts`, `src/lib/vitals.ts`, `src/lib/webVitals/`** | Above + `npm run build && node scripts/check-web-vitals-chunks.mjs` |
-| **MSW** (`src/mocks/**`, `test/handlers.ts`, MSW wiring in `main.tsx`) | `npm run lint && npm run typecheck && npm test` (smoke dev manually if handlers changed) |
-| **Suspected bundle size / duplicate deps** | `npm run build:analyze` → open `dist/bundle-analysis.html` (do not commit HTML) |
-| **Regressions in standard vs attribution web-vitals chunks** | `npm run verify:web-vitals-chunks:full` (two full builds — use sparingly) |
-| **Vendor chunk byte budget** (touched `vite.config.ts` `codeSplitting.groups`, added a vendor dep, or `npm run build` output looks heavier) | `npm run build && npm run size:check` (reads `.size-limit.json` per-chunk brotli budgets) |
+- **Docs only** (`*.md` in repo root / `README`, brain markdown) — `npm run format:check`
+- **Styling only** (`*.css`, `*.scss`, `*.styled.*`) — `npm run format:check` + `npm run lint` (if CSS is in ESLint scope)
+- **TS/TSX / tests** (logic, components, hooks, stores) — `npm run lint && npm run typecheck && npm test`
+- **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing/flows) — `npm run test:e2e:prod` (or `npm run build && PLAYWRIGHT_USE_PREVIEW=1 npm run test:e2e`; needs Chromium once)
+- **Touches `src/env.ts`, `vite.config.ts`, `src/lib/vitals.ts`, `src/lib/webVitals/`** — Above + `npm run build && node scripts/check-web-vitals-chunks.mjs`
+- **MSW** (`src/mocks/**`, `test/handlers.ts`, MSW wiring in `main.tsx`) — `npm run lint && npm run typecheck && npm test` (smoke dev manually if handlers changed)
+- **Suspected bundle size / duplicate deps** — `npm run build:analyze` → open `dist/bundle-analysis.html` (do not commit HTML)
+- **Regressions in standard vs attribution web-vitals chunks** — `npm run verify:web-vitals-chunks:full` (two full builds — use sparingly)
+- **Vendor chunk byte budget** (touched `vite.config.ts` `codeSplitting.groups`, added a vendor dep, or `npm run build` output looks heavier) — `npm run build && npm run size:check` (reads `.size-limit.json` per-chunk brotli budgets)
 
 ---
 
-## Full local CI (same order as GitHub Actions)
+## Local gates (`verify` vs `ci:local`)
 
-Run **`npm run ci:local`**. Step order and tooling **mostly mirror** `.github/workflows/ci.yml` (audit at moderate+ → typecheck → Oxlint → ESLint → format check → Vitest coverage → production build → web-vitals chunk script → Playwright Chromium install → E2E against `vite preview`). **`ci:local` is stricter**: after `verify:web-vitals-chunks` it adds **`npm run size:check`** (size-limit per-chunk brotli budgets from `.size-limit.json`) — this step is NOT in the GitHub workflow today (see `[2026-05] size-limit per-chunk brotli budget` in DECISIONS for the cost/benefit gap). Inspect `package.json` if you need the exact chain.
+- **`npm run verify`** — commit/push gate: typecheck → oxlint → eslint → format → test:coverage → build → **`test:e2e:prod`** (Playwright vs `vite preview`). This is what husky **pre-push** runs.
+- **`npm run ci:local`** — stricter mirror of GitHub Actions: audit at moderate+ → same path as verify through build → web-vitals chunk script → size:check → Playwright install → E2E. Use when you want the full CI-shaped run (audit + size budgets), not for every push.
 
-Use **before push** or when impact is unclear. **Do not** run as default for one-line fixes or copy edits in Brain.
+**Do not** run `ci:local` as default for one-line fixes or copy edits in Brain.
 
 ---
 
 ## Do not run by default
 
-| Command | Why |
-|---------|-----|
-| `npm run verify:web-vitals-chunks:full` | Two production builds; only for vitals/env/chunk work (plain `verify:web-vitals-chunks` is a cheap `dist/` check) |
-| `ANALYZE=true` / `build:analyze` | Heavy; only for bundle investigation |
-| `npm ci` | Reinstalls deps; CI uses it on clean runners — locally use when lockfile changes |
+- **`npm run verify:web-vitals-chunks:full`** — two production builds; only for vitals/env/chunk work (plain `verify:web-vitals-chunks` is a cheap `dist/` check)
+- **`ANALYZE=true` / `build:analyze`** — heavy; only for bundle investigation
+- **`npm ci`** — reinstalls deps; CI uses it on clean runners — locally use when lockfile changes
 
 ---
 

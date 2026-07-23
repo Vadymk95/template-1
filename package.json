@@ -20,7 +20,7 @@
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "lint:staged": "lint-staged",
-        "verify": "node scripts/check-hooks.mjs && npm run typecheck && npm run lint:oxlint && npm run lint && npm run format:check && npm run test:coverage",
+        "verify": "node scripts/check-hooks.mjs && npm run typecheck && npm run lint:oxlint && npm run lint && npm run format:check && npm run test:coverage && npm run build && npm run test:e2e:prod",
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
@@ -28,7 +28,8 @@
         "test:e2e:ui": "playwright test --ui",
         "ci:local": "npm audit --audit-level=moderate && npm run typecheck && npm run lint:oxlint && npm run lint && npm run format:check && npm run test:coverage && npm run build && npm run verify:web-vitals-chunks && npm run size:check && npx playwright install --with-deps chromium && PLAYWRIGHT_USE_PREVIEW=1 npm run test:e2e",
         "preview": "vite preview",
-        "prepare": "husky"
+        "prepare": "husky",
+        "test:e2e:prod": "PLAYWRIGHT_USE_PREVIEW=1 playwright test"
     },
     "dependencies": {
         "@hookform/resolvers": "^5.4.0",

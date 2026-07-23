@@ -2,12 +2,12 @@
 
 ## Entry Points
 
-| File                   | Role                                                |
-| ---------------------- | --------------------------------------------------- |
-| `index.html`           | HTML shell — `i18n-loading` FOUC guard + `#i18n-boot` decorative spinner until i18n ready |
+| File                   | Role                                                                                                                                                                                                                                                |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `index.html`           | HTML shell — `i18n-loading` FOUC guard + `#i18n-boot` decorative spinner until i18n ready                                                                                                                                                           |
 | `src/main.tsx`         | Async bootstrap: optional DEV MSW worker (`src/mocks/browser.ts`, opt-out `VITE_ENABLE_MSW=false`) → root: i18n ready gate (or `I18nInitErrorFallback` on init failure) → `I18nextProvider` → QueryClient → Router; `reportWebVitals()` after mount |
-| `src/App.tsx`          | Layout shell: ErrorBoundary → Header/Main/Footer    |
-| `src/router/index.tsx` | Router assembly, merge route modules here           |
+| `src/App.tsx`          | Layout shell: ErrorBoundary → Header/Main/Footer                                                                                                                                                                                                    |
+| `src/router/index.tsx` | Router assembly, merge route modules here                                                                                                                                                                                                           |
 
 ## Adding a New Page
 
@@ -76,6 +76,7 @@ src/index.css — single source of truth for Tailwind v4:
 ```
 
 Dark mode toggle: `src/hooks/theme/useTheme.ts`
+
 - Modes: `'light' | 'dark' | 'system'` (system follows OS preference)
 - Toggles `.dark` class on `<html>`, persists to `localStorage` key `"theme"`
 - Usage: `const { theme, setTheme } = useTheme()`
@@ -87,9 +88,9 @@ To add new color token: add to `:root`, then map in `@theme inline`.
 
 MSW runs in two modes — same handlers, different adapter:
 
-| Mode | Where | Adapter | When to use |
-|------|-------|---------|-------------|
-| **Node** | `src/test/server.ts` | `msw/node` | Unit + integration tests (Vitest). No browser needed. |
+| Mode        | Where                         | Adapter                                  | When to use                                                                                                                                            |
+| ----------- | ----------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Node**    | `src/test/server.ts`          | `msw/node`                               | Unit + integration tests (Vitest). No browser needed.                                                                                                  |
 | **Browser** | `public/mockServiceWorker.js` | `msw/browser` via `src/mocks/browser.ts` | Dev without a real backend (worker started from `main.tsx` unless `VITE_ENABLE_MSW` is `'false'`); Storybook / Playwright can reuse the same handlers. |
 
 `public/mockServiceWorker.js` is a generated Service Worker — do not edit it manually.
@@ -98,8 +99,7 @@ To update after MSW upgrade: `npx msw init public/`.
 
 ## CI / Supply chain
 
-| Artifact                   | Role                                                                 |
-| -------------------------- | -------------------------------------------------------------------- |
-| `.github/workflows/ci.yml` | PR + push `master`: audit (moderate+) → typecheck → oxlint → ESLint → format → test:coverage → **build** → web-vitals chunk check → Playwright E2E (Chromium, `vite preview`) |
-| `.cursor/brain/VERIFICATION.md` | **When to run which checks** (agents: avoid full pipeline for tiny edits); local mirror: `npm run ci:local` |
-| `.github/dependabot.yml`   | Weekly npm version PRs (limit 8 open)                                |
+- **`.github/workflows/ci.yml`** — PR + push `master`: audit (moderate+) → typecheck → oxlint → ESLint → format → test:coverage → **build** → web-vitals chunk check → Playwright E2E (Chromium, `vite preview`)
+- **`npm run verify`** — local commit/push gate (includes build + `test:e2e:prod`); husky **pre-push**
+- **`.cursor/brain/VERIFICATION.md`** — when to run which checks; `ci:local` is the stricter audit/size superset
+- **`.github/dependabot.yml`** — weekly npm version PRs (limit 8 open)

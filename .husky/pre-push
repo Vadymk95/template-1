@@ -9,11 +9,9 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
     set -e
 fi
 
-echo "→ format:check"
-npm run format:check || { echo "❌ Formatting check failed. Run 'npm run format' and re-commit."; exit 1; }
-
-echo "→ lint"
-npm run lint || { echo "❌ Lint failed. Fix errors before push."; exit 1; }
-
-echo "→ type-check"
-npx tsc -b --noEmit || { echo "❌ TypeScript type-check failed. Fix errors before push."; exit 1; }
+echo "→ verify (typecheck → lint → format → coverage → build → e2e)"
+npm run verify || {
+    echo "❌ verify failed. Fix before push."
+    echo "   First-time Playwright browsers: npx playwright install --with-deps chromium"
+    exit 1
+}
