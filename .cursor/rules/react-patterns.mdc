@@ -107,3 +107,9 @@ export const NotFoundPage = lazy(() => import('./NotFoundPage'));
 - ❌ Logic > 10 lines directly in JSX — extract to hook.
 - ❌ `import React from 'react'` — not needed in React 19 with JSX transform.
 - ❌ `any` in component props.
+
+## 8. Interaction & base-layer states (binding)
+
+- **States must be PERCEPTIBLY DISTINCT, not merely present.** A hover / active / focus / selection colour must not resolve to ≈ the element's own default or background colour — verify it is VISIBLE. Failure modes seen in the wild: a base link colour equal to its `hover:` colour (zero visible hover — only the cursor changes); a `::selection` highlight built on a near-background token (invisible selection). Chrome/nav links default to a neutral (`text-muted-foreground`) so the `hover:text-primary` shift shows.
+- **Compound states must stay COHERENT.** When two states co-occur (focus+invalid, hover+selected, disabled+focus) they must not visually fight — the more urgent state owns the shared channel (e.g. an invalid field recolours its focus ring, `aria-invalid:focus-visible:ring-destructive`, so focused+invalid reads as one error state; disabled cancels hover). Check state PAIRS, not just singles.
+- **Base-layer globals** (`::selection`, base links, `:focus-visible`) must be perceptibly distinct AND must NOT be built on quiet near-background tokens (`--muted`, or an `--accent` that is a slate-3-style near-background neutral). System feedback (selection, focus ring) is built on `--primary` / `--ring`, never the quiet hover token. If you define `::selection`, use `background-color: hsl(var(--primary)); color: hsl(var(--primary-foreground));` — a quiet token renders the highlight invisible.
