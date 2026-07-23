@@ -5,9 +5,11 @@
 **Decision**: extract magic strings used in 2+ places OR carrying external contract to named constants. Apply selectively per framework below. NOT a blanket "extract everything" — single-use strings stay inline (Ghost Principle).
 
 **Extraction sites added this commit**:
+
 - `src/store/keys.ts` — `STORAGE_KEYS` (Zustand `persist({ name })` + plain `localStorage.setItem(key)` keys — external contract: renaming breaks persisted user data), `DEVTOOLS_NAMES` (Zustand `devtools({ name })` labels — Redux DevTools panel grouping), `USER_STORE_ACTIONS` (per-store `set(..., false, { type })` labels — refactor safety + DevTools discoverability). Per-store ACTION constants keep namespaces short; do NOT roll into one mega-object as more stores land.
 
 **Pattern**: `as const` objects, NOT `enum`. Type via `typeof OBJ[keyof typeof OBJ]`. Reasons:
+
 - Zero runtime overhead vs enum (~150 bytes per enum compiled)
 - Tree-shakeable (numeric enums have reverse-mapping bloat)
 - Plays better with structural type matching
@@ -16,6 +18,7 @@
 **TanStack Query keys — INTENTIONALLY NOT centralized**: existing `greetingKeys` / `exampleKeys` factories stay **colocated** with their `queryOptions()` factories in `src/lib/api/<domain>.queries.ts`. This matches Dominik Dorfmeister's "Effective React Query Keys" recommendation (TkDodo blog, 2021; still current as of TanStack Query v5) — colocated factories scale better than a central `queryKeys.ts` registry because (a) one file owns one feature's cache surface, (b) deleting a feature deletes its keys with it, (c) no central import-fan-out hotspot. A centralized `src/lib/queryKeys.ts` would have been a regression here.
 
 **When NOT to extract** (do NOT pile in cosmetic refactors):
+
 - Single-use strings (logger source tags like `'[i18n]'`, one-off event names, test selectors)
 - Self-documenting at use site (`aria-label` on a close button)
 - i18n keys (handled by i18next)
@@ -31,6 +34,7 @@
 **Why**: catches BE shape drift at receive time (HTTP boundary) instead of buried in render. Removes "undefined → NaN → blank UI" class of bugs. Provides `z.infer<typeof Schema>` types for free (single source of truth).
 
 **Scope**:
+
 - TanStack Query `queryFn` (use `safeFetchQueryFn(url, schema)`)
 - Direct fetch calls (use `safeFetch(url, schema)`)
 - localStorage / sessionStorage reads (use `Schema.safeParse(JSON.parse(raw))`)
@@ -38,6 +42,7 @@
 **When NOT to use**: tRPC / GraphQL with codegen (other pattern handles it); throwaway prototypes; high-frequency polling where ~50-200μs parse matters.
 
 **Trade-offs**:
+
 - +0 KB bundle (Zod already in deps for forms)
 - ~50-200μs parse per response (negligible)
 - Schemas duplicate BE types — acceptable for solo/small-team. For multi-team scale, consider codegen (openapi-zod-client, @ts-rest) later.
@@ -50,7 +55,7 @@
 
 **Decision**: add `size-limit@^12.1.0` + `@size-limit/preset-app@^12.1.0` devDeps + `npm run size:check` script + `.size-limit.json` config with per-chunk brotli budgets. Wired into `ci:local` AFTER `verify:web-vitals-chunks` (asserts size, not composition — orthogonal to existing script). Per /consilium 2026-05-23 APPLY Item 6 (5/6 YES, 1 COND satisfied by pre-flight overlap check).
 
-**Why**: `scripts/check-web-vitals-chunks.mjs` asserts chunk *composition* (subscribeStandard vs subscribeAttribution split correctness), NOT chunk *size*. `chunkSizeWarningLimit: 600` (KB raw) in `vite.config.ts` is a Vite *warning*, not a CI fail. No per-chunk byte-budget gate currently exists. `size-limit` 868K weekly DLs is ~10× over `bundlesize@85K` (May 2026 npm registry direct) — clear winner.
+**Why**: `scripts/check-web-vitals-chunks.mjs` asserts chunk _composition_ (subscribeStandard vs subscribeAttribution split correctness), NOT chunk _size_. `chunkSizeWarningLimit: 600` (KB raw) in `vite.config.ts` is a Vite _warning_, not a CI fail. No per-chunk byte-budget gate currently exists. `size-limit` 868K weekly DLs is ~10× over `bundlesize@85K` (May 2026 npm registry direct) — clear winner.
 
 **Initial budgets (brotli)** — set at current size + ~20% headroom so first-fork CI passes:
 
