@@ -120,8 +120,10 @@ Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
 
 ## Dev Tooling
 
-- **Which checks to run** — see `.cursor/brain/VERIFICATION.md` (point-in-time vs full `ci:local`; avoids running audit/build/vitals for every small change).
-- `npm run ci:local` — mirrors `.github/workflows/ci.yml` locally (audit → typecheck → oxlint → eslint → format → test:coverage → build → web-vitals chunk check).
+- **Which checks to run** — see `.cursor/brain/VERIFICATION.md` (point-in-time vs `verify` / `ci:local`; avoids running audit/build/vitals for every small change).
+- `npm run verify` — commit/push gate: typecheck → oxlint → eslint → format → test:coverage → build → **`test:e2e:prod`**. Husky **pre-push** runs this.
+- `npm run ci:local` — stricter local CI (adds audit + web-vitals chunk check + size:check on top of the verify path).
+- `npm run test:e2e:prod` — Playwright against `vite preview` (same mode as CI / verify gate).
 - `npm run dev` — Vite dev server (`vite.config.ts` pins port 3000). ESLint runs via the IDE extension (recommended in `.vscode/extensions.json`) and as a pre-commit gate in `lint-staged` — no in-Vite linter.
 - `npm run build` — `tsc -b` then Vite production build (Rolldown)
 - `npm run verify:web-vitals-chunks` — asserts chunk split on the current `dist/` (run after `build`); `verify:web-vitals-chunks:full` — two production builds asserting standard vs attribution variants (use after changing `src/lib/vitals.ts` or env wiring)
@@ -129,5 +131,5 @@ Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
 - `npm run typecheck` — `tsc -b` only (also used in CI before lint)
 - `npm run test` — Vitest run
 - `npm run lint` — ESLint 9 flat: `typescript-eslint` **strict + stylistic** (type-aware), `import-x` (**order**, **no-cycle**), parent-relative imports under `src/**` restricted (use `@/` or `@locales/` for locale JSON); `vite-plugins/**` may use `../src/**` (loads before Vite resolves `@/`). `lint:oxlint` runs first in CI.
-- **E2E** — Playwright (`e2e/`, `playwright.config.ts`): local default `npm run test:e2e` starts **`vite` dev** on port 3000; CI / `PLAYWRIGHT_USE_PREVIEW=1` uses **`vite preview`** on 4173 after `build`. Chromium installed via `npx playwright install --with-deps chromium` in CI and `ci:local`.
+- **E2E** — Playwright (`e2e/`, `playwright.config.ts`): local default `npm run test:e2e` starts **`vite` dev** on port 3000; CI / `test:e2e:prod` / `PLAYWRIGHT_USE_PREVIEW=1` uses **`vite preview`** on 4173 after `build`. Chromium installed via `npx playwright install --with-deps chromium` in CI and `ci:local`.
 - Staged commits: Oxlint fix → ESLint fix → Prettier (see `lint-staged` in package.json)

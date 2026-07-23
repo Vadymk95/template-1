@@ -117,9 +117,19 @@
 
 ## [2026-04] Verification guide (`.cursor/brain/VERIFICATION.md`) + `ci:local`
 
-**Decision**: `.cursor/brain/VERIFICATION.md` defines minimal checks per task type; `npm run ci:local` mirrors CI. Agents should read it and avoid running audit/build/vitals-analyze for every trivial edit.
+**Decision**: `.cursor/brain/VERIFICATION.md` defines minimal checks per task type; `npm run ci:local` mirrors CI with extras (audit, size). Agents should read it and avoid running audit/build/vitals-analyze for every trivial edit.
 
-**Why**: Reduces noise, latency, and false “full audit” habits while keeping a single command for pre-push confidence.
+**Why**: Reduces noise, latency, and false “full audit” habits while keeping a single command for full local CI confidence.
+
+---
+
+## [2026-07] Playwright e2e inside `verify` + pre-push
+
+**Decision**: append build + `test:e2e:prod` (`PLAYWRIGHT_USE_PREVIEW=1`) to `npm run verify`, and point `.husky/pre-push` at full `npm run verify` (was typecheck-only). `ci:local` remains the stricter audit/size/LHCI-style (where applicable) superset.
+
+**Why**: Catch preview-mode e2e regressions before CI; typecheck-only pre-push left runtime gaps.
+
+**Trade-off**: pre-push is slower. Accepted so e2e cannot be skipped by habit.
 
 ---
 

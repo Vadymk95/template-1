@@ -208,24 +208,26 @@ VITE_ENABLE_MSW=false
 
 ### Available Scripts
 
-| Command                            | Description                                        |
-| ---------------------------------- | -------------------------------------------------- |
-| `npm run dev`                      | Start Vite dev server (port 3000)                  |
-| `npm run build`                    | `tsc -b` + Vite production build (Oxc + Brotli)    |
-| `npm run preview`                  | Serve production build locally                     |
-| `npm run typecheck`                | Runs `tsc -b` (no emit)                            |
-| `npm run lint`                     | Run ESLint                                         |
-| `npm run lint:oxlint`              | Fast Oxc-based lint pass (pre-ESLint)              |
-| `npm run format`                   | Format codebase with Prettier                      |
-| `npm run format:check`             | Check code formatting                              |
-| `npm test`                         | Run unit tests (Vitest)                            |
-| `npm run test:watch`               | Run tests in watch mode                            |
-| `npm run test:coverage`            | Run tests with coverage report                     |
-| `npm run test:e2e`                 | Playwright E2E tests                               |
-| `npm run test:e2e:ui`              | Playwright UI mode                                 |
-| `npm run ci:local`                 | Full local CI (mirrors `.github/workflows/ci.yml`) |
-| `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks   |
-| `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                 |
+| Command                            | Description                                                          |
+| ---------------------------------- | -------------------------------------------------------------------- |
+| `npm run dev`                      | Start Vite dev server (port 3000)                                    |
+| `npm run build`                    | `tsc -b` + Vite production build (Oxc + Brotli)                      |
+| `npm run preview`                  | Serve production build locally                                       |
+| `npm run typecheck`                | Runs `tsc -b` (no emit)                                              |
+| `npm run lint`                     | Run ESLint                                                           |
+| `npm run lint:oxlint`              | Fast Oxc-based lint pass (pre-ESLint)                                |
+| `npm run format`                   | Format codebase with Prettier                                        |
+| `npm run format:check`             | Check code formatting                                                |
+| `npm test`                         | Run unit tests (Vitest)                                              |
+| `npm run test:watch`               | Run tests in watch mode                                              |
+| `npm run test:coverage`            | Run tests with coverage report                                       |
+| `npm run test:e2e`                 | Playwright E2E (vite dev locally unless preview)                     |
+| `npm run test:e2e:prod`            | Playwright against `vite preview` (verify gate)                      |
+| `npm run test:e2e:ui`              | Playwright UI mode                                                   |
+| `npm run verify`                   | Commit/push gate: typecheck → lint → format → coverage → build → e2e |
+| `npm run ci:local`                 | Superset of verify (adds audit + chunk/size checks)                  |
+| `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks                     |
+| `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                                   |
 
 ### Git Hooks
 
@@ -240,7 +242,7 @@ VITE_ENABLE_MSW=false
 
 **Pre-push:**
 
-- Runs `npx tsc -b --force --noEmit`
+- Runs full **`npm run verify`** (includes production build + Playwright against `vite preview`)
 
 ### CI (GitHub Actions)
 
@@ -362,7 +364,7 @@ describe('Component', () => {
 
 ### E2E
 
-Playwright specs in `e2e/` run against Chromium. Local default: `npm run test:e2e` starts `vite dev` on port 3000. CI / `PLAYWRIGHT_USE_PREVIEW=1` uses `vite preview` on 4173 after `build`.
+Playwright specs in `e2e/` run against Chromium. Local default: `npm run test:e2e` starts `vite dev` on port 3000. CI / `npm run test:e2e:prod` / `PLAYWRIGHT_USE_PREVIEW=1` uses `vite preview` on 4173 after `build`. The local **`npm run verify`** gate (and husky pre-push) runs `test:e2e:prod`.
 
 ## 🏗️ Build & Deployment
 

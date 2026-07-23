@@ -98,8 +98,8 @@ To update after MSW upgrade: `npx msw init public/`.
 
 ## CI / Supply chain
 
-| Artifact                   | Role                                                                 |
-| -------------------------- | -------------------------------------------------------------------- |
-| `.github/workflows/ci.yml` | PR + push `master`: audit (moderate+) → typecheck → oxlint → ESLint → format → test:coverage → **build** → web-vitals chunk check → Playwright E2E (Chromium, `vite preview`) |
-| `.cursor/brain/VERIFICATION.md` | **When to run which checks** (agents: avoid full pipeline for tiny edits); local mirror: `npm run ci:local` |
-| `.github/dependabot.yml`   | Weekly npm version PRs (limit 8 open)                                |
+- **`.github/workflows/ci.yml`** — PR + push `master`: audit (moderate+) → typecheck → oxlint → ESLint → format → test:coverage → **build** → web-vitals chunk check → Playwright E2E (Chromium, `vite preview`)
+- **`npm run verify`** — local commit/push gate (includes build + `test:e2e:prod`); husky **pre-push**
+- **`.cursor/brain/VERIFICATION.md`** — when to run which checks; `ci:local` is the stricter audit/size superset
+- **`.github/dependabot.yml`** — weekly npm version PRs (limit 8 open)
+
