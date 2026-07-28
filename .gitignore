@@ -42,3 +42,13 @@ coverage
 # ghost-mode ignore (~/.gitignore_global) so plain `git add` works for agents.
 !.cursor/
 !.cursor/**
+
+# .claude/commands/ holds the repo's own agent commands and is tracked for the
+# same reason. The directory itself has to be re-included first: the global
+# ignore lists `.claude/`, and git will not descend into an ignored directory to
+# see a negation inside it. Machine-local settings stay untracked.
+!.claude/
+!.claude/commands/
+!.claude/commands/**
+.claude/settings.local.json
+.claude/settings.json

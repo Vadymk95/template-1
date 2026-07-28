@@ -52,7 +52,9 @@ export const apiClient = async <T>(endpoint: string, options?: RequestInit): Pro
     });
 
     if (!response.ok) {
-        let errorMessage = response.statusText || 'Unknown error';
+        // No initialiser: both branches below assign unconditionally, so a default
+        // here would be dead code (ESLint 10 `no-useless-assignment` catches it).
+        let errorMessage: string;
 
         try {
             const errorData: unknown = await response.json();

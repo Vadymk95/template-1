@@ -1,5 +1,65 @@
 # Architectural Decisions
 
+## [2026-07] The gate is `verify`; `verify` is a superset of CI
+
+**Decision.** Every check lives in `package.json`, never only in a workflow file. `verify` holds all
+offline checks; `verify:ci` is `audit:gate && verify` and is what both `.husky/pre-push` and GitHub
+Actions run. The CI job is one step: `npm run verify:ci`, plus only what CI alone can do — dependency
+install, the browser cache, artifact upload.
+
+**Why.** CI used to list its own steps, and two of them (`npm audit`, `verify:web-vitals-chunks`) were
+absent from `verify`, while `size:check` lived in `ci:local` and therefore ran in no pipeline at all. So
+a green local gate did not predict a green CI, and one gate never ran anywhere. Both are the same
+defect: a check added to the workflow instead of to the script.
+
+**Consequence, accepted.** `verify` is slower — it now also builds, checks the web-vitals chunk split,
+checks the size budget and runs Playwright. It can go red on a dependency bump rather than on your own
+code. That is the cost of a gate that no longer lies. If it becomes intolerable, a check comes out of
+BOTH the script and CI, so the superset property survives.
+
+**`audit:gate` is in `verify:ci`, not `verify`,** because it needs the network. An implementer working
+offline must still be able to run the complete offline gate.
+
+**Pre-commit is repo-scoped.** `lint-staged` fixes and re-stages the staged set, but for a partially
+staged file it restores the unstaged hunks *after* fixing, so formatting drift survived the commit and
+only failed at push — leaving files that were already fixed and never committed. The hook now also runs
+`lint:oxlint` and `format:check` over the whole repo and refuses the commit, naming the remedy
+(`npm run fix && git add -u`). ESLint stays on pre-push: type-aware and slow. **Not adopted:** a hook
+that commits for you. It would sweep whatever else is dirty into the commit and has no honest message
+to use.
+
+**Advisory exceptions are data, not thresholds.** `audit:gate` fails on every high or critical
+advisory, on an expired allowance, on an allowance whose advisory has disappeared, and on its own
+inability to complete. Lowering `--audit-level` to make a finding go away is not available; writing
+down the reason with an expiry is. `scripts/audit-gate.test.mjs` covers the fail-closed paths,
+including the invalid-payload one — a security gate that reports success when it cannot run is worse
+than no gate.
+
+**Revisit trigger:** if `verify` crosses roughly five minutes locally, move e2e into its own CI job and
+out of the pre-push hook — but out of `verify` only together with the workflow, never one alone.
+
+## [2026-07] ESLint 10; `settings.react.version` must be a literal
+
+**Decision.** ESLint 10, ahead of the 9.x end of life on 2026-08-06. Three plugins still cap their
+`eslint` peer below 10 — `eslint-plugin-react` at `^9.7`, `eslint-plugin-jsx-a11y` at `^9`, and
+`eslint-plugin-import` at `^9`, which arrives transitively — so each gets an `overrides` entry mapping
+its peer to `$eslint`. `npm install` and `npm ci` both succeed with **no `--legacy-peer-deps`**; the
+blanket flag was rejected as a permanent posture in a repo with a hardened `.npmrc`.
+
+**`settings.react.version` is `'19.2'`, never `'detect'`.** `eslint-plugin-react` resolves `'detect'`
+through `detectReactVersion` → `resolveBasedir`, which calls the `context.getFilename()` API that
+ESLint 10 removed; every react rule needing the version then throws at load. A trailing config object
+with no `files` key repeats the pin so no shared config can reintroduce `'detect'` for its own
+patterns. Keep it in step with the `react` major/minor in `package.json`.
+
+**The green was checked for fail-open**, because a silent no-op looks identical to a clean run: under
+ESLint 10 the config declares 1252 rules with 237 active and 10 plugins loaded on a real source file.
+ESLint 10 also caught a genuine dead store that 9.x did not — `no-useless-assignment` on an error
+message initialised and then unconditionally overwritten in both branches below it.
+
+**Still held:** TypeScript stays `~6.0.x` (`typescript-eslint@8.65.0` peers `typescript >=4.8.4
+<6.1.0`), and `@types/node` stays 24.x to match `engines.node`. Both were re-verified, not assumed.
+
 ## [2026-05] Magic strings → constants (Zustand keys + devtools labels)
 
 **Decision**: extract magic strings used in 2+ places OR carrying external contract to named constants. Apply selectively per framework below. NOT a blanket "extract everything" — single-use strings stay inline (Ghost Principle).

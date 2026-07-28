@@ -102,8 +102,13 @@ Implement directly → write integration tests via `renderWithProviders`.
 Canonical gate — must pass before declaring the task done:
 
 ```bash
-npm run verify  # check-hooks → typecheck → oxlint --deny-warnings → eslint --max-warnings 0 → format:check → test:coverage
+npm run verify  # check-hooks → typecheck → oxlint → eslint → format:check → test:coverage
+                # → build → web-vitals chunks → size-limit → ensure-playwright → e2e
+npm run verify:ci  # audit:gate (needs network) + everything in verify — what CI and pre-push run
 ```
+
+`verify` is a strict SUPERSET of the offline checks CI runs, so a green `verify` predicts a green CI.
+That property is the point: **a new check belongs in the script, never only in the workflow file.**
 
 Individual commands are targeted checks during iteration only — never a substitute for the gate:
 
@@ -111,9 +116,23 @@ Individual commands are targeted checks during iteration only — never a substi
 npm run typecheck     # tsc -b — solution / project references
 npm run lint          # eslint . --max-warnings 0
 npm run lint:oxlint   # oxlint --deny-warnings
-npm run format:check  # Prettier compliance
+npm run fix           # oxlint --fix → eslint --fix → prettier --write (the one remedy command)
 npm test              # vitest run
 ```
+
+### 4.1a Verification Integrity
+
+Green means nothing until you know the gate can go red.
+
+1. **Capture the exit code without a pipe**: `npm run verify > /tmp/verify.log 2>&1; echo $?`. Piping
+   to `tail` returns the PIPE's status, so a failed build reads as a pass.
+2. **Mutation-check the tests**: if mentally reverting your change leaves the suite green, the test is
+   worthless. Writing a test is Phase 3; proving it would have failed is this step.
+3. **Prove a new gate gates**: break it on purpose once — an expired entry in
+   `scripts/audit-allowlist.json`, a raw hex in a component, a staged `src` logic file with no
+   `*.test.*` sibling — and watch it refuse. Then revert the sabotage.
+4. **A check that reports success when it could not run is fail-OPEN.** Ask what it does on a missing
+   directory, an empty result, or no network — not only on the failure it was written for.
 
 ### 4.2 Self-Correction with Root Cause Analysis
 
@@ -168,52 +187,3 @@ Every task MUST end with:
 Format: `Confidence: HIGH | MEDIUM | LOW — <one-line reason>`
 
 ---
-
-## Pipeline Flowchart
-
-```
-START
-  │
-  ▼
-[Phase 1: Deep Discovery]
-  │ Brain scan → Risk detection → Scope declaration
-  │
-  ▼
-[Phase 2: Architectural Simulation + Solver-Verifier]
-  │ sequential-thinking → Critique → Mental test cases
-  │ ── Gate: Approval by RISK — SKELETONS / store / API contract / router touched ──
-  │
-  ▼
-[Phase 3: TDD-First Execution]
-  │ Requirements → Red → Green → Refactor
-  │ 1–2 files/iteration → Ghost Principle check
-  │
-  ▼
-[Phase 4: Verification Loop + Diff Self-Review]
-  │ lint → format → types → tests → manual review
-  │ ── Fail? → Root Cause Analysis → Fix → Re-verify ──
-  │
-  ▼
-[Phase 5: Brain Auto-Sync]
-  │ `.cursor/brain/` → MAP / DECISIONS / SKELETONS / DICTIONARY
-  │
-  ▼
-[Phase 6: Confidence Declaration]
-  │ HIGH / MEDIUM / LOW + reason
-  │
-  ▼
-DONE
-```
-
----
-
-## Anti-Patterns (FORBIDDEN)
-
-- ❌ Skipping Phase 1 and jumping straight to code.
-- ❌ Editing > 2 files without intermediate verification.
-- ❌ Patching lint/type errors without Root Cause Analysis.
-- ❌ Completing a task without Brain sync declaration.
-- ❌ Modifying code outside declared scope (Ghost Principle violation).
-- ❌ Writing business logic without tests first.
-- ❌ Using relative `../../` imports instead of `@/` aliases.
-- ❌ Leaving `console.log` or raw `console.error(e)` in code.

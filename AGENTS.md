@@ -36,12 +36,47 @@ React 19 · TypeScript 6.0 strict · Vite 8 (Rolldown) · Tailwind **v4** · sha
 
 ## Commands / the gate
 
+**Five agent commands** in `.claude/commands/`. Each one puts the agent in a role, with this repo's own
+gate, danger zones and test infrastructure named inside it — so nothing has to be guessed or invented.
+
 ```bash
-npm run dev          # Vite dev server
-npm run verify       # typecheck → oxlint → eslint → prettier → coverage → build → e2e (commit/push gate)
-npm run test:e2e:prod # Playwright against `vite preview` (same as verify gate)
-npm run ci:local     # full local CI (adds audit + chunk/size checks on top of verify)
+/onboard   # get genuinely oriented: read the brain, VERIFY it against the code, report drift, stop
+/feat      # implement a feature: reuse check → scope → plan → test-first → gate → report
+/test      # write tests that hunt corner cases at integration seams, not the happy path
+/review    # senior review of the diff: leaks, security, bug-hunt algorithm, test strength
+/docs      # bring AGENTS.md + .cursor/brain/ back in line with the code and with master's history
 ```
+
+Scripts:
+
+```bash
+npm run fix          # oxlint --fix → eslint --fix → prettier --write — the one remedy command
+npm test             # vitest run (the gate uses test:coverage — thresholds only apply with --coverage)
+```
+
+The gate:
+
+```bash
+npm run dev           # Vite dev server
+npm run verify        # THE gate: typecheck → oxlint → eslint → format → coverage → build
+                      # → web-vitals chunks → size-limit → playwright browsers → e2e
+npm run verify:ci     # verify + audit:gate — what pre-push and GitHub CI both run
+npm run test:e2e:prod # Playwright against `vite preview` (same mode as the gate)
+npm run bench:verify  # the gate step by step with timings, to attribute a slow run
+```
+
+**`verify` is a strict superset of the offline checks CI runs.** A green `verify` therefore predicts a
+green CI, and keeping that true is a rule: **a new check goes into the script, never only into the
+workflow file.** `audit:gate` sits in `verify:ci` rather than `verify` because it needs the network,
+so an offline agent can still run the full offline gate.
+
+`ci:local` is an alias of `verify:ci`, kept for muscle memory across templates.
+
+**Pre-commit is repo-scoped, not staged-scoped.** `lint-staged` fixes and re-stages what you are
+committing, but for a partially staged file it restores the unstaged hunks _after_ fixing — so
+formatting drift used to survive a commit and only fail at push, leaving "already fixed but never
+committed" files in the tree. The hook now also runs `lint:oxlint` and `format:check` over the whole
+repo and refuses the commit, naming the remedy: `npm run fix && git add -u`.
 
 **Bootstrap after clone**: `npm run prepare` (once) — `.npmrc` disables lifecycle
 scripts as a supply-chain guard, so husky hooks don't install themselves; the

@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import queryPlugin from '@tanstack/eslint-plugin-query';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
+import i18next from 'eslint-plugin-i18next';
 import pluginImport from 'eslint-plugin-import-x';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import oxlintPlugin from 'eslint-plugin-oxlint';
@@ -49,6 +50,7 @@ export default defineConfig([
     {
         files: ['**/*.{ts,tsx}'],
         plugins: {
+            i18next,
             'jsx-a11y': jsxA11y,
             react: pluginReact
         },
@@ -78,7 +80,9 @@ export default defineConfig([
             }
         },
         settings: {
-            react: { version: 'detect' },
+            // NOT 'detect' — see the trailing settings block at the end of this
+            // file for why that crashes under ESLint 10.
+            react: { version: '19.2' },
             // resolver-next is the new API for eslint-plugin-import-x.
             // The legacy 'import-x/resolver' interface throws "node with invalid interface"
             // at runtime. createTypeScriptImportResolver wraps eslint-import-resolver-typescript
@@ -118,6 +122,43 @@ export default defineConfig([
             // ─── Console ─────────────────────────────────────────────────────
             // Use src/lib/logger.ts instead. console.* left in code = prod noise.
             'no-console': 'error',
+
+            // ─── Magic numbers — extract to a constants file (exempt below) ───
+            // Cheap models scatter literals; force named constants. Universal
+            // units (60 s/min, 1000 ms/s, 100 %) and trivial (-1,0,1,2) ignored.
+            '@typescript-eslint/no-magic-numbers': [
+                'error',
+                {
+                    ignore: [-1, 0, 1, 2, 60, 100, 1000],
+                    ignoreEnums: true,
+                    ignoreReadonlyClassProperties: true,
+                    ignoreArrayIndexes: true,
+                    ignoreDefaultValues: true,
+                    ignoreTypeIndexes: true
+                }
+            ],
+
+            // ─── Architecture boundaries — lower layers must not import upward ─
+            // Documented in AGENTS.md; enforced here so drift fails the gate
+            // instead of waiting for a reviewer to notice it.
+            'import-x/no-restricted-paths': [
+                'error',
+                {
+                    zones: [
+                        {
+                            target: './src/components',
+                            from: './src/pages',
+                            message: 'Layer inversion: components must not import pages.'
+                        },
+                        { target: './src/hocs', from: './src/pages' },
+                        { target: './src/hooks', from: './src/pages' },
+                        { target: './src/store', from: './src/pages' },
+                        { target: './src/store', from: './src/components' },
+                        { target: './src/lib', from: './src/pages' },
+                        { target: './src/lib', from: './src/components' }
+                    ]
+                }
+            ],
 
             // ─── FC ban — use FunctionComponent explicitly ────────────────────
             // FC is just a short alias: type FC<P> = FunctionComponent<P>
@@ -201,7 +242,43 @@ export default defineConfig([
             ],
 
             // ─── jsx-a11y ────────────────────────────────────────────────────
-            ...jsxA11y.configs.recommended.rules
+            ...jsxA11y.configs.recommended.rules,
+
+            // ─── i18n — surface hardcoded user-visible strings (nudge t()) ────
+            // The gate runs with --max-warnings 0, so a warning here still blocks;
+            // `warn` severity only softens the IDE colour while typing.
+            // `mode: 'jsx-text-only'` flags ONLY plain text whose direct parent is
+            // a JSXElement/JSXFragment — the lowest-false-positive mode. Defaults
+            // already exempt className/key/id/type attributes and <Trans>, so
+            // structural strings do not flood. Intentional English-only surfaces
+            // turn it off in their own block below.
+            'i18next/no-literal-string': ['warn', { mode: 'jsx-text-only' }]
+        }
+    },
+    // ─── Intentional English-only surfaces ───────────────────────────────────
+    // I18nInitErrorFallback and RouteErrorBoundary render when i18next may have
+    // failed to initialise, so t() is unavailable by definition and the copy is
+    // fixed English. DevPlayground is dev tooling, not user-facing product UI.
+    {
+        files: [
+            'src/components/common/I18nInitErrorFallback/**/*.{ts,tsx}',
+            'src/components/common/RouteErrorBoundary/**/*.{ts,tsx}',
+            'src/pages/DevPlayground/**/*.{ts,tsx}'
+        ],
+        rules: {
+            'i18next/no-literal-string': 'off'
+        }
+    },
+    // ─── Declaration-only registries — the one place literals live ───────────
+    {
+        files: [
+            '**/constants.ts',
+            '**/constants/**/*.{ts,tsx}',
+            'src/store/keys.ts',
+            'src/router/routes.ts'
+        ],
+        rules: {
+            '@typescript-eslint/no-magic-numbers': 'off'
         }
     },
     // ─── No raw hex colors in UI code — use design tokens ───────────────────
@@ -289,6 +366,10 @@ export default defineConfig([
             // Test helpers/fixtures don't need declared return contracts.
             '@typescript-eslint/explicit-function-return-type': 'off',
             '@typescript-eslint/no-empty-function': 'off',
+            // Fixture values are the point of a test; naming them adds indirection.
+            '@typescript-eslint/no-magic-numbers': 'off',
+            // Hardcoded JSX text in fixtures is not user-facing — don't nudge t().
+            'i18next/no-literal-string': 'off',
             // Tests legitimately use non-null assertions for mocks
             '@typescript-eslint/no-non-null-assertion': 'off',
             // Test files can use inline types more freely
@@ -312,6 +393,8 @@ export default defineConfig([
         rules: {
             ...tseslint.configs.disableTypeChecked.rules,
             '@typescript-eslint/explicit-function-return-type': 'off',
+            '@typescript-eslint/no-magic-numbers': 'off',
+            'i18next/no-literal-string': 'off',
             'import-x/no-cycle': 'off',
             'import-x/order': 'off',
             'func-style': 'off',
@@ -322,5 +405,18 @@ export default defineConfig([
                 }
             ]
         }
+    },
+    /*
+     * REQUIRED for ESLint 10, do not set back to 'detect'. `eslint-plugin-react`
+     * resolves `version: 'detect'` through `detectReactVersion` -> `resolveBasedir`,
+     * which calls the `context.getFilename()` API that ESLint 10 removed; every
+     * react rule needing the version then throws at load. An explicit string skips
+     * that path entirely (`lib/util/version.js`).
+     * This block deliberately has NO `files` key, so it applies to every linted file
+     * and cannot be undone by a shared config that sets 'detect' for its own
+     * patterns. Keep it in step with the `react` major/minor in package.json.
+     */
+    {
+        settings: { react: { version: '19.2' } }
     }
 ]);

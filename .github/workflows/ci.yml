@@ -18,6 +18,7 @@ concurrency:
 jobs:
     validate:
         runs-on: ubuntu-latest
+        timeout-minutes: 25
         env:
             HUSKY: '0'
 
@@ -50,28 +51,22 @@ jobs:
             - name: Install dependencies
               run: npm ci --ignore-scripts
 
-            - name: Audit dependencies
-              run: npm audit --audit-level=moderate
+            # Keyed on the lock file, so a @playwright/test bump invalidates the
+            # cache and scripts/ensure-playwright.mjs (inside the gate) reinstalls
+            # the builds that version actually needs.
+            - name: Cache Playwright browsers
+              uses: actions/cache@v6
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-            # Type check first — fast feedback before slow linting
-            - name: Type check
-              run: npm run typecheck
-
-            # oxlint: Rust-based linter (~100x faster than ESLint)
-            # Catches basic errors instantly; ESLint handles TS-specific rules after
-            - name: Lint (oxlint)
-              run: npm run lint:oxlint
-
-            - name: Lint (ESLint)
-              run: npm run lint
-
-            - name: Check Formatting
-              run: npm run format:check
-
-            # Coverage run enforces thresholds defined in vitest.config.ts.
-            # Plain `test` skips thresholds — always use `test:coverage` in CI.
-            - name: Run Tests with Coverage
-              run: npm run test:coverage
+            # ONE step on purpose. `verify:ci` is the same command the pre-push hook
+            # runs, and the `verify` inside it is a strict superset of every check
+            # this job used to list separately. Adding a check HERE instead of to
+            # the script is exactly what makes a green local gate stop predicting a
+            # green CI — if it belongs in CI, it belongs in the script.
+            - name: Verify (audit gate, types, lint, format, coverage, build, size, e2e)
+              run: npm run verify:ci
 
             - name: Upload coverage report
               uses: actions/upload-artifact@v7
@@ -81,23 +76,10 @@ jobs:
                   path: coverage/
                   retention-days: 14
 
-            - name: Production build
-              run: npm run build
-
-            - name: Verify Web Vitals chunk split (default build)
-              run: npm run verify:web-vitals-chunks
-
-            - name: Cache Playwright browsers
-              uses: actions/cache@v6
-              id: playwright-cache
+            - name: Upload Playwright report on failure
+              uses: actions/upload-artifact@v7
+              if: failure()
               with:
-                  path: ~/.cache/ms-playwright
-                  key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-            - name: Install Playwright (Chromium only)
-              run: npx playwright install --with-deps chromium
-
-            - name: End-to-end tests (Playwright)
-              run: npm run test:e2e
-              env:
-                  CI: true
+                  name: playwright-report
+                  path: playwright-report/
+                  retention-days: 7

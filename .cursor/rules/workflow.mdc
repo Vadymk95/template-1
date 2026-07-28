@@ -19,6 +19,16 @@ Gate by **risk, not LOC**.
 
 **FORBIDDEN**: Starting implementation of a non-trivial task before approval.
 
+## Scope Discipline
+
+- **Flag unrequested work the MOMENT it appears**, not in the final write-up. A padding fix that
+  arrives with a new animation, a new class name and a new test is scope creep even when each piece is
+  defensible on its own. The resolution is often to move the idea onto an existing primitive rather
+  than to revert it — but the flag is not optional and it is not late.
+- **A review finding must sit on a line the diff actually touches.** Whole-file context tempts you
+  toward legacy lines; that temptation is how a one-file fix becomes a refactor. Discovered debt gets
+  its own issue, never this diff.
+
 ## Planning Requirements
 
 A plan must include:

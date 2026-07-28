@@ -11,13 +11,22 @@ import { logger } from '@/lib/logger';
 import { RoutesPath } from '@/router/routes';
 import { useUserStore } from '@/store/user/userStore';
 
+// Interpolated into the message too, so the rule and the text it advertises
+// cannot drift apart.
+const PASSWORD_MIN_LENGTH = 8;
+
+const HTTP_UNAUTHORIZED = 401;
+
 // Schema defined at module level — stable reference, zodResolver reads it once.
 // Error messages are intentionally English here.
 // To wire zod to i18n globally, set a custom z.setErrorMap() in your app entry.
 // z.email() is the Zod v4 way — replaces the deprecated z.string().email()
 const loginSchema = z.object({
     email: z.string().min(1, 'Email is required').pipe(z.email('Enter a valid email address')),
-    password: z.string().min(1, 'Password is required').min(8, 'At least 8 characters')
+    password: z
+        .string()
+        .min(1, 'Password is required')
+        .min(PASSWORD_MIN_LENGTH, `At least ${String(PASSWORD_MIN_LENGTH)} characters`)
 });
 
 export type LoginFormData = z.infer<typeof loginSchema>;
@@ -43,7 +52,7 @@ export const useLoginForm = (): {
         } catch (error) {
             logger.warn('Login failed', { error: String(error) });
             const message =
-                error instanceof ApiError && error.status === 401
+                error instanceof ApiError && error.status === HTTP_UNAUTHORIZED
                     ? t('auth:login.error.invalidCredentials')
                     : t('errors:api.unknown');
             form.setError('root', { message });

@@ -1,0 +1,68 @@
+name: Security
+
+on:
+    pull_request:
+        branches: [master]
+    push:
+        branches: [master]
+    schedule:
+        # Sunday 06:00 UTC — weekly catch-up scan picks up CVEs published mid-week.
+        - cron: '0 6 * * 0'
+
+# Avoid duplicate runs when a branch push triggers a PR.
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+    gitleaks:
+        name: Secret scan (gitleaks)
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        permissions:
+            contents: read
+        steps:
+            - name: Checkout (full history)
+              uses: actions/checkout@v7
+              with:
+                  # gitleaks needs commit history to scan past commits, not just HEAD.
+                  fetch-depth: 0
+
+            - name: Run gitleaks
+              # SHA-pinned — tags are mutable and have been retargeted in supply-chain
+              # attacks (tj-actions, 2025); Dependabot's github-actions ecosystem keeps
+              # this fresh.
+              uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  # Fail the job on any finding (default already, but explicit).
+                  GITLEAKS_EXIT_CODE: 1
+
+    codeql:
+        name: CodeQL (JavaScript / TypeScript)
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        permissions:
+            actions: read
+            contents: read
+            security-events: write
+        strategy:
+            fail-fast: false
+            matrix:
+                language: [javascript-typescript]
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v4
+              with:
+                  languages: ${{ matrix.language }}
+                  # Adds the security-extended pack — broader coverage at the cost of run time.
+                  # Drop to default if CodeQL becomes a bottleneck.
+                  queries: security-extended
+
+            - name: Perform analysis
+              uses: github/codeql-action/analyze@v4
+              with:
+                  category: '/language:${{ matrix.language }}'

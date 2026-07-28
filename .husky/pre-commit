@@ -1,1 +1,29 @@
+# Staged-scope pass: autofix and re-stage what is actually being committed.
 npx lint-staged
+
+# TDD-gate: staged src logic files must have a co-located *.test.* sibling.
+# Guarded explicitly rather than leaning on husky's `sh -e`: an implicit errexit
+# is one refactor away from turning this into a fail-open check.
+node scripts/check-test-siblings.mjs || exit 1
+
+# Repo-scope pass. lint-staged only touches STAGED files, and for a partially
+# staged file it restores the unstaged hunks AFTER fixing — so formatting drift
+# can survive a commit and then fail the push gate. That is how "already fixed
+# but never committed" files end up dangling in the tree. Catch it here, while
+# the remedy is still one command, instead of after the commit exists.
+#
+# oxlint is repo-wide because it costs well under a second. ESLint is type-aware
+# and slow, so it stays on pre-push with the rest of the gate.
+npm run lint:oxlint || {
+    echo ""
+    echo "✖ oxlint failed somewhere in the repo, not only in your staged files."
+    echo "  Autofix what can be fixed and stage it:  npm run fix && git add -u"
+    exit 1
+}
+
+npm run format:check || {
+    echo ""
+    echo "✖ Formatting drift in the repo, outside the staged set."
+    echo "  Autofix and stage it in one step:  npm run fix && git add -u"
+    exit 1
+}

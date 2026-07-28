@@ -44,7 +44,15 @@ export default mergeConfig(
                     branches: 48
                 }
             },
-            include: ['src/**/*.{test,spec}.{ts,tsx}', 'vite-plugins/**/*.{test,spec}.{ts,tsx}']
+            // `scripts/**` is deliberately `.mjs`: it sits outside every tsconfig
+            // project, so a `.ts` test there would fail ESLint's project service.
+            // Coverage `include` stays `src/**`, so build tooling cannot inflate
+            // or dilute the thresholds.
+            include: [
+                'src/**/*.{test,spec}.{ts,tsx}',
+                'vite-plugins/**/*.{test,spec}.{ts,tsx}',
+                'scripts/**/*.{test,spec}.mjs'
+            ]
         }
     })
 );
