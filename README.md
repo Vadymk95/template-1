@@ -93,13 +93,13 @@ After cloning, these are the exact files / symbols to edit to make the template 
 
 ### Developer Experience
 
-- **ESLint 9** — Flat Config with import-x + jsx-a11y rules
+- **ESLint 10** — Flat Config with import-x, jsx-a11y, layer boundaries, no-magic-numbers, raw-hex ban
 - **Oxlint** — fast structural pre-pass in CI and lint-staged
 - **Prettier 3** — code formatting
 - **Husky + lint-staged** — git hooks for quality gates
 - **Commitlint** — conventional commits enforcement
 - **Vitest 4.1** — unit testing with Testing Library
-- **Playwright 1.61** — E2E tests
+- **Playwright 1.62** — E2E tests; browsers installed on demand by `scripts/ensure-playwright.mjs`
 
 ## 🛠 Project Structure
 
@@ -208,53 +208,85 @@ VITE_ENABLE_MSW=false
 
 ### Available Scripts
 
-| Command                            | Description                                                          |
-| ---------------------------------- | -------------------------------------------------------------------- |
-| `npm run dev`                      | Start Vite dev server (port 3000)                                    |
-| `npm run build`                    | `tsc -b` + Vite production build (Oxc + Brotli)                      |
-| `npm run preview`                  | Serve production build locally                                       |
-| `npm run typecheck`                | Runs `tsc -b` (no emit)                                              |
-| `npm run lint`                     | Run ESLint                                                           |
-| `npm run lint:oxlint`              | Fast Oxc-based lint pass (pre-ESLint)                                |
-| `npm run format`                   | Format codebase with Prettier                                        |
-| `npm run format:check`             | Check code formatting                                                |
-| `npm test`                         | Run unit tests (Vitest)                                              |
-| `npm run test:watch`               | Run tests in watch mode                                              |
-| `npm run test:coverage`            | Run tests with coverage report                                       |
-| `npm run test:e2e`                 | Playwright E2E (vite dev locally unless preview)                     |
-| `npm run test:e2e:prod`            | Playwright against `vite preview` (verify gate)                      |
-| `npm run test:e2e:ui`              | Playwright UI mode                                                   |
-| `npm run verify`                   | Commit/push gate: typecheck → lint → format → coverage → build → e2e |
-| `npm run ci:local`                 | Superset of verify (adds audit + chunk/size checks)                  |
-| `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks                     |
-| `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                                   |
+| Command                            | Description                                                       |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| `npm run dev`                      | Start Vite dev server (port 3000)                                 |
+| `npm run build`                    | `tsc -b` + Vite production build (Oxc + Brotli)                   |
+| `npm run preview`                  | Serve production build locally                                    |
+| `npm run typecheck`                | Runs `tsc -b` (no emit)                                           |
+| `npm run lint`                     | Run ESLint                                                        |
+| `npm run lint:oxlint`              | Fast Oxc-based lint pass (pre-ESLint)                             |
+| `npm run format`                   | Format codebase with Prettier                                     |
+| `npm run format:check`             | Check code formatting                                             |
+| `npm test`                         | Run unit tests (Vitest)                                           |
+| `npm run test:watch`               | Run tests in watch mode                                           |
+| `npm run test:coverage`            | Run tests with coverage report                                    |
+| `npm run test:e2e`                 | Playwright E2E (vite dev locally unless preview)                  |
+| `npm run test:e2e:prod`            | Playwright against `vite preview` (verify gate)                   |
+| `npm run test:e2e:ui`              | Playwright UI mode                                                |
+| `npm run fix`                      | The remedy: oxlint `--fix` → eslint `--fix` → prettier, repo-wide |
+| `npm run verify`                   | **The gate** — every offline check (see below)                    |
+| `npm run verify:ci`                | `audit:gate && verify` — what pre-push and CI both run            |
+| `npm run ci:local`                 | Alias of `verify:ci`                                              |
+| `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist       |
+| `npm run bench:verify`             | The gate step by step with timings                                |
+| `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                  |
+| `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks                  |
+| `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                                |
+
+### The gate
+
+`npm run verify` runs, in order: `check-hooks` → `typecheck` → `lint:oxlint` → `lint` → `format:check`
+→ `test:coverage` → `build` → `verify:web-vitals-chunks` → `size:check` → `ensure-playwright` →
+`test:e2e:prod`.
+
+`npm run verify:ci` is `audit:gate && verify`. The audit gate is separate because it needs the network,
+so an offline contributor can still run the complete offline gate.
+
+**`verify` is a strict superset of the offline checks CI runs**, which is what makes a green local gate
+predict a green CI. Keeping that true is a rule: **a new check goes into the script, never only into the
+workflow file.** Adding one to CI alone is how this template's gate stopped predicting CI once already.
+
+`npm test` deliberately does not enforce coverage — the thresholds in `vitest.config.ts` only apply with
+`--coverage`, which is why the gate uses `test:coverage`.
+
+### Agent commands
+
+Five commands in `.claude/commands/`, each mirrored by a shim in `.cursor/commands/` so Cursor and
+Claude Code behave identically: `/onboard`, `/feat`, `/test`, `/review`, `/docs`. Each names this repo's
+own gate, danger zones and test infrastructure, so an agent does not have to guess or invent them.
+`.github/copilot-instructions.md` carries the same standards for GitHub Copilot code review.
 
 ### Git Hooks
 
-**Pre-commit** (via Husky + lint-staged):
+**Pre-commit** (Husky):
 
-- Oxlint `--fix` → ESLint `--fix` → Prettier on staged files
-- Blocks commit if errors remain
+1. `lint-staged` — oxlint `--fix` → ESLint `--fix` → Prettier on the **staged** files
+2. TDD gate — a staged `src` logic file with no co-located `*.test.*` blocks the commit
+3. **Repo-wide** `lint:oxlint` and `format:check`
 
-**Commit message** (via Commitlint):
+Step 3 exists because `lint-staged` only touches the staged set, and for a partially staged file it
+restores the unstaged hunks _after_ fixing — so formatting drift used to survive the commit and fail at
+push, leaving files that were already fixed and never committed. On failure the hook prints the remedy:
+`npm run fix && git add -u`.
 
-- Enforces `type(scope): subject`, max 96 chars
+**Commit message** (Commitlint): `type(scope): subject`, max 96 chars.
 
-**Pre-push:**
-
-- Runs full **`npm run verify`** (includes production build + Playwright against `vite preview`)
+**Pre-push:** `npm run verify:ci`.
 
 ### CI (GitHub Actions)
 
-On pull requests and pushes to `master` (Node 24.x, `npm ci`):
+**`ci.yml`** — on pull requests and pushes to `master` (Node 24.x, `npm ci --ignore-scripts`): a single
+`npm run verify:ci` step, plus the Playwright browser cache and artifact uploads. One step on purpose —
+see the gate rule above.
 
-1. `npm audit --audit-level=moderate`
-2. `typecheck` → `lint:oxlint` → `lint` → `format:check`
-3. `test:coverage`
-4. `build` + `scripts/check-web-vitals-chunks.mjs`
-5. Playwright E2E against `vite preview`
+**`security.yml`** — on push, PR and a weekly cron: gitleaks over the full history (SHA-pinned action;
+tags are mutable and have been retargeted in supply-chain attacks) and CodeQL `security-extended`.
+Findings land in the repo's Security tab. Exclusions live in `.github/codeql/codeql-config.yml` with
+their reason written down, rather than being dismissed in the UI where the reason is lost.
 
-**Dependabot** (weekly): proposes npm dependency updates.
+**Dependabot** (weekly): proposes npm and GitHub Actions updates, with a cooldown so fresh releases
+soak before a PR opens.
 
 ### Dev Playground (template seed)
 

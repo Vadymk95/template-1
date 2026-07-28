@@ -234,7 +234,12 @@ message initialised and then unconditionally overwritten in both branches below 
 
 ---
 
-## [2026-04] ESLint 9 (not 10) — intentional hold
+## [2026-04] ESLint 9 (not 10) — intentional hold — SUPERSEDED
+
+**Superseded by "[2026-07] ESLint 10; `settings.react.version` must be a literal" above.** The hold
+was lifted before the 2026-08-06 end of life: the plugin peers still cap below 10, but three
+`overrides` entries resolve that without `--legacy-peer-deps`, and the one real crash path turned out
+to be `settings.react.version: 'detect'`. Kept for the reasoning, not as current guidance.
 
 **Decision**: Holding on ESLint **9.x**. Not upgrading to ESLint **10** yet.
 

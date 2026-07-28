@@ -9,9 +9,13 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
     set -e
 fi
 
-echo "→ verify (typecheck → lint → format → coverage → build → e2e)"
-npm run verify || {
-    echo "❌ verify failed. Fix before push."
-    echo "   First-time Playwright browsers: npx playwright install --with-deps chromium"
+# verify:ci, not verify — pushing implies network, so the audit gate can run here.
+# If this hook ran only `verify`, a green pre-push would stop predicting a green CI,
+# which is the whole property the gate exists to hold.
+echo "→ verify:ci (audit gate → types → lint → format → coverage → build → size → e2e)"
+npm run verify:ci || {
+    echo "❌ verify:ci failed. Fix before push."
+    echo "   Lint or formatting: npm run fix && git add -u"
+    echo "   Playwright browsers are installed by scripts/ensure-playwright.mjs"
     exit 1
 }

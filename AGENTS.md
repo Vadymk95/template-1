@@ -88,7 +88,7 @@ The gate is **zero-warnings**: `eslint --max-warnings 0`, `oxlint --deny-warning
 
 ## Version holds (do not "fix" by bumping)
 
-- **ESLint stays 9.x** — `eslint-plugin-react` peers stop at `^9.7`, `eslint-plugin-jsx-a11y` at `^9` (verified 2026-07-16). ESLint 9 EOL is 2026-08-06 — re-check the peers before bumping.
+- **ESLint is 10.x** — the 9.x hold was lifted ahead of the 2026-08-06 end of life. Three plugins still cap their `eslint` peer below 10 (`eslint-plugin-react` at `^9.7`, `eslint-plugin-jsx-a11y` at `^9`, and `eslint-plugin-import` transitively), so each has an `overrides` entry mapping that peer to `$eslint`. Do not remove them, and do not reach for `--legacy-peer-deps`. **`settings.react.version` must stay a literal, never `'detect'`** — see `DECISIONS.md`.
 - **TypeScript stays `~6.0.x`** — `typescript-eslint` peer is `<6.1.0`. TS 7 exists; do not bump until the peer widens.
 - **`oxlint` tilde-tracks `eslint-plugin-oxlint`** — lockstep releases; the plugin pins `~<its version>`.
 - **`@types/node` stays 24.x** — types match `engines.node >= 24`, not the newest Node.

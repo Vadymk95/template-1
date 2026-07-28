@@ -61,6 +61,8 @@ jobs:
                   # Adds the security-extended pack — broader coverage at the cost of run time.
                   # Drop to default if CodeQL becomes a bottleneck.
                   queries: security-extended
+                  # Excludes the generated MSW worker, with the reason in the file.
+                  config-file: ./.github/codeql/codeql-config.yml
 
             - name: Perform analysis
               uses: github/codeql-action/analyze@v4
