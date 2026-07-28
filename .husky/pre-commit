@@ -14,16 +14,15 @@ node scripts/check-test-siblings.mjs || exit 1
 #
 # oxlint is repo-wide because it costs well under a second. ESLint is type-aware
 # and slow, so it stays on pre-push with the rest of the gate.
-npm run lint:oxlint || {
-    echo ""
-    echo "✖ oxlint failed somewhere in the repo, not only in your staged files."
-    echo "  Autofix what can be fixed and stage it:  npm run fix && git add -u"
-    exit 1
-}
+# Both checks run even when the first one fails, so one commit attempt reports
+# everything that needs fixing instead of sending you round twice.
+repo_gate_status=0
+npm run lint:oxlint || repo_gate_status=1
+npm run format:check || repo_gate_status=1
 
-npm run format:check || {
+if [ "$repo_gate_status" -ne 0 ]; then
     echo ""
-    echo "✖ Formatting drift in the repo, outside the staged set."
+    echo "✖ Repo-wide oxlint or formatting failed, outside the staged set."
     echo "  Autofix and stage it in one step:  npm run fix && git add -u"
     exit 1
-}
+fi
