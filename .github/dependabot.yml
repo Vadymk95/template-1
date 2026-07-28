@@ -17,13 +17,25 @@ updates:
               dependency-type: production
           development-dependencies:
               dependency-type: development
-      # ESLint 10 ecosystem: most plugins (jsx-a11y, react, react-hooks) declare
-      # peer deps up to ^9 only. Ignore until plugin ecosystem catches up.
+      # Every entry here mirrors a version hold in .cursor/brain/DECISIONS.md. An
+      # ignore that outlives its reason is worse than none: it silently withholds
+      # security patches. Check the reason before adding or keeping one.
+      #
+      # typescript: `typescript-eslint@8` peers `>=4.8.4 <6.1.0`. A bump to 7.x
+      # makes BOTH `npm install` and `npm ci` fail with ERESOLVE — the whole tree
+      # stops resolving, not just linting. A sibling template had that bump merged
+      # and reach master; this guard is why it cannot happen here.
+      #
+      # eslint: the repo IS on 10.x. The floor is `>=11` so patches and minors
+      # inside 10 still arrive; a major would again outrun the plugin peers that
+      # `overrides` currently map to `$eslint`.
       ignore:
+          - dependency-name: typescript
+            versions: ['>=6.1']
           - dependency-name: eslint
-            versions: ['>=10']
+            versions: ['>=11']
           - dependency-name: '@eslint/js'
-            versions: ['>=10']
+            versions: ['>=11']
 
     - package-ecosystem: github-actions
       directory: '/'

@@ -106,7 +106,7 @@ Committed configs must never contain absolute local paths. The VS Code i18next e
 ## Commit format
 
 `type(scope): description` — max 96 chars.
-Types: `feat` `fix` `chore` `docs` `style` `refactor` `perf` `test` `revert`
+Types: `feat` `fix` `chore` `docs` `style` `refactor` `perf` `test` `revert` `build` `ci`
 
 ## Maintaining this file
 

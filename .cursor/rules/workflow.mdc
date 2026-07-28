@@ -73,7 +73,7 @@ Individual commands (`npm run typecheck`, `npm run lint`, `npm run lint:oxlint`,
 type(scope): description
 ```
 
-- **Types**: `feat` `fix` `chore` `docs` `style` `refactor` `perf` `test` `revert`
+- **Types**: `feat` `fix` `chore` `docs` `style` `refactor` `perf` `test` `revert` `build` `ci`
 - **Max 96 chars** on header line.
 - **English only**, imperative mood ("add", not "added" or "adds").
 - **No Co-authored-by tags**.
