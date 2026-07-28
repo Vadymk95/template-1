@@ -35,6 +35,23 @@ down the reason with an expiry is. `scripts/audit-gate.test.mjs` covers the fail
 including the invalid-payload one — a security gate that reports success when it cannot run is worse
 than no gate.
 
+**An allowance is the last resort, not the first.** `GHSA-mh99-v99m-4gvg` (brace-expansion,
+unbounded expansion → OOM) was allowlisted here on the reading that `minimatch@3` is pinned by
+eslint's own dependencies and by `eslint-plugin-react` / `eslint-plugin-jsx-a11y`, so nothing could be
+bumped. That was true of the *direct* dependencies and wrong about the *transitive* one:
+`brace-expansion@5.0.8` sits outside the advisory range `<=5.0.7`, and a root override
+`"brace-expansion": ">=5.0.8"` closes the advisory with `minimatch@3` untouched — 5.0.8 is
+dual-published, so `require()` still resolves a CommonJS build. `npm audit` goes to zero for it and the
+full gate stays green. What made the allowance look inevitable was npm's own suggested remediation:
+`eslint-plugin-react@7.22.0`, a semver-major **downgrade**. Read the advisory's fixed range directly
+instead of trusting `fixAvailable`.
+
+**Removing an allowance and adding the override are ONE commit.** The moment the override lands the
+advisory disappears from the audit, which makes the allowance **stale**, which fails the gate by
+design. Verified rather than assumed: re-adding the entry after the override produces
+`Stale allowlist entry: GHSA-mh99-v99m-4gvg` and exit 1. That is the stale check doing its job — it is
+what stops allowances outliving the problem they described.
+
 **Revisit trigger:** if `verify` crosses roughly five minutes locally, move e2e into its own CI job and
 out of the pre-push hook — but out of `verify` only together with the workflow, never one alone.
 

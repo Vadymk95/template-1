@@ -1,11 +1,5 @@
 [
     {
-        "id": "GHSA-mh99-v99m-4gvg",
-        "expires": "2026-09-01",
-        "reason": "brace-expansion <=5.0.7 can be driven into unbounded expansion and an out-of-memory crash. Every installed path is a development-time tool expanding patterns from our own configuration rather than user input: eslint itself, @eslint/config-array and @eslint/eslintrc through minimatch@3, eslint-plugin-react and eslint-plugin-jsx-a11y. Nothing in the shipped bundle reaches it.",
-        "upstream": "Blocked upstream: minimatch@^3.1.2 is pinned by eslint's own dependencies and by eslint-plugin-react / eslint-plugin-jsx-a11y, all of which are already at their latest versions. npm's suggested remediation is eslint-plugin-react@7.22.0, a downgrade from 7.37.5 flagged semver-major, which is destructive rather than a fix."
-    },
-    {
         "id": "GHSA-qwww-vcr4-c8h2",
         "expires": "2026-11-01",
         "reason": "React Router >=7.12.0 <8.3.0 executes an action before returning the 400 in RSC mode, bypassing CSRF protection. This template is a client-rendered Vite SPA using react-router-dom 7.x in declarative/data mode: there is no RSC entry, no createCallServer call, and no @react-router/dev in the tree, so the vulnerable path is not reachable here. A fork that adopts RSC mode must re-evaluate this allowance instead of inheriting it.",

@@ -103,6 +103,7 @@
         "vitest": "^4.1.10"
     },
     "overrides": {
+        "brace-expansion": ">=5.0.8",
         "fast-uri": ">=3.1.4",
         "eslint-plugin-react": {
             "eslint": "$eslint"
