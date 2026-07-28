@@ -1,5 +1,21 @@
 name: Security
 
+# WHERE THIS WORKS — read before forking into a private repo.
+#
+# `gitleaks` works anywhere: it runs the scanner itself and fails the job on a
+# finding, independent of any GitHub feature or plan. (One caveat: the action asks
+# for a GITLEAKS_LICENSE when the repo is owned by an ORGANISATION; a personal
+# account needs nothing.)
+#
+# `codeql` needs GitHub **code scanning** enabled, which is free on PUBLIC repos
+# and a paid add-on on private ones. This repository is public, so it works as
+# written. In a PRIVATE fork the analyze step fails when it tries to upload
+# results, and the API says so plainly:
+#   "Code scanning is not enabled for this repository." (HTTP 403)
+# A private fork therefore has to either enable Advanced Security for the repo, or
+# delete the `codeql` job below and keep `gitleaks`. Do not "fix" a red CodeQL job
+# by weakening the workflow — it is a plan boundary, not a configuration mistake.
+
 on:
     pull_request:
         branches: [master]

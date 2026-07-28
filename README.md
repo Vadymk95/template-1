@@ -285,6 +285,18 @@ tags are mutable and have been retargeted in supply-chain attacks) and CodeQL `s
 Findings land in the repo's Security tab. Exclusions live in `.github/codeql/codeql-config.yml` with
 their reason written down, rather than being dismissed in the UI where the reason is lost.
 
+### Where the security workflow works
+
+`gitleaks` runs anywhere — it executes the scanner itself and fails the job on a finding, independent of
+any GitHub feature or plan. The action only asks for a `GITLEAKS_LICENSE` when the repository is owned by
+an **organisation**; a personal account needs nothing.
+
+`codeql` needs GitHub **code scanning**, which is free on **public** repositories and a paid add-on on
+private ones. This template is public, so it works as shipped. In a **private fork** the analyze step
+fails while uploading results (`Code scanning is not enabled for this repository`, HTTP 403). A private
+fork must either enable Advanced Security for the repo or delete the `codeql` job and keep `gitleaks`.
+That is a plan boundary, not a misconfiguration — do not weaken the workflow to make it green.
+
 **Dependabot** (weekly): proposes npm and GitHub Actions updates, with a cooldown so fresh releases
 soak before a PR opens.
 
