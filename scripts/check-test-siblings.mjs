@@ -18,32 +18,48 @@ import { existsSync } from 'node:fs';
 const EXEMPT =
     /(\.test\.[tj]sx?$|\.d\.ts$|\/index\.tsx?$|constants\.ts$|\/keys\.ts$|\/routes\.ts$|\/_example[^/]*$|\/main\.tsx$|\/App\.tsx$|vite-env\.d\.ts$|\/env\.ts$|^src\/components\/ui\/|^src\/mocks\/|^src\/test\/)/;
 
-const isSrcLogic = (f) => /^src\/.+\.(ts|tsx)$/.test(f) && !EXEMPT.test(f);
+export const isSrcLogic = (file) => /^src\/.+\.(ts|tsx)$/.test(file) && !EXEMPT.test(file);
 
-const argvFiles = process.argv.slice(2);
-const files = argvFiles.length
-    ? argvFiles
-    : execSync('git diff --cached --name-only --diff-filter=ACM', { encoding: 'utf8' })
-          .split('\n')
-          .filter(Boolean);
+/**
+ * Pure decision half, so the EXEMPT list can be tested without a git index or a
+ * real tree. `exists` is injected for the same reason: this is the piece most
+ * likely to be edited later (usually to widen an exemption), so it is the piece
+ * that needs a spec.
+ */
+export const findMissingSiblings = (files, exists) =>
+    files.filter((file) => {
+        if (!isSrcLogic(file)) {
+            return false;
+        }
+        const base = file.replace(/\.(ts|tsx)$/, '');
+        return !exists(`${base}.test.ts`) && !exists(`${base}.test.tsx`);
+    });
 
-const missing = [];
-for (const f of files) {
-    if (!isSrcLogic(f)) continue;
-    const base = f.replace(/\.(ts|tsx)$/, '');
-    if (!existsSync(`${base}.test.ts`) && !existsSync(`${base}.test.tsx`)) {
-        missing.push(f);
+const stagedFiles = () =>
+    execSync('git diff --cached --name-only --diff-filter=ACM', { encoding: 'utf8' })
+        .split('\n')
+        .filter(Boolean);
+
+const main = () => {
+    const argvFiles = process.argv.slice(2);
+    const missing = findMissingSiblings(argvFiles.length ? argvFiles : stagedFiles(), existsSync);
+
+    if (missing.length === 0) {
+        return;
     }
-}
 
-if (missing.length) {
     console.error('\n✖ TDD-gate: staged source files with no co-located *.test.* sibling:');
-    for (const m of missing) {
-        const ext = m.endsWith('.tsx') ? 'tsx' : 'ts';
-        console.error(`  - ${m}  → add ${m.replace(/\.(ts|tsx)$/, `.test.${ext}`)}`);
+    for (const file of missing) {
+        const ext = file.endsWith('.tsx') ? 'tsx' : 'ts';
+        console.error(`  - ${file}  → add ${file.replace(/\.(ts|tsx)$/, `.test.${ext}`)}`);
     }
     console.error(
         '\nTests must exist alongside source. Add the test, or if genuinely exempt extend EXEMPT in scripts/check-test-siblings.mjs.\n'
     );
     process.exit(1);
+};
+
+// Guarded so importing this module for a test does not shell out to git.
+if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+    main();
 }
