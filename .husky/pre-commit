@@ -1,5 +1,17 @@
 # Staged-scope pass: autofix and re-stage what is actually being committed.
-npx lint-staged
+#
+# Guarded and pinned, for the same reason the TDD gate below is guarded. `--no-install`
+# stops npx fetching a different lint-staged from the network when node_modules is
+# incomplete — a gate that runs a tool the repo does not pin is not a gate. And the
+# explicit `if !` does not lean on husky's `sh -e`: relying on an implicit errexit here
+# is one refactor away from a swallowed failure, which lands a commit with no autofix at
+# all and only looks harmless because the repo-scope pass below usually fails too.
+if ! npx --no-install lint-staged; then
+    echo ""
+    echo "✖ The staged-file autofix failed. Fix the reported files first."
+    echo "  One remedy, then stage:  npm run fix && git add -u"
+    exit 1
+fi
 
 # TDD-gate: staged src logic files must have a co-located *.test.* sibling.
 # Guarded explicitly rather than leaning on husky's `sh -e`: an implicit errexit
