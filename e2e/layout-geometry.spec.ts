@@ -57,7 +57,15 @@ for (const width of VIEWPORT_WIDTHS) {
         const results: string[] = [];
 
         for (const route of ROUTES_UNDER_TEST) {
-            await page.goto(route.path, { waitUntil: 'domcontentloaded' });
+            /*
+             * `load`, not `domcontentloaded`. Found by running Firefox: at `domcontentloaded` the
+             * stylesheet is not necessarily applied yet, so the page measures with UA defaults — a
+             * submit button 18px tall and an input 19px, which look like catastrophic layout defects and
+             * are simply an unstyled snapshot. Chromium happened to apply the CSS before that event, so
+             * a single-engine run could not see it. A geometry measurement needs the render-blocking
+             * resources in, which is what `load` waits for.
+             */
+            await page.goto(route.path, { waitUntil: 'load' });
             await expect(page.getByRole('main')).toBeVisible();
 
             const violationCountBefore = violations.length;
