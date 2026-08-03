@@ -52,6 +52,14 @@ apply — then test those, not the happy path:
 - **Boundaries, from both sides.** For a rule at N, assert N and N-1. Empty, one, many. First and last.
   Zero results versus a failed request — they are different and often collapse into the same branch by
   accident.
+- **Content extremes, for anything that renders copy.** The shortest string the schema allows, a typical
+  one, a long one, and ONE UNBROKEN TOKEN with nothing to wrap on — plus zero, one and many for a
+  collection. A long sentence wraps on its spaces and hides the defect that the unbroken token finds.
+  jsdom has no layout, so a unit test can pin a class string and no more: the measurement is
+  `npm run verify:full` (`/dev/ui/content-stress` at 390 / 640 / 768 / 1024 / 1440). Add a case to
+  `src/pages/DevPlayground/stressMatrix.ts` when you add a content-bearing component. And name the RANGE
+  a guard must cover, never a single example — a guard proven at one width usually just moves the defect
+  to another.
 - **Contract seams between modules.** Where your change crosses a boundary — component to hook, hook to
   api function, api to MSW, store to selector — assert the shape that crosses it. A response validated
   by type assertion instead of a Zod parse is trusted on faith; test what happens when the shape is

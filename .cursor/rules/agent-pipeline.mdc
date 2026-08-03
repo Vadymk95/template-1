@@ -133,6 +133,20 @@ Green means nothing until you know the gate can go red.
    `*.test.*` sibling — and watch it refuse. Then revert the sabotage.
 4. **A check that reports success when it could not run is fail-OPEN.** Ask what it does on a missing
    directory, an empty result, or no network — not only on the failure it was written for.
+5. **Name the condition under which the green would have been RED.** If you cannot name one, the check
+   proved nothing — and a check that cannot fail still gets recorded as evidence. Three real shapes in
+   this repo: a layout measurement taken while i18next still hides the document sees NO element and
+   passes every invariant vacuously; a Playwright `testMatch` that matches nothing collects zero tests
+   and exits 0; and `vitest --coverage` prints `Excluding it from coverage` for a file it could not
+   parse and then exits 0 with a percentage over a smaller set.
+6. **Check the cases that "cannot happen".** For UI that is: the shortest copy the schema allows, the
+   longest, one unbroken token with nothing to wrap on, zero items, one item, many — at every width
+   where it renders. Run `npm run verify:full`; `npm test` cannot see any of it, because jsdom has no
+   layout.
+7. **Do not reason about what a browser does — run it.** `CROSS_BROWSER=1` adds Firefox and WebKit to
+   the geometry specs. Measured here rather than predicted: Firefox reports `clientWidth: 0` for an
+   inline `<label>` (CSSOM says an inline box has no client box) while Chromium reports a box, so a rule
+   about content overflow was asking a question one engine cannot answer.
 
 ### 4.2 Self-Correction with Root Cause Analysis
 

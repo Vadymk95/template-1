@@ -34,6 +34,20 @@ React 19 · TypeScript 6.0 strict · Vite 8 (Rolldown) · Tailwind **v4** · sha
 
 **Consistency beats preference** — match the surrounding file's style and patterns.
 
+**Content variance** — anything that renders authored copy is proven against content it has NOT seen:
+`minimal` / `typical` / `long` / `unbroken` for text, `none` / `one` / `many` for collections. The fixture
+is `/dev/ui/content-stress` (dev-only), measured by `e2e/dev/content-stress.spec.ts` at
+390 / 640 / 768 / 1024 / 1440; the assembled pages are measured by `e2e/layout-geometry.spec.ts`. Add a
+case when you add a content-bearing component. Two rules earned the hard way: the RANGE of widths a guard
+covers is part of its specification (a guard proven at one width usually just moves the defect), and a
+wrap class with no red-to-green proof gets deleted rather than kept "to be safe".
+
+**Rendering differences are measured, not predicted** — engines disagree about intrinsic sizing, font
+metrics (so any `ch` measure), scrollbar gutters and `forced-colors`. `CROSS_BROWSER=1` adds Firefox and
+WebKit to the geometry specs; CI runs that as its own job. Measured here: Firefox reports
+`clientWidth: 0` for an inline `<label>` per CSSOM while Chromium reports a box. Never reason about what
+an engine does — run it.
+
 ## Commands / the gate
 
 **Five agent commands** in `.claude/commands/`. Each one puts the agent in a role, with this repo's own
@@ -58,12 +72,19 @@ The gate:
 
 ```bash
 npm run dev           # Vite dev server
-npm run verify        # THE gate: typecheck → oxlint → eslint → format → coverage → build
+npm run verify        # THE gate: hooks → typecheck → oxlint → eslint → format → coverage → build
                       # → web-vitals chunks → size-limit → playwright browsers → e2e
 npm run verify:ci     # verify + audit:gate — what pre-push and GitHub CI both run
+npm run verify:full   # verify:ci + smoke:dev — adds the content-variance fixture (needs a dev server)
+npm run smoke:dev     # the content-stress fixture alone, against `vite dev`
 npm run test:e2e:prod # Playwright against `vite preview` (same mode as the gate)
 npm run bench:verify  # the gate step by step with timings, to attribute a slow run
 ```
+
+`verify:full` is the rung to run before a PR that touched a shared UI primitive, the layout shell or
+`src/index.css`. It is not inside `verify` because it needs a second server on its own port; CI runs it as
+a mandatory `dev-smoke` job instead, so it cannot be forgotten. `bench:verify` DERIVES its step list from
+the `verify` script — do not hand-write a second list, that one had already drifted by two steps.
 
 **`verify` is a strict superset of the offline checks CI runs.** A green `verify` therefore predicts a
 green CI, and keeping that true is a rule: **a new check goes into the script, never only into the

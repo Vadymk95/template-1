@@ -116,6 +116,15 @@ The pre-commit hook only proves a `*.test.*` file exists. You judge whether it i
 - `disabled` on an anchor does nothing; on a button it drops focus to the body. Expect `aria-disabled`
   plus a click guard.
 - `prefers-reduced-motion` resolves to the end state, not to a faster animation.
+- A focus reset written as `outline-none` rather than `outline-hidden`: only the latter emits an outline
+  under `forced-colors: active`, where the `ring-*` box-shadow is suppressed and there would otherwise be
+  no indicator at all.
+- New copy-bearing markup with no case in the content-stress fixture, and any wrap guard added without a
+  red-to-green proof — a `min-w-0` that changes no invariant at any width is decoration, and decoration in
+  a shared component is what the next author copies. A flex child holding text needs `min-w-0` because
+  `overflow-wrap` alone cannot lower its min-content floor.
+- A claim about what a browser does, asserted rather than measured. `CROSS_BROWSER=1` runs Firefox and
+  WebKit on the geometry specs; engines disagree about intrinsic sizing and font metrics.
 - A list that can exceed roughly 50 rows without virtualisation; an image in the first viewport without
   `fetchpriority="high"`; a below-fold import that is not lazy.
 

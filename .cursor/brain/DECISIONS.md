@@ -334,3 +334,105 @@ to be `settings.react.version: 'detect'`. Kept for the reasoning, not as current
 **Decision**: Under `build.rolldownOptions.output.codeSplitting.groups`, the **`state-vendor`** group includes paths for `zustand`, `@tanstack/react-query`, and **`@tanstack/query-core`**.
 
 **Why**: Analyzer runs showed `query-core` splitting out when only `react-query` matched. Same cacheable vendor boundary as the previous `manualChunks` logic.
+
+## Content variance is measured in a browser, not asserted in jsdom
+
+**Decision.** Every content-bearing primitive is rendered once per content state on a dev-only route
+(`/dev/ui/content-stress`) and MEASURED by Playwright at 390 / 640 / 768 / 1024 / 1440. The invariants
+live as pure predicates in `e2e/support/geometry.ts`, shared by that spec and by
+`e2e/layout-geometry.spec.ts`, which measures the assembled pages instead of the primitives. Two
+consumers, one definition — two copies of a rule is the defect the module exists to prevent.
+
+**Why a browser.** jsdom has no layout, so a unit test can pin a class string and nothing more. The
+defects this found on the first run were all invisible to the unit suite: 172px of overflow from a
+40-character unbroken token at 390, a button row 1161px wide inside a 798px container at 1440 (so NOT a
+narrow-viewport problem), and 28px of horizontal DOCUMENT scroll from the header on every route at 390.
+
+**Why the fixture is dev-only.** A stress page in the production bundle would be the wrong trade. That
+choice has a consequence worth stating: the fixture is unreachable from the `vite preview` run inside
+`verify`, so it needs its own server and its own rung — `verify:full`, plus a mandatory `dev-smoke` CI
+job. `playwright.config.ts` MUST keep `dev/**` in `testIgnore`: without it the production project
+collects the dev spec, runs it against `vite preview` where the route 404s, and the coverage becomes an
+illusion that still reports a pass.
+
+**Counts are derived, never literal.** The fixture publishes `data-stress-total` /
+`data-stress-components` from its own case list and the spec compares what it FOUND against those, with a
+floor and a named state set. A hardcoded `toHaveCount(32)` means adding a component silently requires
+editing the spec, and the version that forgets is green.
+
+**States: `minimal` / `typical` / `long` / `unbroken` for text, `none` / `one` / `many` for collections.**
+`unbroken` is the load-bearing one — a long sentence wraps on its spaces and hides a missing wrap guard.
+`minimal` is one character rather than the empty string, because an unreadable label is a content bug and
+not a layout one. **Not included, deliberately:** an RTL state, because no RTL locale ships here and
+adding one is a product decision, not a fixture decision.
+
+## The 44px touch floor is a ratchet here, not a redesign
+
+**Measured:** exactly two rendered sizes sit below the floor across every route and content state — 40
+(`Button`, from `h-10` and `size-10`) and 36 (`Input`, from `h-9`). Both are shadcn's default scale, which
+this template ships unaltered.
+
+**Decision.** `e2e/support/control-targets.ts` accepts those two EXACT sizes with a stated reason and an
+exit condition; every other size below the floor fails the gate. Raising the whole kit to 44 would change
+the visual scale of every app scaffolded from here, which is the consuming app's design decision. Keying
+on the exact size is what keeps this a ratchet: a 38px control matches nothing in the list.
+
+An acceptance list is the one gate component that fails by wrongly ACCEPTING, and sabotage never points
+that way, so `control-targets.test.ts` is all near-misses: 37/38/39/41/42 refused, an icon-only control
+refused at an accepted height but a narrow width, and the input entry proven unable to excuse an
+icon-only control.
+
+## `outline-hidden`, never `outline-none` — an accessibility change wearing a rename's clothes
+
+**Compiled from the installed Tailwind rather than recalled:** `.outline-hidden` emits
+`outline-style: none` PLUS `@media (forced-colors: active) { outline: 2px solid transparent;
+outline-offset: 2px }`; `.outline-none` emits only the first. Every focusable control here pairs the
+outline reset with a `ring-*`, which is a `box-shadow`, and `forced-colors` suppresses box-shadows. So
+with `outline-none` a Windows high-contrast user had NO focus indicator at all (WCAG 2.4.7).
+
+Swept in `button.tsx`, `input.tsx` and `SkipLink`. Pinned three ways, because no single one is enough:
+class-string assertions (`focus-indicator.test.tsx`, `SkipLink.test.tsx`), a committed browser test that
+emulates the mode (`e2e/forced-colors.spec.ts`), and `better-tailwindcss/no-deprecated-classes`. Mutation
+check: restoring `outline-none` makes the browser test report `outline=none shadow=none` and the unit test
+fail. **On every Tailwind minor bump, read the release notes for renamed utilities** — the build emits no
+warning and only the lint rule can catch a rename that is already known.
+
+## Tailwind class hygiene: two rules adopted on a pre-flight, one refused
+
+`no-deprecated-classes` 2 findings / 2 genuine · `enforce-canonical-classes` 0 · `no-unknown-classes` 0.
+The first two are enabled; `no-unknown-classes` is NOT, despite scoring zero, because its failure mode in
+a TEMPLATE is a false positive on the first hand-written CSS class a consumer adds, and this repo already
+applies `i18n-loading` imperatively rather than through a `className` the rule can see. Zero findings
+today is not evidence it is safe for whatever gets scaffolded from here. Both plugins stay — the rule sets
+do not overlap.
+
+## Gate hygiene: three fail-open shapes closed
+
+- **Coverage dropout.** Measured: with an unparseable file inside the coverage scope, vitest prints
+  `Failed to parse <file>. Excluding it from coverage.` and **exits 0**, so the percentage describes a
+  smaller set of files and can even go up. `scripts/check-coverage.mjs` wraps the run and refuses on that
+  marker; proven in both directions. Marker-based rather than a file-count baseline on purpose — a
+  baseline in a template would record the file count of an empty scaffold.
+- **`bench:verify` had drifted from the gate it claimed to mirror**, missing the `check-hooks` and
+  `ensure-playwright` steps while its own header said "same steps as `npm run verify`". The step list is
+  now DERIVED from the `verify` script and throws on a segment it cannot parse, so a step cannot silently
+  disappear from the benchmark. A second list claiming the gate's scope always drifts narrower than the
+  gate; the fix is to have no second list.
+- **`npx` without `--no-install`** in `ensure-playwright.mjs`: with an incomplete `node_modules`, npx
+  fetches the newest Playwright and installs browsers for a version this repo does not pin.
+
+## Cross-engine coverage is opt-in and scoped, and it earned its place immediately
+
+`CROSS_BROWSER=1` adds Firefox and WebKit projects, `testMatch`-scoped to the geometry specs. Not in the
+default run: three engines on every spec triples the local e2e wall-clock, and a WebKit font-metric
+difference in an unrelated spec would fail a push for a reason unconnected to the change.
+
+**What it found on the first run, which no amount of reasoning had:** Firefox reports `clientWidth: 0`
+for an inline `<label>` — CSS `overflow` does not apply to inline non-replaced elements and CSSOM defines
+their client box as zero — while Chromium reports a box. Every `<label>` on the page read as a 176px
+overflow in one engine and as nothing in the other. The engine difference is real; the defect was in the
+rule, which now exempts exactly `display: inline` and is tested in both directions.
+
+A `testMatch` that matches nothing collects ZERO tests and reports success, so
+`scripts/check-cross-browser-selection.mjs` asks Playwright whether every configured project actually has
+work, and fails closed on a report it cannot read.

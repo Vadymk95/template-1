@@ -51,3 +51,21 @@ From repo root the paths are `.cursor/brain/MAP.md`, `.cursor/brain/PROJECT_CONT
 - [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md) — mentions the same seed by name in the stack section
 - [`SKELETONS.md`](./SKELETONS.md) — danger-zones including DevPlayground's DEV-only contract
 - [`README.md` → Make it yours (fork checklist)](../../README.md#-make-it-yours-fork-checklist) — the exact brand / i18n / theme-token symbols a forker edits first (graduating seeds is step 5 there)
+
+## `src/pages/DevPlayground/ContentStress.tsx` + `stressMatrix.ts` — content-variance fixture
+
+**Route:** `/dev/ui/content-stress`, mounted only under `import.meta.env.DEV` (same gate as the
+playground), so the whole tree is tree-shaken out of production bundles.
+
+**Why it exists:** it is the input to `e2e/dev/content-stress.spec.ts`, which measures every primitive
+against content it has not seen at five viewport widths. Deleting the page deletes the measurement — the
+spec then finds no fixture and, without its non-empty assertions, would report a pass over nothing.
+
+**How to extend it:** add an entry to `CONTENT_STRESS_CASES` in `stressMatrix.ts` and a branch to
+`renderCase`. Counts are derived, so nothing else needs editing. Primitive cases guard the shipped kit and
+their fixes belong in `src/components/ui/*`; composition cases document a layout idiom and their fixes
+belong in the fixture, then get copied into the page that needs the idiom.
+
+**When to delete:** when the app has enough real content-bearing pages that
+`e2e/layout-geometry.spec.ts` covers every primitive under real content variance. Not before — a route
+sweep only exercises the copy that happens to be authored today.
