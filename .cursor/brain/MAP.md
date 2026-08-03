@@ -109,6 +109,7 @@ To update after MSW upgrade: `npx msw init public/`.
 | Path | Role |
 | --- | --- |
 | `e2e/support/geometry.ts` | Pure layout-invariant predicates (overflow, touch target, narrow wrapped label) + the control/field selectors. No Playwright import, so it is unit-testable and shared by two specs. |
+| `e2e/support/measure.ts` | The in-page measurement, one definition shared by both geometry specs. Serialised into the page by Playwright, so it references nothing from module scope. |
 | `e2e/support/control-targets.ts` | The two kit sizes accepted below the 44px touch floor, each with a reason and an exit condition. A ratchet, not an amnesty. |
 | `e2e/support/cross-browser.ts` | Which specs run on every engine, and the `CROSS_BROWSER` switch. |
 | `e2e/dev/content-stress.spec.ts` | Measures every primitive × content state × 5 widths against the invariants. Dev server only. |

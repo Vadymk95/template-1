@@ -3,13 +3,13 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { parseVerifySteps } from './bench-verify.mjs';
+import { parseVerifySteps, resolveScript } from './bench-verify.mjs';
 
 // `process.cwd()` rather than `import.meta.url`: under Vitest the module URL is not a `file:` URL, so
 // resolving relative to it throws. The script itself runs under plain node and uses the URL form.
 const verifyScript = () => {
     const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
-    return manifest.scripts.verify;
+    return resolveScript(manifest.scripts, 'verify');
 };
 
 /**
@@ -53,5 +53,30 @@ describe('parseVerifySteps', () => {
 
     it('ignores empty segments from a trailing separator', () => {
         expect(parseVerifySteps('npm run lint &&  ')).toHaveLength(1);
+    });
+});
+
+describe('resolveScript', () => {
+    it('follows an alias to the script that holds the steps', () => {
+        const scripts = {
+            verify: 'npm run verify:enterprise',
+            'verify:enterprise': 'npm run lint && npm run build'
+        };
+
+        expect(resolveScript(scripts, 'verify')).toBe('npm run lint && npm run build');
+    });
+
+    it('returns a non-alias script unchanged', () => {
+        expect(resolveScript({ verify: 'npm run lint && npm run build' }, 'verify')).toBe(
+            'npm run lint && npm run build'
+        );
+    });
+
+    it('throws on a cycle instead of looping forever', () => {
+        expect(() => resolveScript({ a: 'npm run b', b: 'npm run a' }, 'a')).toThrow(/cycle/);
+    });
+
+    it('throws when the script does not exist', () => {
+        expect(() => resolveScript({}, 'verify')).toThrow(/no `verify` script/);
     });
 });

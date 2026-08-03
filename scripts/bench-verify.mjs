@@ -42,15 +42,31 @@ export const parseVerifySteps = (script) =>
             );
         });
 
-const readVerifyScript = () => {
-    const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-    const script = manifest.scripts?.verify;
+/**
+ * Follows an alias to the script that actually holds the steps. `verify` is sometimes just
+ * `npm run verify:enterprise`, and benchmarking that would report one step called "verify:enterprise"
+ * — technically derived, and useless. Bounded by a seen-set so a self-referential alias throws instead
+ * of looping.
+ */
+export const resolveScript = (scripts, name, seen = new Set()) => {
+    if (seen.has(name)) {
+        throw new Error(`bench-verify: script alias cycle at "${name}".`);
+    }
+    seen.add(name);
 
+    const script = scripts?.[name];
     if (!script) {
-        throw new Error('package.json has no `verify` script to benchmark.');
+        throw new Error(`package.json has no \`${name}\` script to benchmark.`);
     }
 
-    return script;
+    const alias = /^npm run ([\w:.-]+)$/.exec(script.trim());
+    return alias ? resolveScript(scripts, alias[1], seen) : script;
+};
+
+const readVerifyScript = () => {
+    const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+
+    return resolveScript(manifest.scripts, 'verify');
 };
 
 const main = () => {

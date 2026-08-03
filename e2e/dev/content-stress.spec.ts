@@ -9,20 +9,25 @@ import {
     hasInsufficientControlTarget,
     hasNarrowWrappedLabel
 } from '../support/geometry';
+import { measureDocument, measureSubtree } from '../support/measure';
 
 /**
- * Measures every primitive against every content state at every width the app is expected to render
- * at, and reports the ones that break a layout invariant.
+ * Measures every primitive against every content state at every width the app is expected to render at,
+ * and reports the ones that break a layout invariant.
  *
- * Runs against the DEV server, because the fixture route is mounted only under `import.meta.env.DEV`
- * — see `playwright.dev.config.ts`. `playwright.config.ts` must keep `dev/**` in `testIgnore`, or the
- * production project collects this file and runs it against `vite preview`, where the route 404s and
- * the coverage becomes an illusion that still looks like a win.
+ * Runs against the DEV server, because the fixture route is mounted only under `import.meta.env.DEV` —
+ * see `playwright.dev.config.ts`. `playwright.config.ts` must keep `dev/**` in `testIgnore`, or the
+ * production project collects this file and runs it against `vite preview`, where the route 404s and the
+ * coverage becomes an illusion that still looks like a win.
  *
  * FIVE widths, not one. A guard proven at a single width proves almost nothing: a defect fixed at 390
  * commonly just moves to 1024, so the range a guard must cover is part of its specification.
+ *
+ * The predicates live in `../support/geometry` and the in-page measurement in `../support/measure`, each
+ * with ONE definition shared with the production-side spec.
  */
 const CONTENT_STRESS_ROUTE = '/dev/ui/content-stress';
+const SELECTORS = { control: CONTROL_SELECTOR, field: FIELD_SELECTOR };
 const VIEWPORT_WIDTHS = [390, 640, 768, 1024, 1440] as const;
 const VIEWPORT_HEIGHT = 900;
 
@@ -30,30 +35,13 @@ const VIEWPORT_HEIGHT = 900;
 const MIN_EXPECTED_COMPONENTS = 3;
 
 /**
- * Named here on purpose. Counts are derived from the fixture, but the STATES are the contract: if one
- * is renamed or quietly dropped, a derived count would still add up and this spec would not notice.
+ * Named here on purpose. Counts are derived from the fixture, but the STATES are the contract: if one is
+ * renamed or quietly dropped, a derived count would still add up and this spec would not notice.
  */
 const EXPECTED_STATES = ['long', 'many', 'minimal', 'none', 'one', 'typical', 'unbroken'] as const;
 
 /** The one state whose case may legitimately have nothing visible to measure. */
 const EMPTY_COLLECTION_STATE = 'none';
-
-interface ElementMeasurement {
-    chWidth: number;
-    clientWidth: number;
-    contentWidth: number;
-    display: string;
-    hasTextLabel: boolean;
-    height: number;
-    isControl: boolean;
-    isField: boolean;
-    label: string;
-    lineCount: number;
-    overflowX: string;
-    scrollWidth: number;
-    selector: string;
-    width: number;
-}
 
 test.describe('content stress', () => {
     test('keeps every primitive and content state inside the layout invariants', async ({
@@ -77,22 +65,16 @@ test.describe('content stress', () => {
         await expect(cases).toHaveCount(expectedTotal);
 
         /*
-         * Fail CLOSED on a page that rendered nothing. Every element here is hidden while i18next
-         * loads (`html.i18n-loading { visibility: hidden }`), so a run caught mid-boot would measure
-         * no elements and pass every invariant vacuously — green while checking nothing. This is a
+         * Fail CLOSED on a page that rendered nothing. Every element here is hidden while i18next loads
+         * (`html.i18n-loading { visibility: hidden }`), so a run caught mid-boot would measure no
+         * elements and pass every invariant vacuously — green while checking nothing. This is a
          * PAGE-level condition, which is why it is asserted once rather than per case.
          */
-        const visibleUnderRoot = await root.evaluate(
-            (node) =>
-                Array.from(node.querySelectorAll('*')).filter(
-                    (element) =>
-                        element instanceof HTMLElement &&
-                        element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
-                ).length
-        );
-        expect(visibleUnderRoot, 'the fixture page rendered nothing visible').toBeGreaterThan(
-            expectedTotal
-        );
+        const pageMeasurement = await root.evaluate(measureSubtree, SELECTORS);
+        expect(
+            pageMeasurement.elements.length,
+            'the fixture page rendered nothing visible'
+        ).toBeGreaterThan(expectedTotal);
 
         const components = new Set<string>();
         const states = new Set<string>();
@@ -104,13 +86,10 @@ test.describe('content stress', () => {
         for (const width of VIEWPORT_WIDTHS) {
             await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
 
-            const document = await page.evaluate(() => ({
-                clientWidth: window.document.documentElement.clientWidth,
-                scrollWidth: window.document.documentElement.scrollWidth
-            }));
-            if (hasDocumentOverflow(document.scrollWidth, document.clientWidth)) {
+            const documentWidths = await page.evaluate(measureDocument);
+            if (hasDocumentOverflow(documentWidths.scrollWidth, documentWidths.clientWidth)) {
                 violations.push(
-                    `document | - | ${width}px | html | scrollWidth=${document.scrollWidth} clientWidth=${document.clientWidth}`
+                    `document | - | ${width}px | html | scrollWidth=${documentWidths.scrollWidth} clientWidth=${documentWidths.clientWidth}`
                 );
             }
 
@@ -122,170 +101,15 @@ test.describe('content stress', () => {
                 components.add(component);
                 states.add(state);
 
-                const target = stressCase.locator('[data-stress-target]');
-                const measurement = await target.evaluate(
-                    (node, selectors) => {
-                        const isVisible = (element: HTMLElement) => {
-                            const style = getComputedStyle(element);
-                            const rect = element.getBoundingClientRect();
-                            return (
-                                element.checkVisibility({
-                                    checkOpacity: true,
-                                    checkVisibilityCSS: true
-                                }) &&
-                                style.display !== 'none' &&
-                                style.visibility !== 'hidden' &&
-                                rect.width > 0 &&
-                                rect.height > 0
-                            );
-                        };
-
-                        // A screen-reader-only node is absolutely positioned and clipped to a pixel. Left
-                        // in, it registers as both an overflow and a 1px control on every case.
-                        const isVisuallyHidden = (element: HTMLElement) => {
-                            const style = getComputedStyle(element);
-                            const rect = element.getBoundingClientRect();
-                            return (
-                                style.position === 'absolute' &&
-                                (style.clip !== 'auto' || style.clipPath !== 'none') &&
-                                rect.width <= 1 &&
-                                rect.height <= 1
-                            );
-                        };
-
-                        // Rendered line count, not a guess from the string length: each text node's client
-                        // rects are deduped by their top edge, within a pixel of rounding.
-                        const getTextLineCount = (element: HTMLElement) => {
-                            const walker = window.document.createTreeWalker(
-                                element,
-                                NodeFilter.SHOW_TEXT
-                            );
-                            const tops: number[] = [];
-                            let textNode = walker.nextNode();
-                            while (textNode) {
-                                if (textNode.textContent?.trim()) {
-                                    const parent = textNode.parentElement;
-                                    if (parent && isVisible(parent) && !isVisuallyHidden(parent)) {
-                                        const range = window.document.createRange();
-                                        range.selectNodeContents(textNode);
-                                        for (const rect of Array.from(range.getClientRects())) {
-                                            if (
-                                                !tops.some((top) => Math.abs(top - rect.top) <= 1)
-                                            ) {
-                                                tops.push(rect.top);
-                                            }
-                                        }
-                                    }
-                                }
-                                textNode = walker.nextNode();
-                            }
-                            return tops.length;
-                        };
-
-                        const getVisibleText = (element: HTMLElement) => {
-                            // A field's own value or placeholder IS its visible text; it has no text child
-                            // nodes, so walking children would report every input as unlabelled.
-                            if (element instanceof HTMLInputElement) {
-                                return (element.value || element.placeholder).trim();
-                            }
-                            if (element instanceof HTMLTextAreaElement) {
-                                return (element.value || element.placeholder).trim();
-                            }
-                            if (element instanceof HTMLSelectElement) {
-                                return (element.selectedOptions[0]?.textContent ?? '').trim();
-                            }
-
-                            const walker = window.document.createTreeWalker(
-                                element,
-                                NodeFilter.SHOW_TEXT
-                            );
-                            const parts: string[] = [];
-                            let textNode = walker.nextNode();
-                            while (textNode) {
-                                const parent = textNode.parentElement;
-                                const value = textNode.textContent?.trim();
-                                if (
-                                    value &&
-                                    parent &&
-                                    isVisible(parent) &&
-                                    !isVisuallyHidden(parent)
-                                ) {
-                                    parts.push(value);
-                                }
-                                textNode = walker.nextNode();
-                            }
-                            return parts.join(' ').replaceAll(/\s+/g, ' ');
-                        };
-
-                        // Turns a pixel width into a character measure in the element's OWN font, which is
-                        // what a readability rule is actually about. Font metrics differ per engine, so
-                        // this must be measured rather than assumed.
-                        const measureCh = (element: HTMLElement) => {
-                            const style = getComputedStyle(element);
-                            const probe = window.document.createElement('span');
-                            probe.style.position = 'fixed';
-                            probe.style.visibility = 'hidden';
-                            probe.style.width = '1ch';
-                            probe.style.fontFamily = style.fontFamily;
-                            probe.style.fontSize = style.fontSize;
-                            probe.style.fontWeight = style.fontWeight;
-                            window.document.body.append(probe);
-                            const width = probe.getBoundingClientRect().width;
-                            probe.remove();
-                            return width;
-                        };
-
-                        const elements = [node, ...Array.from(node.querySelectorAll('*'))].filter(
-                            (element): element is HTMLElement =>
-                                element instanceof HTMLElement &&
-                                isVisible(element) &&
-                                !isVisuallyHidden(element)
-                        );
-
-                        return {
-                            clientWidth: node.clientWidth,
-                            scrollWidth: node.scrollWidth,
-                            elements: elements.map((element) => {
-                                const style = getComputedStyle(element);
-                                const rect = element.getBoundingClientRect();
-                                const isControl = element.matches(selectors.control);
-                                const isField = element.matches(selectors.field);
-                                const visibleText = isControl ? getVisibleText(element) : '';
-                                return {
-                                    chWidth: isControl ? measureCh(element) : 0,
-                                    clientWidth: element.clientWidth,
-                                    contentWidth: Math.max(
-                                        0,
-                                        element.clientWidth -
-                                            Number.parseFloat(style.paddingLeft) -
-                                            Number.parseFloat(style.paddingRight)
-                                    ),
-                                    display: style.display,
-                                    hasTextLabel: visibleText.length > 0,
-                                    height: rect.height,
-                                    isControl,
-                                    isField,
-                                    label: visibleText,
-                                    lineCount: isControl ? getTextLineCount(element) : 0,
-                                    overflowX: style.overflowX,
-                                    scrollWidth: element.scrollWidth,
-                                    selector:
-                                        element.dataset.slot ??
-                                        element.getAttribute('role') ??
-                                        element.tagName.toLowerCase(),
-                                    width: rect.width
-                                };
-                            })
-                        };
-                    },
-                    { control: CONTROL_SELECTOR, field: FIELD_SELECTOR }
-                );
+                const measurement = await stressCase
+                    .locator('[data-stress-target]')
+                    .evaluate(measureSubtree, SELECTORS);
 
                 /*
-                 * A case that measured nothing is only legitimate for an EMPTY collection — an empty
-                 * list has no visible box, and neither does the wrapper that holds only that list.
-                 * Anything else measuring nothing is a case that failed to render, which would
-                 * otherwise pass every invariant by having nothing to check.
+                 * A case that measured nothing is only legitimate for an EMPTY collection — an empty list
+                 * has no visible box, and neither does the wrapper that holds only that list. Anything
+                 * else measuring nothing is a case that failed to render, which would otherwise pass
+                 * every invariant by having nothing to check.
                  */
                 if (measurement.elements.length === 0) {
                     emptyCases.push(`${component} | ${state}`);
@@ -297,7 +121,7 @@ test.describe('content stress', () => {
                     );
                 }
 
-                for (const element of measurement.elements as ElementMeasurement[]) {
+                for (const element of measurement.elements) {
                     // A field scrolls its own value; see FIELD_SELECTOR for why that is not an overflow.
                     if (
                         !element.isField &&
@@ -342,8 +166,8 @@ test.describe('content stress', () => {
             }
         }
 
-        // Attached on green too, so the harness can be used as an INSTRUMENT — "does this class
-        // change anything at any width" is answerable from a passing run.
+        // Attached on green too, so the harness can be used as an INSTRUMENT — "does this class change
+        // anything at any width" is answerable from a passing run.
         await testInfo.attach('content-stress-results', {
             body: results.join('\n'),
             contentType: 'text/plain'
