@@ -46,7 +46,15 @@ interface CaseProps {
     heading: string;
     iconLabel: string;
     itemCount: number;
+    /**
+     * A CHROME label: short by contract, because `Button`'s base variant keeps `whitespace-nowrap`.
+     * Separate from `text` on purpose — feeding a paragraph here measures the wrong thing and reads as a
+     * broken primitive. Found on the sibling template, whose typical string happened to be a sentence:
+     * the base button then held 568px of content in a 292px column and looked like a defect.
+     */
+    label: string;
     message: string;
+    /** Prose: a real sentence, which is what a paragraph or a list item actually carries. */
     text: string;
 }
 
@@ -55,12 +63,13 @@ const renderCase = ({
     heading,
     iconLabel,
     itemCount,
+    label,
     message,
     text
 }: CaseProps): ReactElement => {
     switch (component) {
         case 'Button':
-            return <Button>{text}</Button>;
+            return <Button>{label}</Button>;
         case 'ButtonRow':
             /*
              * The IDIOM for a button that may carry a sentence, and the reason the base variant is not
@@ -77,16 +86,16 @@ const renderCase = ({
                         variant="secondary"
                         className="h-auto min-h-10 min-w-0 whitespace-normal"
                     >
-                        <span className="min-w-0 wrap-anywhere">{text}</span>
+                        <span className="min-w-0 wrap-anywhere">{label}</span>
                     </Button>
                     <Button variant="outline" className="h-auto min-h-10 min-w-0 whitespace-normal">
-                        <span className="min-w-0 wrap-anywhere">{text}</span>
+                        <span className="min-w-0 wrap-anywhere">{label}</span>
                     </Button>
                 </div>
             );
         case 'IconButton':
             return (
-                <Button variant="ghost" size="icon" aria-label={`${iconLabel} ${text}`}>
+                <Button variant="ghost" size="icon" aria-label={`${iconLabel} ${label}`}>
                     <Check className="size-4" />
                 </Button>
             );
@@ -94,9 +103,9 @@ const renderCase = ({
             return (
                 <div className="space-y-2">
                     <label className="text-sm leading-none font-medium" htmlFor="stress-field">
-                        {text}
+                        {label}
                     </label>
-                    <Input id="stress-field" placeholder={text} defaultValue={text} />
+                    <Input id="stress-field" placeholder={label} defaultValue={text} />
                     <p className="text-sm text-destructive" role="alert">
                         {message}
                     </p>
@@ -136,7 +145,8 @@ export const ContentStress: FunctionComponent = () => {
 
     // Real authored copy, never lorem-ipsum: the transform starts from a string the product ships, so
     // the TYPICAL state is genuinely typical and the LONG state is a real string tripled.
-    const sourceText = t('home:features.state');
+    const sourceText = t('home:description');
+    const sourceLabel = t('common:button.submit');
     const sourceHeading = t('home:features.title');
     const sourceMessage = t('errors:validation.maxLength');
     const iconLabel = t('common:success');
@@ -172,6 +182,7 @@ export const ContentStress: FunctionComponent = () => {
                                     heading: transformText(sourceHeading, state),
                                     iconLabel,
                                     itemCount: resolveItemCount(state),
+                                    label: transformText(sourceLabel, state),
                                     message: transformText(sourceMessage, state),
                                     text: transformText(sourceText, state)
                                 })}

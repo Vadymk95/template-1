@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/test-utils';
 
+import commonTranslations from '@locales/en/common.json';
+
 import { Header } from './index';
 
 /**
@@ -39,7 +41,7 @@ describe('Header', () => {
     it('renders the brand, the navigation and the auth control', () => {
         renderHeader();
 
-        expect(screen.getByRole('link', { name: /react enterprise foundation/i })).toBeVisible();
+        expect(screen.getByRole('link', { name: commonTranslations.appName })).toBeVisible();
         expect(screen.getByRole('link', { name: /^home$/i })).toBeVisible();
         expect(screen.getByRole('link', { name: /dashboard/i })).toBeVisible();
         expect(screen.getByRole('button', { name: /sign in/i })).toBeVisible();
@@ -68,7 +70,7 @@ describe('Header', () => {
     it('truncates a long brand name on an inner element, not on the flex container', () => {
         renderHeader();
 
-        const brand = screen.getByRole('link', { name: /react enterprise foundation/i });
+        const brand = screen.getByRole('link', { name: commonTranslations.appName });
         expect(brand.className).toContain('min-w-0');
         expect(brand.className).not.toContain('truncate');
         expect(brand.firstElementChild).toHaveClass('truncate');

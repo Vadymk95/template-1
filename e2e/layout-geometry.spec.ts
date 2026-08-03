@@ -38,6 +38,7 @@ interface ElementMeasurement {
     hasTextLabel: boolean;
     height: number;
     isControl: boolean;
+    isField: boolean;
     label: string;
     lineCount: number;
     overflowX: string;
@@ -111,6 +112,22 @@ for (const width of VIEWPORT_WIDTHS) {
                 };
 
                 const getVisibleText = (element: HTMLElement) => {
+                    // A field's own value or placeholder IS its visible text; it has no text child
+                    // nodes, so walking children would report every input as unlabelled — and an
+                    // unlabelled control is then held to the icon-only width rule, which a full-width
+                    // field cannot fail meaningfully. Kept identical to the content-stress spec: the
+                    // two in-page measurements are separate copies and this fix landed in one of them
+                    // first, which is exactly how they drift.
+                    if (element instanceof HTMLInputElement) {
+                        return (element.value || element.placeholder).trim();
+                    }
+                    if (element instanceof HTMLTextAreaElement) {
+                        return (element.value || element.placeholder).trim();
+                    }
+                    if (element instanceof HTMLSelectElement) {
+                        return (element.selectedOptions[0]?.textContent ?? '').trim();
+                    }
+
                     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
                     const parts: string[] = [];
                     let textNode = walker.nextNode();
@@ -154,6 +171,7 @@ for (const width of VIEWPORT_WIDTHS) {
                         const style = getComputedStyle(element);
                         const rect = element.getBoundingClientRect();
                         const isControl = element.matches(controlSelector);
+                        const isField = element.matches('input, select, textarea');
                         const visibleText = isControl ? getVisibleText(element) : '';
                         return {
                             chWidth: isControl ? measureCh(element) : 0,
@@ -168,6 +186,7 @@ for (const width of VIEWPORT_WIDTHS) {
                             hasTextLabel: visibleText.length > 0,
                             height: rect.height,
                             isControl,
+                            isField,
                             label: visibleText,
                             lineCount: isControl ? getTextLineCount(element) : 0,
                             overflowX: style.overflowX,
@@ -201,7 +220,9 @@ for (const width of VIEWPORT_WIDTHS) {
             }
 
             for (const element of measurement.elements as ElementMeasurement[]) {
+                // A field scrolls its own value by design; that is not a layout overflow.
                 if (
+                    !element.isField &&
                     hasContentOverflow({
                         accountedNegativeInlineMargin: 0,
                         clientWidth: element.clientWidth,
