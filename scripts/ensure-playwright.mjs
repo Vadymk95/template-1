@@ -46,19 +46,43 @@ export const evaluatePlan = (plan, exists) => {
     return { unreadable: false, required, missing: required.filter((path) => !exists(path)) };
 };
 
-const install = (browser) => {
-    // Throws on a non-zero exit, so a failed install fails the gate.
-    execFileSync('npx', ['playwright', 'install', '--with-deps', browser], { stdio: 'inherit' });
+/**
+ * Which browsers to ensure. `PLAYWRIGHT_BROWSERS` is a comma-separated list so the cross-browser CI
+ * job can ask for the extra engines without a second script; `PLAYWRIGHT_BROWSER` (singular) stays
+ * supported because it is the older name.
+ *
+ * Pure, and empty entries are dropped rather than passed through: `playwright install ""` installs
+ * EVERY browser, which would turn a stray trailing comma into a multi-hundred-megabyte download.
+ */
+export const parseBrowsers = (env) => {
+    const raw = env.PLAYWRIGHT_BROWSERS ?? env.PLAYWRIGHT_BROWSER ?? 'chromium';
+    const browsers = raw
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+
+    return browsers.length > 0 ? browsers : ['chromium'];
 };
 
-const main = () => {
-    const browser = process.env.PLAYWRIGHT_BROWSER ?? 'chromium';
+const install = (browser) => {
+    // Throws on a non-zero exit, so a failed install fails the gate.
+    // `--no-install`: without it a missing `node_modules` makes npx FETCH the newest playwright and
+    // install browsers for a version this repo does not pin.
+    execFileSync('npx', ['--no-install', 'playwright', 'install', '--with-deps', browser], {
+        stdio: 'inherit'
+    });
+};
 
+const ensure = (browser) => {
     let plan = '';
     try {
-        plan = execFileSync('npx', ['playwright', 'install', browser, '--dry-run'], {
-            encoding: 'utf8'
-        });
+        plan = execFileSync(
+            'npx',
+            ['--no-install', 'playwright', 'install', browser, '--dry-run'],
+            {
+                encoding: 'utf8'
+            }
+        );
     } catch {
         console.error('! could not read the playwright install plan; installing unconditionally');
         install(browser);
@@ -85,6 +109,12 @@ const main = () => {
         console.log(`    ${path}`);
     }
     install(browser);
+};
+
+const main = () => {
+    for (const browser of parseBrowsers(process.env)) {
+        ensure(browser);
+    }
 };
 
 // Only run when executed directly, so importing it in a test has no side effects.

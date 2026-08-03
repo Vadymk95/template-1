@@ -6,7 +6,7 @@ import { RouteSkeleton } from '@/components/common/RouteSkeleton';
 import { ProtectedRoute } from '@/hocs/ProtectedRoute';
 import { WithSuspense } from '@/hocs/WithSuspense';
 import { DashboardPage } from '@/pages/DashboardPage';
-import { DevPlayground } from '@/pages/DevPlayground';
+import { ContentStress, DevPlayground } from '@/pages/DevPlayground';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -63,6 +63,17 @@ const baseRoutes: RouteObject[] = [
                           element: (
                               <WithSuspense fallback={<RouteSkeleton />}>
                                   <DevPlayground />
+                              </WithSuspense>
+                          )
+                      },
+                      // Content-variance fixture measured by `e2e/dev/content-stress.spec.ts`.
+                      // Dev-only for the same reason as the playground above: it exists to be
+                      // measured, not shipped, so it must not add a production route.
+                      {
+                          path: RoutesPath.DevContentStress,
+                          element: (
+                              <WithSuspense fallback={<RouteSkeleton />}>
+                                  <ContentStress />
                               </WithSuspense>
                           )
                       }

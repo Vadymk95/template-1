@@ -4,7 +4,7 @@
 // "Executable doesn't exist". The regression test for that exact case is below.
 import { describe, expect, it } from 'vitest';
 
-import { evaluatePlan, parseRequiredPaths } from './ensure-playwright.mjs';
+import { evaluatePlan, parseBrowsers, parseRequiredPaths } from './ensure-playwright.mjs';
 
 const CACHE = '/Users/dev/Library/Caches/ms-playwright';
 
@@ -109,5 +109,32 @@ describe('evaluatePlan', () => {
                 missing: []
             });
         }
+    });
+});
+
+describe('parseBrowsers', () => {
+    it('defaults to chromium', () => {
+        expect(parseBrowsers({})).toEqual(['chromium']);
+    });
+
+    it('reads the singular older name', () => {
+        expect(parseBrowsers({ PLAYWRIGHT_BROWSER: 'webkit' })).toEqual(['webkit']);
+    });
+
+    it('reads a comma-separated list and prefers it over the singular name', () => {
+        expect(
+            parseBrowsers({
+                PLAYWRIGHT_BROWSERS: 'chromium, firefox ,webkit',
+                PLAYWRIGHT_BROWSER: 'chromium'
+            })
+        ).toEqual(['chromium', 'firefox', 'webkit']);
+    });
+
+    it('drops empty entries instead of passing them to the installer', () => {
+        // `playwright install ""` installs EVERY browser, so a stray trailing comma would turn a
+        // targeted install into a multi-hundred-megabyte download.
+        expect(parseBrowsers({ PLAYWRIGHT_BROWSERS: 'chromium,,' })).toEqual(['chromium']);
+        expect(parseBrowsers({ PLAYWRIGHT_BROWSERS: ' , ' })).toEqual(['chromium']);
+        expect(parseBrowsers({ PLAYWRIGHT_BROWSERS: '' })).toEqual(['chromium']);
     });
 });

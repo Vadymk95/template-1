@@ -51,7 +51,11 @@ export default mergeConfig(
             include: [
                 'src/**/*.{test,spec}.{ts,tsx}',
                 'vite-plugins/**/*.{test,spec}.{ts,tsx}',
-                'scripts/**/*.{test,spec}.mjs'
+                'scripts/**/*.{test,spec}.mjs',
+                // Pure helpers shared by the Playwright specs. `.test.ts` here runs in Vitest and
+                // `.spec.ts` runs in Playwright — the two runners must not collect each other's files,
+                // which is why both configs carry the matching ignore.
+                'e2e/support/**/*.test.ts'
             ]
         }
     })

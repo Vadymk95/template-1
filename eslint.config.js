@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import queryPlugin from '@tanstack/eslint-plugin-query';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
+import betterTailwindcss from 'eslint-plugin-better-tailwindcss';
 import i18next from 'eslint-plugin-i18next';
 import pluginImport from 'eslint-plugin-import-x';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
@@ -385,7 +386,7 @@ export default defineConfig([
     // Playwright — not part of app tsconfig project references; disable type-aware TS rules.
     {
         ...tseslint.configs.disableTypeChecked,
-        files: ['e2e/**/*.ts', 'playwright.config.ts'],
+        files: ['e2e/**/*.ts', 'playwright.config.ts', 'playwright.dev.config.ts'],
         languageOptions: {
             ...tseslint.configs.disableTypeChecked.languageOptions,
             globals: { ...globals.node }
@@ -398,12 +399,59 @@ export default defineConfig([
             'import-x/no-cycle': 'off',
             'import-x/order': 'off',
             'func-style': 'off',
+            /*
+             * `@/` resolves to `src/`, so a spec importing a shared helper from `e2e/support/` has no
+             * alias to use and must go up one directory. Flat config REPLACES a rule's options rather
+             * than merging them, so this block has to restate every part that should still apply —
+             * dropping the pattern group without restating the FC ban would silently switch it off
+             * here. Same composition as the `vite-plugins/**` block above.
+             */
+            'no-restricted-imports': [
+                'error',
+                {
+                    paths: [
+                        {
+                            name: 'react',
+                            importNames: ['FC'],
+                            message:
+                                "Use 'FunctionComponent' instead: const MyComponent: FunctionComponent<Props> = ({ ... }) => { ... }"
+                        }
+                    ]
+                }
+            ],
             'prettier/prettier': [
                 'error',
                 {
                     trailingComma: 'none'
                 }
             ]
+        }
+    },
+    /*
+     * Tailwind class HYGIENE, alongside `eslint-plugin-tailwindcss` below rather than instead of it —
+     * the two rule sets do not overlap, so both plugins stay.
+     *
+     * Adopted on a measured pre-flight, not on suspicion:
+     *   no-deprecated-classes       2 findings / 2 genuine  (`rounded` -> `rounded-sm`, `shadow` -> `shadow-sm`)
+     *   enforce-canonical-classes   0 findings              (locks in what is already true)
+     *   no-unknown-classes          0 findings              — NOT enabled, see below
+     *
+     * `no-deprecated-classes` earns its place immediately: a Tailwind MINOR can rename a utility, the
+     * build emits no warning, and `outline-none` -> `outline-hidden` proved that a rename can be an
+     * accessibility change wearing a rename's clothes. This is the only automated thing that sees it.
+     *
+     * `no-unknown-classes` stays OFF despite scoring zero here. Its failure mode in a TEMPLATE is a
+     * false positive on the first hand-written CSS class a consumer adds, and this repo already applies
+     * `i18n-loading` / `i18n-boot` imperatively rather than through a `className` the rule can see. Zero
+     * findings today is not evidence it is safe for whatever gets scaffolded from here.
+     */
+    {
+        files: ['**/*.tsx'],
+        plugins: { 'better-tailwindcss': betterTailwindcss },
+        settings: { 'better-tailwindcss': { entryPoint: './src/index.css' } },
+        rules: {
+            'better-tailwindcss/no-deprecated-classes': 'error',
+            'better-tailwindcss/enforce-canonical-classes': 'error'
         }
     },
     /*

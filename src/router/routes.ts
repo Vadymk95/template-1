@@ -3,6 +3,7 @@ export const RoutesPath = {
     Login: '/login',
     Dashboard: '/dashboard',
     DevPlayground: '/dev/ui',
+    DevContentStress: '/dev/ui/content-stress',
     NotFound: '*'
 } as const;
 
