@@ -173,6 +173,17 @@ html:not(.i18n-loading) .i18n-boot {
 @layer base {
     body {
         @apply bg-background text-foreground min-h-screen antialiased;
+        /*
+         * A single unbroken token — a URL, an untranslated identifier, a long product name — has
+         * nothing to wrap on and pushes the page sideways. Measured before this line existed: the
+         * content-stress fixture overflowed its 292px column by 172px at 390 with a 40-character
+         * token, and only at 390, which is why a guard proven at one width proves nothing.
+         *
+         * `break-word` and not `anywhere`: `anywhere` also shrinks intrinsic min-content size, which
+         * would silently change how flex and grid items size themselves everywhere. Where a flex item
+         * needs that, it opts in locally with `min-w-0` (see `e2e/dev/content-stress.spec.ts`).
+         */
+        overflow-wrap: break-word;
     }
 }
 

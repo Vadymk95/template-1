@@ -25,14 +25,14 @@ import { NavLink } from 'react-router-dom';
 
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
+import {
+    CHROME_BRAND_LABEL,
+    CHROME_BRAND_LINK,
+    chromeNavLinkClass
+} from '@/components/layout/chromeLink';
 import { Button } from '@/components/ui/button';
 import { RoutesPath } from '@/router/routes';
 import { useUserStore } from '@/store/user/userStore';
-
-const navLinkClass = ({ isActive }: { isActive: boolean }): string =>
-    `text-sm transition-colors hover:text-foreground ${
-        isActive ? 'text-foreground font-medium' : 'text-muted-foreground'
-    }`;
 
 export const Header: FunctionComponent = () => {
     const { t } = useTranslation('common');
@@ -42,21 +42,33 @@ export const Header: FunctionComponent = () => {
 
     return (
         <header className="border-b bg-card">
-            <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-                <NavLink to={RoutesPath.Root} className="text-base font-semibold tracking-tight">
-                    {t('appName')}
+            {/*
+             * `flex-wrap` is load-bearing, not tidiness. Measured before it existed: at a 390px
+             * viewport the three groups summed wider than the row, so the control group ran from
+             * x=259 to x=418 and the DOCUMENT scrolled horizontally by 28px — on every route, on
+             * every phone. A row that cannot wrap and cannot shrink can only overflow.
+             *
+             * The brand truncates rather than pushes: it is chrome, and an app name long enough to
+             * need two lines is better clipped than allowed to displace the navigation.
+             */}
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3">
+                <NavLink to={RoutesPath.Root} className={CHROME_BRAND_LINK}>
+                    <span className={CHROME_BRAND_LABEL}>{t('appName')}</span>
                 </NavLink>
 
-                <nav className="flex items-center gap-4" aria-label={t('navigation.home')}>
-                    <NavLink to={RoutesPath.Root} end className={navLinkClass}>
+                <nav
+                    className="flex min-w-0 flex-wrap items-center gap-4"
+                    aria-label={t('navigation.home')}
+                >
+                    <NavLink to={RoutesPath.Root} end className={chromeNavLinkClass}>
                         {t('navigation.home')}
                     </NavLink>
-                    <NavLink to={RoutesPath.Dashboard} className={navLinkClass}>
+                    <NavLink to={RoutesPath.Dashboard} className={chromeNavLinkClass}>
                         {t('navigation.dashboard')}
                     </NavLink>
                 </nav>
 
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <LanguageSwitcher />
                     <ThemeToggle />
                     {isLoggedIn ? (
