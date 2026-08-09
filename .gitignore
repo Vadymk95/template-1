@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 coverage
+# Stryker mutation testing (the incremental report is a local/CI cache, not a source)
+.stryker-tmp
+reports
 # Playwright
 /test-results/
 /playwright-report/

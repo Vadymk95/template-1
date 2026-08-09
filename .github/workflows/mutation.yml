@@ -1,0 +1,45 @@
+name: Mutation
+
+# Mutation testing measures test STRENGTH: it re-runs the suite against mutated
+# source and counts how many mutants the tests kill. Coverage certifies that code
+# RUNS under tests; this certifies the tests would CATCH a wrong implementation.
+# It is deliberately NOT part of `verify` / pre-push: a full run costs minutes
+# (baseline: 3m25s local, 627 mutants), so it rides a weekly schedule instead.
+# `thresholds.break` in stryker.config.json is a floor-of-record from the measured
+# baseline (44.5% on 2026-08-09) — the job fails only when test strength REGRESSES
+# below it. Raise the floor after a good run; never lower it to go green.
+
+on:
+    schedule:
+        # Weekly, offset from the Security workflow's Sunday 06:00 slot.
+        - cron: '0 6 * * 1'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    mutation:
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+        env:
+            HUSKY: '0'
+
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Use Node.js 24.x
+              uses: actions/setup-node@v7
+              with:
+                  node-version: 24.x
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci --ignore-scripts
+
+            - name: Run mutation tests
+              run: npx --no-install stryker run

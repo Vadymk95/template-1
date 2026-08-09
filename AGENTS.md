@@ -79,6 +79,7 @@ npm run verify:full   # verify:ci + smoke:dev — adds the content-variance fixt
 npm run smoke:dev     # the content-stress fixture alone, against `vite dev`
 npm run test:e2e:prod # Playwright against `vite preview` (same mode as the gate)
 npm run bench:verify  # the gate step by step with timings, to attribute a slow run
+npm run test:mutation # StrykerJS strength gate — weekly `mutation.yml` job, NOT in verify (3m+ per run)
 ```
 
 `verify:full` is the rung to run before a PR that touched a shared UI primitive, the layout shell or
@@ -106,6 +107,10 @@ verify gate fails loudly if hooks are missing. Dependency cooldown is also on
 `npm install <pkg> --min-release-age=0`.
 
 The gate is **zero-warnings**: `eslint --max-warnings 0`, `oxlint --deny-warnings`. If it fails, fix the cause — do **not** downgrade rules, silence warnings, or sprinkle `eslint-disable`. If a rule is genuinely wrong for a class of files, add a documented file-scoped override in `eslint.config.js` stating why (see the shadcn/ui and `*.queries.ts` overrides for the pattern).
+
+**Complexity ratchet** — `complexity` 10 / `max-depth` 3 / `max-params` 4 / `max-lines-per-function` 120 / `max-lines` 200 over `src/**`, tests exempt. Thresholds sit above the measured ceiling (see `DECISIONS.md`), so a hit means new drift: split the function first; raising a number needs a fresh measurement and a `DECISIONS.md` line.
+
+**Mutation testing** — `npm run test:mutation` (StrykerJS, weekly `mutation.yml` CI job). Coverage proves code RUNS under tests; the mutation score proves tests would CATCH a wrong implementation — the two disagree here by design (57% coverage vs 44.5% baseline score). `thresholds.break` in `stryker.config.json` is a measured floor-of-record: raise it after a good run, never lower it to go green.
 
 ## Version holds (do not "fix" by bumping)
 

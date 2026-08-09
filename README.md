@@ -230,6 +230,7 @@ VITE_ENABLE_MSW=false
 | `npm run ci:local`                 | Alias of `verify:ci`                                              |
 | `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist       |
 | `npm run bench:verify`             | The gate step by step with timings                                |
+| `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job          |
 | `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                  |
 | `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks                  |
 | `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                                |
