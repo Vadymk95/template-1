@@ -25,6 +25,9 @@ Adding it to CI alone is how the gate stopped predicting CI once already — see
 
 `npm run bench:verify` runs the same steps with per-step timings when the gate feels slow.
 
+`npm run test:mutation` (StrykerJS) sits outside every rung on purpose: it rides the weekly
+`mutation.yml` cron and is never part of `verify` — see AGENTS.md § Mutation testing.
+
 ---
 
 ## Minimal check by task type

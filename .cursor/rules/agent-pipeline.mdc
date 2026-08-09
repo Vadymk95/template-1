@@ -126,8 +126,9 @@ Green means nothing until you know the gate can go red.
 
 1. **Capture the exit code without a pipe**: `npm run verify > /tmp/verify.log 2>&1; echo $?`. Piping
    to `tail` returns the PIPE's status, so a failed build reads as a pass.
-2. **Mutation-check the tests**: if mentally reverting your change leaves the suite green, the test is
-   worthless. Writing a test is Phase 3; proving it would have failed is this step.
+2. **Mutation-check the tests (revert to prove failure)** — the manual discipline, not the
+   `npm run test:mutation` StrykerJS gate: if mentally reverting your change leaves the suite green,
+   the test is worthless. Writing a test is Phase 3; proving it would have failed is this step.
 3. **Prove a new gate gates**: break it on purpose once — an expired entry in
    `scripts/audit-allowlist.json`, a raw hex in a component, a staged `src` logic file with no
    `*.test.*` sibling — and watch it refuse. Then revert the sabotage.
