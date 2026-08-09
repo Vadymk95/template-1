@@ -467,6 +467,10 @@ sandbox copy (Stryker does not read `.gitignore`); and the runner's dependency t
 fail-closed audit gate — the day that tree carries a high advisory, the remedy is an override floor
 with a major cap, not an allowlist entry. Known limit, stated honestly: the vitest runner mutates
 what unit/RTL tests can see; a defect only Playwright would catch is invisible to this score.
+Second limit, same honesty: mutation testing measures only the kill side of test strength (would
+the suite catch a breakage); an over-strict test that wrongly rejects a legitimate implementation
+is invisible to it, and that side stays with review discipline (this repo's refusing-direction
+test culture, e.g. the `control-targets.test.ts` near-misses).
 
 ## Override floors: fresh-advisory sweep of 2026-08-09, and two floors that had aged
 
