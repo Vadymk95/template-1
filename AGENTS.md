@@ -50,8 +50,10 @@ an engine does — run it.
 
 ## Commands / the gate
 
-**Five agent commands** in `.claude/commands/`. Each one puts the agent in a role, with this repo's own
-gate, danger zones and test infrastructure named inside it — so nothing has to be guessed or invented.
+**Five agent commands** in `.claude/commands/`, each mirrored by a thin shim in `.cursor/commands/` so
+Cursor and Claude Code behave identically — edit the `.claude/` file, never the shim. Each one puts the
+agent in a role, with this repo's own gate, danger zones and test infrastructure named inside it — so
+nothing has to be guessed or invented.
 
 ```bash
 /onboard   # get genuinely oriented: read the brain, VERIFY it against the code, report drift, stop
@@ -72,6 +74,7 @@ The gate:
 
 ```bash
 npm run dev           # Vite dev server
+npm run verify:iter   # iteration tier: oxlint → tsc → vitest --changed (seconds; not a hand-over gate)
 npm run verify        # THE gate: hooks → typecheck → oxlint → eslint → format → coverage → build
                       # → web-vitals chunks → size-limit → playwright browsers → e2e
 npm run verify:ci     # verify + audit:gate — what pre-push and GitHub CI both run
@@ -81,6 +84,13 @@ npm run test:e2e:prod # Playwright against `vite preview` (same mode as the gate
 npm run bench:verify  # the gate step by step with timings, to attribute a slow run
 npm run test:mutation # StrykerJS strength gate — weekly `mutation.yml` job, NOT in verify (3m+ per run)
 ```
+
+**The gate is tiered by moment, not run per edit.** Iterating: `npm run verify:iter` (oxlint → tsc
+incremental → `vitest --changed`, seconds) plus the one Playwright spec the change affects, against the
+running dev server. Handing over: the full `verify` runs ONCE before the task is reported done, and the
+reviewer re-runs it at acceptance — heavy verification belongs to code being accepted, not to every
+iteration. Pre-push (`verify:ci`) stays the one full run before anything leaves the machine; the tiering
+is not permission to skip it.
 
 `verify:full` is the rung to run before a PR that touched a shared UI primitive, the layout shell or
 `src/index.css`. It is not inside `verify` because it needs a second server on its own port; CI runs it as

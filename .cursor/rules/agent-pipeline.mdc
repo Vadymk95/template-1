@@ -99,7 +99,7 @@ Implement directly → write integration tests via `renderWithProviders`.
 
 ### 4.1 Automated Checks
 
-Canonical gate — must pass before declaring the task done:
+Canonical gate — must pass ONCE, before declaring the task done; it is not an iteration tool:
 
 ```bash
 npm run verify  # check-hooks → typecheck → oxlint → eslint → format:check → test:coverage
@@ -110,9 +110,12 @@ npm run verify:ci  # audit:gate (needs network) + everything in verify — what 
 `verify` is a strict SUPERSET of the offline checks CI runs, so a green `verify` predicts a green CI.
 That property is the point: **a new check belongs in the script, never only in the workflow file.**
 
-Individual commands are targeted checks during iteration only — never a substitute for the gate:
+Between batches run the iteration tier; individual commands are drill-downs on a specific failure —
+neither substitutes for the gate:
 
 ```bash
+npm run verify:iter   # iteration tier: oxlint → tsc (incremental) → vitest --changed (seconds)
+npx playwright test e2e/<file>.spec.ts   # only the spec the change affects, against the running dev server
 npm run typecheck     # tsc -b — solution / project references
 npm run lint          # eslint . --max-warnings 0
 npm run lint:oxlint   # oxlint --deny-warnings

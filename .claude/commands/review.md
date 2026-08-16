@@ -26,7 +26,10 @@ Load `.cursor/brain/SKELETONS.md`. If the diff enters a danger zone, that sectio
 Read every changed line before forming an opinion. Judgement-first review allocates attention, and
 allocating means skipping — a uniform pass has no earlier verdict of its own to defend.
 
-Then run the gate yourself, never on the author's word:
+Then, when the diff is heading to ACCEPTANCE, run the gate yourself, never on the author's word — heavy
+verification belongs to code being accepted. A round that is already producing findings needs the diff
+read and targeted checks (`npm run verify:iter`), not the full pipeline; the accepting pass always gets
+the full gate:
 
 ```bash
 npm run verify > /tmp/verify.log 2>&1; echo $?

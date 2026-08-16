@@ -3,8 +3,13 @@
 **Goal:** match checks to the change. Do **not** run the full gate for every tiny edit — but never
 declare a task done on a targeted check alone.
 
-## The three rungs
+## The four rungs
 
+- **`npm run verify:iter`** — the iteration rung: `lint:oxlint` → `typecheck` (incremental via `tsc -b`)
+  → `vitest run --changed --passWithNoTests` (only tests reachable from the uncommitted diff). Seconds;
+  run it after every change. Two deliberate properties: while `package.json` or a vite/vitest config is
+  dirty, `--changed` runs the FULL suite (those files are force-rerun triggers); and `--changed` follows
+  the import graph only, so cross-cutting suites surface at the full-gate run, not during iteration.
 - **`npm run verify`** — every **offline** check, in order: `check-hooks` → `typecheck` → `lint:oxlint`
   → `lint` → `format:check` → `test:coverage` → `build` → `verify:web-vitals-chunks` → `size:check` →
   `ensure-playwright` → `test:e2e:prod` (Playwright against `vite preview`).
@@ -36,7 +41,7 @@ Targeted checks are for the iteration loop. The gate is what says "done".
 
 - **Docs only** (`*.md`, brain markdown) — `npm run format:check`
 - **Styling only** (`*.css`) — `npm run format:check`
-- **TS/TSX / tests** (logic, components, hooks, stores) — `npm run lint && npm run typecheck && npm test`
+- **TS/TSX / tests** (logic, components, hooks, stores) — `npm run verify:iter`
 - **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing) — `npm run test:e2e:prod`
 - **A shared UI primitive, the layout shell, or `src/index.css`** — `npm run verify:full`. Anything
   content-bearing has to be measured against content it has not seen; the unit suite cannot do it
@@ -50,8 +55,7 @@ Targeted checks are for the iteration loop. The gate is what says "done".
   `npm run build && npm run verify:web-vitals-chunks`
 - **Added or bumped a dependency** — `npm run audit:gate` (fails closed on high/critical, on an expired
   or stale allowance, and on its own inability to run) plus `npm run build && npm run size:check`
-- **MSW** (`src/mocks/**`, `src/test/handlers.ts`, MSW wiring in `main.tsx`) —
-  `npm run lint && npm run typecheck && npm test`
+- **MSW** (`src/mocks/**`, `src/test/handlers.ts`, MSW wiring in `main.tsx`) — `npm run verify:iter`
 - **Touched `eslint.config.js`** — `npm run lint`, then confirm the run is not silently a no-op:
   `npx eslint --print-config <a real source file>` should report a plausible active-rule count. A config
   that crashes on load and a config that lints nothing look identical from the exit code alone.

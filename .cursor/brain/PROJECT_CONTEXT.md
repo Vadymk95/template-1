@@ -121,6 +121,7 @@ Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
 ## Dev Tooling
 
 - **Which checks to run** — see `.cursor/brain/VERIFICATION.md`. Targeted checks are for the iteration loop; the gate is what says "done".
+- `npm run verify:iter` — the iteration rung: oxlint → tsc (incremental) → `vitest --changed` (seconds). Run per change; the gate runs ONCE before hand-over.
 - `npm run verify` — **the gate**, all offline checks: `check-hooks` → typecheck → oxlint → eslint → format:check → test:coverage → build → `verify:web-vitals-chunks` → `size:check` → `ensure-playwright` → **`test:e2e:prod`**.
 - `npm run verify:ci` — `audit:gate && verify`. Husky **pre-push** runs this, and the GitHub `validate` job is a single step over the same script. `verify` is a strict superset of CI's offline checks, so a green `verify` predicts a green CI — keep it that way by adding new checks to the SCRIPT, never only to the workflow. `ci:local` is an alias.
 - `npm run audit:gate` — fail-closed dependency audit (`scripts/audit-gate.mjs`): blocks every high/critical advisory, an expired or stale allowance in `scripts/audit-allowlist.json`, and its own inability to complete. Not inside `verify` because it needs the network.
