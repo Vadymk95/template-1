@@ -24,7 +24,7 @@ if (!existsSync(expected)) {
     process.exit(1);
 }
 
-let hooksPath = '';
+let hooksPath;
 try {
     hooksPath = execFileSync('git', ['config', 'core.hooksPath'], { encoding: 'utf8' }).trim();
 } catch {
