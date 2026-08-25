@@ -20,9 +20,12 @@ export default defineConfig({
     testIgnore: ['dev/**', '**/*.test.ts'],
     fullyParallel: true,
     forbidOnly: usePreview,
-    retries: usePreview ? 2 : 0,
-    /** Preview/CI: single worker avoids contention on one server process. */
-    workers: usePreview ? 1 : undefined,
+    // Retries belong to the remote runner only: a retry on the local gate turns a
+    // flake into a green line, and the flake survives to bite elsewhere.
+    retries: process.env.CI ? 2 : 0,
+    // Runner sizing is CI's concern, not preview's: a two-core runner pins one
+    // worker; the local gate runs at the machine's core-count default.
+    ...(process.env.CI ? { workers: 1 } : {}),
     reporter: [['html', { open: 'never' }], ['list']],
     timeout: 60_000,
     expect: {
@@ -57,8 +60,11 @@ export default defineConfig({
         ? {
               command: 'npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
               url: baseURL,
-              /** Local: attach if preview already running; CI: always fresh (no leaked processes). */
-              reuseExistingServer: !process.env.CI,
+              /**
+               * Always fresh: the gate must measure the dist the run just built. Attaching to a
+               * preview left over from another branch measures the wrong tree while reporting green.
+               */
+              reuseExistingServer: false,
               timeout: 120_000,
               stdout: 'pipe',
               stderr: 'pipe'
