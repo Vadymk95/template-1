@@ -75,7 +75,7 @@ The gate:
 ```bash
 npm run dev           # Vite dev server
 npm run verify:iter   # iteration tier: oxlint → tsc → vitest --changed (seconds; not a hand-over gate)
-npm run verify        # THE gate: hooks → typecheck → oxlint → eslint → format → coverage → build
+npm run verify        # THE gate: hooks → preflight → oxlint → format → typecheck → eslint (cached) → coverage → build
                       # → web-vitals chunks → size-limit → playwright browsers → e2e
 npm run verify:ci     # verify + audit:gate — what pre-push and GitHub CI both run
 npm run verify:full   # verify:ci + smoke:dev — adds the content-variance fixture (needs a dev server)

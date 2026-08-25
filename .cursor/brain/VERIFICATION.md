@@ -10,9 +10,11 @@ declare a task done on a targeted check alone.
   run it after every change. Two deliberate properties: while `package.json` or a vite/vitest config is
   dirty, `--changed` runs the FULL suite (those files are force-rerun triggers); and `--changed` follows
   the import graph only, so cross-cutting suites surface at the full-gate run, not during iteration.
-- **`npm run verify`** — every **offline** check, in order: `check-hooks` → `typecheck` → `lint:oxlint`
-  → `lint` → `format:check` → `test:coverage` → `build` → `verify:web-vitals-chunks` → `size:check` →
-  `ensure-playwright` → `test:e2e:prod` (Playwright against `vite preview`).
+- **`npm run verify`** — every **offline** check, in order: `check-hooks` → `check-gate-env` (preflight:
+  the preview port is free — prints the fix) → `lint:oxlint` → `format:check` → `typecheck` → `lint`
+  (cached; cheap independent stages first) → `test:coverage` → `build` → `verify:web-vitals-chunks` →
+  `size:check` → `ensure-playwright` → `test:e2e:prod` (fresh `vite preview`, never an attached
+  leftover; retries and the single worker stay on real `CI`).
 - **`npm run verify:ci`** — `audit:gate && verify`. The audit gate needs the network, which is why it
   is not inside `verify`: an offline implementer can still run the complete offline gate.
 - **`npm run verify:full`** — `verify:ci && smoke:dev`. `smoke:dev` measures the content-variance
