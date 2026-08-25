@@ -21,6 +21,7 @@ reports
 /playwright/.cache/
 *.local
 .eslintcache
+.prettiercache
 *.tsbuildinfo
 
 # Environment variables
