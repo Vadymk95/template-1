@@ -15,7 +15,7 @@ priority: 100
 
 ### Phase 1 Fast-Track
 
-If the task targets **only** files matching `*.css`, `*.i18n.*`, `*.spec.ts`, `*.test.ts`, or `*.md` — skip Brain reads and proceed directly to Phase 3. State: `"Phase 1 skipped — styling/i18n/test/docs task."` Still emit the **Rule Receipt** (step 7 below) for the conditional rules the task area maps to. When in doubt → run full Phase 1.
+If the task targets **only** files matching `*.css`, `*.i18n.*`, `public/locales/**/*.json`, `*.spec.ts`, `*.test.ts`, or `*.md` — skip Brain reads and proceed directly to Phase 3. State: `"Phase 1 skipped — styling/i18n/test/docs task."` Still emit the **Rule Receipt** (step 7 below) for the conditional rules the task area maps to. When in doubt → run full Phase 1.
 
 ---
 

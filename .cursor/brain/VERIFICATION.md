@@ -43,6 +43,8 @@ Targeted checks are for the iteration loop. The gate is what says "done".
 
 - **Docs only** (`*.md`, brain markdown) — `npm run format:check`
 - **Styling only** (`*.css`) — `npm run format:check`
+- **i18n copy only** (value edits in `public/locales/**/*.json`) — `npm run format:check`; wrapping and
+  overflow for new copy lengths belong to the content-variance tier, not to a per-edit run
 - **TS/TSX / tests** (logic, components, hooks, stores) — `npm run verify:iter`
 - **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing) — `npm run test:e2e:prod`
 - **A shared UI primitive, the layout shell, or `src/index.css`** — `npm run verify:full`. Anything
