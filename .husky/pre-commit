@@ -31,6 +31,7 @@ node scripts/check-test-siblings.mjs || exit 1
 repo_gate_status=0
 npm run lint:oxlint || repo_gate_status=1
 npm run format:check || repo_gate_status=1
+npm run typecheck || repo_gate_status=1
 
 if [ "$repo_gate_status" -ne 0 ]; then
     echo ""
