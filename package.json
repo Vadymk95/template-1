@@ -17,8 +17,8 @@
         "typecheck": "tsc -b",
         "lint": "eslint . --max-warnings 0 --cache --cache-location .eslintcache",
         "lint:oxlint": "oxlint --config .oxlintrc.json --deny-warnings .",
-        "fix": "oxlint --config .oxlintrc.json --fix . && eslint . --fix && prettier --write .",
-        "format": "prettier --write .",
+        "fix": "oxlint --config .oxlintrc.json --fix . && eslint . --fix --cache --cache-location .eslintcache && prettier --write .",
+        "format": "prettier --write . --cache --cache-location .prettiercache",
         "format:check": "prettier --check . --cache --cache-location .prettiercache",
         "lint:staged": "lint-staged",
         "audit:gate": "node scripts/audit-gate.mjs",
@@ -134,11 +134,11 @@
     "lint-staged": {
         "*.{ts,tsx,js,jsx}": [
             "oxlint --config .oxlintrc.json --fix",
-            "eslint --fix",
-            "prettier --write"
+            "eslint --fix --cache --cache-location .eslintcache",
+            "prettier --write --cache --cache-location .prettiercache"
         ],
         "*.{json,md,yml,yaml}": [
-            "prettier --write"
+            "prettier --write --cache --cache-location .prettiercache"
         ]
     }
 }
