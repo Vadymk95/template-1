@@ -23,7 +23,10 @@ test.describe('forced colours', () => {
     test('keeps a focus indicator on the submit control', async ({ page }) => {
         await page.goto('/login');
 
-        const submit = page.getByRole('button', { name: /sign in/i });
+        // Scoped to the form: the header renders its own "Sign in" button for a signed-out
+        // visitor, so the page-wide role query matches TWO buttons and strict mode's verdict
+        // then depends on mount timing. The spec's subject is the SUBMIT control.
+        const submit = page.locator('form').getByRole('button', { name: /sign in/i });
         await expect(submit).toBeVisible();
         await submit.focus();
 
