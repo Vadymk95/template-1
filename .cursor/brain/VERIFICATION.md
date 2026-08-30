@@ -18,19 +18,20 @@ always runs the full chain — the phase gates only the LOCAL hook.
 | dev-server smoke (content variance) | CI `dev-smoke` job, every PR | unchanged by phases |
 | mutation score | weekly CI | unchanged by phases |
 
-## The tracer, and what silence means
+## The tracer — how it works (the RULES it enforces are the tier law)
 
 Every `verify*` and `test:e2e` run appends one TSV row to `.gate-trace.log` (gitignored);
 `npm run trace:report` turns rows into findings — a forbidden stage run standalone, a run over its
 moment's budget, a code check against a docs-only change, a push from a linked worktree. Moments,
-budgets and classes are DATA in `scripts/gate-tiers.json`; the analyser names no stage. **After a push:
-gate output present in the terminal is part of the contract — silence is a failure, not a pass.**
+budgets and classes are DATA in `scripts/gate-tiers.json`; the analyser names no stage, so the
+discipline changes by editing that JSON.
 
-## Ports — busy means MOVE; only the gate kills
+## Ports — the mechanics
 
-`e2e:one` and `verify:measure` take the next free port (`scripts/run-on-free-port.mjs`) and Playwright
-tears down the server it started; never kill a server you did not start. The push gate alone clears its
-own port (`check-gate-env --kill-port`: SIGTERM, re-probe, refuse if it will not die).
+`e2e:one` and `verify:measure` route through `scripts/run-on-free-port.mjs`, which probes up from the
+base port and exports `PORT` + `PLAYWRIGHT_BASE_URL`; the Playwright config passes that port into its
+webServer command, because Vite reads neither variable. Playwright tears down the server it started.
+The push gate's preflight takes `--kill-port` (SIGTERM, re-probe, refuse if it will not die).
 
 ## The four rungs
 
@@ -53,7 +54,7 @@ own port (`check-gate-env --kill-port`: SIGTERM, re-probe, refuse if it will not
   before a PR that touched a shared UI primitive, the layout shell, or `src/index.css`.
 
 **`verify` is a strict superset of the offline checks CI runs**, so a green `verify` predicts a green
-CI. Husky **pre-push** runs `verify:ci`; the GitHub `validate` job is a single step over the same
+CI. Husky **pre-push** runs `verify:push`, which dispatches by phase to `verify:ci` or the scaffold chain; the GitHub `validate` job is a single step over the same
 script. `ci:local` is an alias of `verify:ci`.
 
 The rule that keeps this true: **a new check goes into the script, never only into the workflow file.**
