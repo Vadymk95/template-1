@@ -1,0 +1,100 @@
+{
+    "_description": "The gate discipline as data. scripts/trace-report.mjs reads this instead of hardcoding stage names; scripts/verify-push.mjs reads `phase`. Editing THIS file is how the discipline changes; the analyser names no stage. Docs: .cursor/brain/VERIFICATION.md (phases + triggers).",
+    "phase": 0,
+    "_phaseMeaning": "0 = scaffold (pre-deploy): the push gate runs audit + hooks + format + types + lint + coverage and SKIPS build/web-vitals-chunks/size/e2e \u2014 there is no prod boundary to guard before the first deploy. 1 = deployed: the push gate runs the full verify:ci chain. Flip with a one-line commit at the FIRST DEPLOY; GATE_PHASE=full overrides per run (template maintainers push gate machinery with it).",
+    "checks": {
+        "verify:iter": {
+            "class": "code",
+            "description": "oxlint -> tsc incremental -> vitest --changed"
+        },
+        "verify": {
+            "class": "code",
+            "description": "hooks -> gate env -> oxlint -> format -> tsc -> lint -> coverage -> build -> chunks -> size -> e2e:prod"
+        },
+        "verify:ci": {
+            "class": "code",
+            "description": "audit:gate -> verify"
+        },
+        "verify:full": {
+            "class": "code",
+            "description": "verify:ci -> smoke:dev"
+        },
+        "verify:push": {
+            "class": "code",
+            "description": "phase-aware push gate: phase 0 -> audit + verify:scaffold, phase 1 -> verify:ci"
+        },
+        "verify:scaffold": {
+            "class": "code",
+            "description": "phase-0 offline gate: hooks -> oxlint -> format -> tsc -> lint -> coverage (no build/size/e2e)"
+        },
+        "verify:measure": {
+            "class": "measure",
+            "description": "build + prod-mode look at the result; sanctioned at ANY moment, never a violation"
+        },
+        "lint": {
+            "class": "code",
+            "description": "eslint (cached)"
+        },
+        "test": {
+            "class": "code",
+            "description": "vitest run"
+        },
+        "test:e2e": {
+            "class": "code",
+            "description": "playwright test"
+        },
+        "build": {
+            "class": "code",
+            "description": "tsc -b && vite build"
+        },
+        "smoke:dev": {
+            "class": "code",
+            "description": "dev-server smoke on its own port"
+        }
+    },
+    "moments": {
+        "iterate": {
+            "description": "The desk. Run per change.",
+            "expected": ["verify:iter"],
+            "forbidden": [
+                "verify",
+                "verify:ci",
+                "verify:full",
+                "verify:push",
+                "verify:scaffold",
+                "lint",
+                "test",
+                "test:e2e",
+                "build",
+                "smoke:dev"
+            ],
+            "budgetSeconds": 15,
+            "runsRegardlessOfDiff": false,
+            "requiresMainCheckout": false
+        },
+        "commit": {
+            "description": "Husky pre-commit: staged autofix, TDD sibling gate, then repo-wide oxlint/format/tsc. Those run as direct commands, not traced npm scripts, so this moment is declared for completeness.",
+            "expected": [],
+            "forbidden": [],
+            "budgetSeconds": 15,
+            "runsRegardlessOfDiff": false,
+            "requiresMainCheckout": true
+        },
+        "measure": {
+            "description": "Answering a question only a rendered result can answer. Legal at any time, any lane; has a budget so a slow measurement is still a finding.",
+            "expected": ["verify:measure"],
+            "forbidden": [],
+            "budgetSeconds": 180,
+            "runsRegardlessOfDiff": true,
+            "requiresMainCheckout": false
+        },
+        "push": {
+            "description": "Husky pre-push -> verify:push (phase-aware). Runs unconditionally, never shortened by what the diff touched.",
+            "expected": ["verify:push"],
+            "forbidden": [],
+            "budgetSeconds": 60,
+            "runsRegardlessOfDiff": true,
+            "requiresMainCheckout": true
+        }
+    }
+}

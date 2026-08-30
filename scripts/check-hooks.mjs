@@ -24,9 +24,19 @@ if (!existsSync(expected)) {
     process.exit(1);
 }
 
+// GIT_DIR/GIT_WORK_TREE may be exported by git itself when this runs inside a hook chain; a
+// child `git` call inheriting them answers for a DIFFERENT repo than the cwd this check is
+// about (the incident class: a test's tmp-repo git call once rewrote a real core.hooksPath).
+const gitEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+);
+
 let hooksPath;
 try {
-    hooksPath = execFileSync('git', ['config', 'core.hooksPath'], { encoding: 'utf8' }).trim();
+    hooksPath = execFileSync('git', ['config', 'core.hooksPath'], {
+        encoding: 'utf8',
+        env: gitEnv
+    }).trim();
 } catch {
     hooksPath = '';
 }

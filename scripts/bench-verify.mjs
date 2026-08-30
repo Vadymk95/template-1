@@ -60,7 +60,16 @@ export const resolveScript = (scripts, name, seen = new Set()) => {
     }
 
     const alias = /^npm run ([\w:.-]+)$/.exec(script.trim());
-    return alias ? resolveScript(scripts, alias[1], seen) : script;
+    if (alias) {
+        return resolveScript(scripts, alias[1], seen);
+    }
+
+    // The gate-trace wrapper is an alias wearing instrumentation: the steps live in the inner
+    // script. Benchmarking the wrapper itself would report one opaque step, so follow it.
+    const traced = /^node scripts\/gate-trace\.mjs [\w:.-]+ -- npm run ([\w:.-]+)$/.exec(
+        script.trim()
+    );
+    return traced ? resolveScript(scripts, traced[1], seen) : script;
 };
 
 const readVerifyScript = () => {
