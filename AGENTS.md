@@ -74,7 +74,11 @@ The gate:
 
 ```bash
 npm run dev           # Vite dev server
-npm run verify:iter   # iteration tier: oxlint → tsc → vitest --changed (seconds; not a hand-over gate)
+npm run verify:iter   # iteration tier: oxlint → tsc → vitest --changed (seconds; run per change)
+npm run verify:measure # MEASURE moment: build + look; add `-- e2e/<f>.spec.ts` for one preview-mode spec
+npm run e2e:one -- <spec> # one Playwright spec, FREE port, through the tracer
+npm run verify:push   # what pre-push runs: phase-aware (see gate-tiers.json / § the gate)
+npm run trace:report  # findings from .gate-trace.log (forbidden moments, budgets, worktrees)
 npm run verify        # THE gate: hooks → preflight → oxlint → format → typecheck → eslint (cached) → coverage → build
                       # → web-vitals chunks → size-limit → playwright browsers → e2e
 npm run verify:ci     # verify + audit:gate — what pre-push and GitHub CI both run
@@ -85,12 +89,36 @@ npm run bench:verify  # the gate step by step with timings, to attribute a slow 
 npm run test:mutation # StrykerJS strength gate — weekly `mutation.yml` job, NOT in verify (3m+ per run)
 ```
 
-**The gate is tiered by moment, not run per edit.** Iterating: `npm run verify:iter` (oxlint → tsc
-incremental → `vitest --changed`, seconds) plus the one Playwright spec the change affects, against the
-running dev server. Handing over: the full `verify` runs ONCE before the task is reported done, and the
-reviewer re-runs it at acceptance — heavy verification belongs to code being accepted, not to every
-iteration. Pre-push (`verify:ci`) stays the one full run before anything leaves the machine; the tiering
-is not permission to skip it.
+**The gate is TIERED by moment, and this section is the ONLY place the tier law lives** — every other
+file (rules, commands, brain) points here and must not restate it, because a restated pipeline rule
+goes stale in place and a stale mandate costs a day of 40-minute rounds (measured in a sibling repo,
+where five copies still demanded the full chain before the first report). Four moments:
+
+- **Iterate** (per change): `npm run verify:iter`, seconds. The one Playwright spec the change
+  touches: `npm run e2e:one -- e2e/<file>.spec.ts` (FREE port, through the tracer).
+- **Measure** (whenever a rendered result must answer a question):
+  `npm run verify:measure [-- e2e/<file>.spec.ts]` — build + look, legal at ANY time, never a
+  violation. Measuring is not verifying.
+- **Commit**: the pre-commit hook owns it (staged autofix → TDD sibling gate → repo-wide
+  oxlint/format, seconds). Nothing to run by hand.
+- **Push**: the pre-push hook runs `verify:push` — PHASE-AWARE (`scripts/gate-tiers.json`): phase 0
+  (scaffold, before the first deploy) runs audit + hooks + oxlint + format + tsc + lint + coverage and
+  loudly skips build/chunks/size/e2e; phase 1 (from the first deploy) runs the full `verify:ci`. CI
+  always runs the full chain regardless of phase.
+
+**Prohibitions, stated as such:** an implementer or reviewer NEVER runs `verify` / `verify:ci` /
+`verify:full` / `build` / `test:e2e` by hand — the full chain belongs to the push hook and CI, and a
+result an agent cannot act on is not worth its minutes. A review round gets the diff plus
+`verify:iter`; acceptance does not re-run the full gate — the push does. Parallel lanes never run heavy
+stages (one machine, shared caches); heavy work serialises at the push.
+
+**Every gate run is traced** to `.gate-trace.log`; `npm run trace:report` turns it into findings. After
+a push, gate output present in the terminal is part of the contract: **silence is a failure, not a
+pass** — a push that printed no gate ran no gate, whatever the exit code says.
+
+**Ports:** a busy port means MOVE (the tooling does it — `e2e:one` and `verify:measure` take the next
+free port), never kill a server you did not start; the push gate alone clears its own port
+(`check-gate-env --kill-port`).
 
 `verify:full` is the rung to run before a PR that touched a shared UI primitive, the layout shell or
 `src/index.css`. It is not inside `verify` because it needs a second server on its own port; CI runs it as

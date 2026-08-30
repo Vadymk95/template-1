@@ -99,13 +99,19 @@ Implement directly → write integration tests via `renderWithProviders`.
 
 ### 4.1 Automated Checks
 
-Canonical gate — must pass ONCE, before declaring the task done; it is not an iteration tool:
+**The tier law lives in `AGENTS.md` § the gate — this file points at it and restates nothing.**
+(Until 2026-08-30 this section said the canonical gate must pass ONCE before declaring the task
+done; that mandate is exactly the drift that cost a sibling repo a day of 40-minute rounds.) What
+an implementer actually runs:
 
 ```bash
-npm run verify  # check-hooks → typecheck → oxlint → eslint → format:check → test:coverage
-                # → build → web-vitals chunks → size-limit → ensure-playwright → e2e
-npm run verify:ci  # audit:gate (needs network) + everything in verify — what CI and pre-push run
+npm run verify:iter                   # per change: oxlint → tsc (incremental) → vitest --changed
+npm run e2e:one -- e2e/<file>.spec.ts # only the spec the change affects — free port, traced
+npm run verify:measure                # need to LOOK at a built result? legal at any time
 ```
+
+The full chain (`verify` / `verify:ci`) belongs to the pre-push hook and CI, and the push is
+phase-aware — see `scripts/gate-tiers.json`.
 
 `verify` is a strict SUPERSET of the offline checks CI runs, so a green `verify` predicts a green CI.
 That property is the point: **a new check belongs in the script, never only in the workflow file.**

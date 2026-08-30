@@ -1,7 +1,36 @@
 # Verification — when to run what (agents & humans)
 
-**Goal:** match checks to the change. Do **not** run the full gate for every tiny edit — but never
-declare a task done on a targeted check alone.
+**Goal:** match checks to the MOMENT. The tier law itself lives in `AGENTS.md` § the gate — one place,
+everything else points. This file holds the mechanics, the phase table, and the tracer.
+
+## Phases — what a push proves, and the trigger that adds more
+
+`scripts/gate-tiers.json` `"phase"` decides; `scripts/verify-push.mjs` dispatches; the skip is printed
+on every phase-0 push. `GATE_PHASE=full` overrides per run (how gate machinery itself is pushed). CI
+always runs the full chain — the phase gates only the LOCAL hook.
+
+| Check | Runs at phase 0 (scaffold) | Added when (the trigger) |
+| --- | --- | --- |
+| audit, hooks-check, oxlint, format, tsc, lint, coverage | yes — every push, seconds | day one |
+| production build in the gate | no | the FIRST DEPLOY: flip `"phase": 1` in its own commit |
+| web-vitals chunks, `size:check` | no | same flip — they measure a built artefact |
+| prod-mode e2e (`vite preview`) | no | same flip — a prod boundary now exists |
+| dev-server smoke (content variance) | CI `dev-smoke` job, every PR | unchanged by phases |
+| mutation score | weekly CI | unchanged by phases |
+
+## The tracer, and what silence means
+
+Every `verify*` and `test:e2e` run appends one TSV row to `.gate-trace.log` (gitignored);
+`npm run trace:report` turns rows into findings — a forbidden stage run standalone, a run over its
+moment's budget, a code check against a docs-only change, a push from a linked worktree. Moments,
+budgets and classes are DATA in `scripts/gate-tiers.json`; the analyser names no stage. **After a push:
+gate output present in the terminal is part of the contract — silence is a failure, not a pass.**
+
+## Ports — busy means MOVE; only the gate kills
+
+`e2e:one` and `verify:measure` take the next free port (`scripts/run-on-free-port.mjs`) and Playwright
+tears down the server it started; never kill a server you did not start. The push gate alone clears its
+own port (`check-gate-env --kill-port`: SIGTERM, re-probe, refuse if it will not die).
 
 ## The four rungs
 

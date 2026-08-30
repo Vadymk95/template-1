@@ -37,8 +37,9 @@ API payload shape, or the router. Trivial leaf edits proceed with a brief note.
   code. Say what the test asserted while it was red.
 - **UI**: implement, then cover it through `renderWithProviders` from `src/test/test-utils.tsx`.
 - Max two files per iteration without an intermediate check — the check is `npm run verify:iter`
-  (seconds), plus the one affected Playwright spec against the running dev server when the surface has
-  one. The full gate is not an iteration tool.
+  (seconds), plus `npm run e2e:one -- e2e/<file>.spec.ts` when the surface has a spec (free port,
+  traced). Need to LOOK at a built result: `npm run verify:measure` — legal at any time. The full
+  chain is never run by hand (tier law: `AGENTS.md` § the gate).
 - Every `src` logic file needs a co-located `*.test.*` — the pre-commit hook refuses otherwise. Write
   the test because it is worth having, not to satisfy the hook.
 - Match the surrounding file exactly: 4-space indent, arrow functions, `FunctionComponent`, `@/`
@@ -47,10 +48,12 @@ API payload shape, or the router. Trivial leaf edits proceed with a brief note.
 
 ## 4. Verify
 
-The full gate runs ONCE, here — iteration between batches used `verify:iter` (§3):
+Hand-over runs the ITERATION tier plus the touched specs — the full chain belongs to the push hook
+and CI (this step said "the full gate runs ONCE, here" until 2026-08-30):
 
 ```bash
-npm run verify > /tmp/verify.log 2>&1; echo $?
+npm run verify:iter > /tmp/verify.log 2>&1; echo $?
+npm run e2e:one -- e2e/<touched>.spec.ts
 ```
 
 Exit code **without a pipe**. Then: revert your change mentally and ask which of your new tests would

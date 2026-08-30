@@ -26,13 +26,13 @@ Load `.cursor/brain/SKELETONS.md`. If the diff enters a danger zone, that sectio
 Read every changed line before forming an opinion. Judgement-first review allocates attention, and
 allocating means skipping — a uniform pass has no earlier verdict of its own to defend.
 
-Then, when the diff is heading to ACCEPTANCE, run the gate yourself, never on the author's word — heavy
-verification belongs to code being accepted. A round that is already producing findings needs the diff
-read and targeted checks (`npm run verify:iter`), not the full pipeline; the accepting pass always gets
-the full gate:
+Every round — findings or acceptance — gets the diff read plus targeted checks, run yourself and never
+on the author's word: `npm run verify:iter`, plus `npm run e2e:one -- e2e/<touched>.spec.ts` where the
+diff has a spec. The full chain belongs to the push hook and CI; acceptance does not pre-run it (this
+section demanded the full gate at acceptance until 2026-08-30 — tier law: `AGENTS.md` § the gate):
 
 ```bash
-npm run verify > /tmp/verify.log 2>&1; echo $?
+npm run verify:iter > /tmp/verify.log 2>&1; echo $?
 ```
 
 Exit code **without a pipe**: piping to `tail` returns the pipe's status, so a failed build reads as a
