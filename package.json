@@ -49,7 +49,9 @@
         "verify:push": "node scripts/gate-trace.mjs verify:push -- node scripts/verify-push.mjs",
         "verify:measure": "node scripts/gate-trace.mjs verify:measure -- node scripts/verify-measure.mjs",
         "e2e:one": "node scripts/gate-trace.mjs test:e2e -- node scripts/run-on-free-port.mjs npx --no-install playwright test",
-        "trace:report": "node scripts/trace-report.mjs"
+        "trace:report": "node scripts/trace-report.mjs",
+        "probe": "node scripts/gate-trace.mjs verify:measure -- node scripts/probe.mjs",
+        "test:one": "node scripts/gate-trace.mjs test -- npx --no-install vitest run"
     },
     "dependencies": {
         "@hookform/resolvers": "^5.4.0",

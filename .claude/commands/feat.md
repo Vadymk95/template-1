@@ -5,6 +5,18 @@ description: Implement a feature in this repo — scope, reuse check, plan, TDD,
 Implement `$ARGUMENTS` in this repo. The process below is the repo-local version: it names this repo's
 actual gate, its actual reuse locations and its actual danger zones, so nothing has to be guessed.
 
+## 0. Before reading anything: is this still needed, and where does it live?
+
+Two questions, both cheap, both measured on a sibling project as the largest recoverable waste in a
+lane's entry:
+
+1. **Is the work still needed?** `git log --oneline -15` and one grep for the thing the task names.
+   Two of five dispatched lanes there returned "already done" after ~430k tokens between them; both
+   were answerable in five minutes. Say what you checked.
+2. **Where does it live?** `.cursor/brain/READING_INDEX.md` maps the situation to the two or three
+   files that answer it. Open that before sweeping a directory - source exploration is ~93% of a
+   lane's entry, and the index exists to cut it.
+
 ## 1. Discovery
 
 1. `.cursor/brain/SKELETONS.md` — does the task touch a danger zone? If yes, that section governs the
