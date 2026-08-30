@@ -75,10 +75,11 @@ Targeted checks are for the iteration loop. The gate is what says "done".
 - **i18n copy only** (value edits in `public/locales/**/*.json`) — `npm run format:check`; wrapping and
   overflow for new copy lengths belong to the content-variance tier, not to a per-edit run
 - **TS/TSX / tests** (logic, components, hooks, stores) — `npm run verify:iter`
-- **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing) — `npm run test:e2e:prod`
-- **A shared UI primitive, the layout shell, or `src/index.css`** — `npm run verify:full`. Anything
-  content-bearing has to be measured against content it has not seen; the unit suite cannot do it
-  because jsdom has no layout. See "Content variance" below.
+- **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing) — `npm run e2e:one -- <spec>`
+- **A shared UI primitive, the layout shell, or `src/index.css`** — the MEASURE moment:
+  `npm run verify:measure -- e2e/layout-geometry.spec.ts`, or `npm run smoke:dev` for the dev-only
+  content-stress fixture. Content-bearing work has to be measured against content it has not seen;
+  the unit suite cannot do it because jsdom has no layout. See "Content variance" below.
 - **A geometry invariant, a wrap guard, or anything about how text lays out** — additionally
   `CROSS_BROWSER=1 npm run smoke:dev` and `CROSS_BROWSER=1 npm run test:e2e:prod`. Engines disagree
   here in ways reasoning does not predict: measured on this repo, Firefox reports `clientWidth: 0` for
@@ -114,7 +115,7 @@ file-scoped override in `eslint.config.js`.
 ## Capturing results honestly
 
 ```bash
-npm run verify > /tmp/verify.log 2>&1; echo $?
+npm run verify:iter > /tmp/verify.log 2>&1; echo $?
 ```
 
 **Without a pipe.** Piping to `tail` returns the pipe's exit status, so a failed build reads as a pass.

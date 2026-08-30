@@ -28,8 +28,8 @@ allocating means skipping — a uniform pass has no earlier verdict of its own t
 
 Every round — findings or acceptance — gets the diff read plus targeted checks, run yourself and never
 on the author's word: `npm run verify:iter`, plus `npm run e2e:one -- e2e/<touched>.spec.ts` where the
-diff has a spec. The full chain belongs to the push hook and CI; acceptance does not pre-run it (this
-section demanded the full gate at acceptance until 2026-08-30 — tier law: `AGENTS.md` § the gate):
+diff has a spec. The full chain belongs to the push hook and CI; acceptance does not pre-run it (tier
+law: `AGENTS.md` § the gate):
 
 ```bash
 npm run verify:iter > /tmp/verify.log 2>&1; echo $?

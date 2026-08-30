@@ -121,7 +121,7 @@ Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
 ## Dev Tooling
 
 - **Which checks to run** — see `.cursor/brain/VERIFICATION.md`. Targeted checks are for the iteration loop; the gate is what says "done".
-- **The tier law lives in `AGENTS.md` § the gate; this list is a POINTER, not a second copy** (it said "the gate runs ONCE before hand-over" until 2026-08-30, one of three rules live at once).
+- **The tier law lives in `AGENTS.md` § the gate; this list is a POINTER, not a second copy.**
 - `npm run verify:iter` — the iteration rung: oxlint → tsc (incremental) → `vitest --changed` (seconds). Run per change; one touched spec via `npm run e2e:one -- <spec>`; need to LOOK at a built result: `npm run verify:measure`.
 - The local push is PHASE-AWARE (`scripts/gate-tiers.json`): phase 0 skips build/chunks/size/e2e until the first deploy; CI always runs the full chain.
 - `npm run verify` — **the gate**, all offline checks: `check-hooks` → `check-gate-env` preflight (free preview port, prints the fix) → oxlint → format:check → typecheck → eslint (cached) → test:coverage → build → `verify:web-vitals-chunks` → `size:check` → `ensure-playwright` → **`test:e2e:prod`** (fresh preview; retries and the single worker stay on real `CI`).

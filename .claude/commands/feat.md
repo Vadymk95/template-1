@@ -49,7 +49,7 @@ API payload shape, or the router. Trivial leaf edits proceed with a brief note.
 ## 4. Verify
 
 Hand-over runs the ITERATION tier plus the touched specs — the full chain belongs to the push hook
-and CI (this step said "the full gate runs ONCE, here" until 2026-08-30):
+and CI:
 
 ```bash
 npm run verify:iter > /tmp/verify.log 2>&1; echo $?

@@ -44,7 +44,7 @@ A plan must include:
 2. **Simulate** — `sequential-thinking` for tasks > 3 steps. Architectural critique.
 3. **Approve** — Get approval by risk: SKELETONS zone, store / Query contract, API payload contract, or router touched.
 4. **Execute** — TDD for logic. Max 1–2 files per iteration.
-5. **Verify** — iterate with `npm run verify:iter`; the full chain belongs to the pre-push hook and CI, never to a hand-run (tier law: `AGENTS.md` § the gate — this step demanded a full `npm run verify` before reporting done until 2026-08-30).
+5. **Verify** — iterate with `npm run verify:iter`; the full chain belongs to the pre-push hook and CI, never to a hand-run (tier law: `AGENTS.md` § the gate).
 6. **Brain Sync** — Update brain docs in `.cursor/brain/` (`MAP.md`, `DECISIONS.md`, `SKELETONS.md`, `DICTIONARY.md`) as needed.
 7. **Confidence** — Declare HIGH | MEDIUM | LOW.
 
@@ -63,9 +63,9 @@ After every change run the iteration tier — seconds, not minutes:
 npm run verify:iter  # oxlint → tsc (incremental) → vitest --changed (only the tests your uncommitted diff reaches)
 ```
 
-Touched a Playwright-covered surface? Run that ONE spec against the running dev server: `npx playwright test e2e/<file>.spec.ts`.
+Touched a Playwright-covered surface? Run that ONE spec: `npm run e2e:one -- e2e/<file>.spec.ts` (free port, traced).
 
-The full chain is the pre-push hook's and CI's, not an implementer's or a reviewer's — tier law in `AGENTS.md` § the gate, not restated here (this paragraph used to mandate a full `npm run verify` at hand-over AND at acceptance). Individual commands (`npm run typecheck`, `npm run lint`, `npm run lint:oxlint`, `npm run format:check`, `npm test`) stay as drill-downs on a specific failure.
+The full chain is the pre-push hook's and CI's, not an implementer's or a reviewer's — tier law in `AGENTS.md` § the gate, not restated here. Individual commands (`npm run typecheck`, `npm run lint`, `npm run lint:oxlint`, `npm run format:check`, `npm test`) stay as drill-downs on a specific failure.
 
 ## Git Commits
 
