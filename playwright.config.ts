@@ -5,7 +5,14 @@ import { isCrossBrowserEnabled, LAYOUT_SPEC_PATTERN } from './e2e/support/cross-
 /** GitHub Actions sets CI. PLAYWRIGHT_USE_PREVIEW=1 matches post-build `vite preview` (e.g. ci:local after `npm run build`). */
 const usePreview = Boolean(process.env.CI) || process.env.PLAYWRIGHT_USE_PREVIEW === '1';
 const crossBrowser = isCrossBrowserEnabled(process.env);
-const port = usePreview ? 4173 : 3000;
+/*
+ * PORT lets a lane MOVE off a busy port instead of fighting for it: several agent lanes share one
+ * machine, and scripts/run-on-free-port.mjs picks the next free port and exports PORT plus a
+ * matching PLAYWRIGHT_BASE_URL. Vite reads neither, so the port has to reach the webServer command
+ * below as an argument — otherwise the server binds its default while Playwright talks to the free
+ * one, and the run measures nothing while looking healthy. Defaults are the previous literals.
+ */
+const port = Number(process.env.PORT ?? (usePreview ? 4173 : 3000));
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 
 export default defineConfig({
@@ -58,7 +65,7 @@ export default defineConfig({
     ],
     webServer: usePreview
         ? {
-              command: 'npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
+              command: `npm run preview -- --host 127.0.0.1 --port ${String(port)} --strictPort`,
               url: baseURL,
               /**
                * Always fresh: the gate must measure the dist the run just built. Attaching to a
@@ -70,7 +77,7 @@ export default defineConfig({
               stderr: 'pipe'
           }
         : {
-              command: 'npm run dev -- --host 127.0.0.1 --port 3000 --strictPort',
+              command: `npm run dev -- --host 127.0.0.1 --port ${String(port)} --strictPort`,
               url: baseURL,
               reuseExistingServer: true,
               timeout: 120_000,

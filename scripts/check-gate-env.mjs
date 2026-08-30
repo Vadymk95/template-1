@@ -9,9 +9,39 @@
  * on 4173 with `--strictPort` and `reuseExistingServer: false`, so anything already listening there
  * fails the suite minutes in — or, before that rule, silently measured a preview from another branch.
  */
+import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
 
 const PORT = 4173;
+
+/**
+ * --kill-port: the PUSH GATE owns the machine while it runs — heavy stages are serialised at the
+ * push by rule, so anything still listening on the gate's port is a stray from an earlier lane (a
+ * leftover preview). The gate clears it and says what it killed. Parallel agent lanes do the
+ * OPPOSITE: they move to a free port (scripts/run-on-free-port.mjs) and never kill a server they
+ * did not start. Without the flag this preflight only refuses, for manual runs.
+ */
+const shouldKillPort = process.argv.includes('--kill-port');
+
+const sleep = (ms) =>
+    new Promise((resolvePromise) => {
+        setTimeout(resolvePromise, ms);
+    });
+
+const listeningPids = (port) => {
+    const result = spawnSync('lsof', ['-ti', `tcp:${String(port)}`, '-sTCP:LISTEN'], {
+        encoding: 'utf8'
+    });
+    if (result.status !== 0 || !result.stdout) {
+        return [];
+    }
+    return result.stdout
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => /^\d+$/.test(line))
+        .map(Number)
+        .filter((pid) => pid !== process.pid);
+};
 
 const portIsFree = async (port) =>
     new Promise((resolve) => {
@@ -30,12 +60,36 @@ const portIsFree = async (port) =>
     });
 
 if (!(await portIsFree(PORT))) {
-    console.error('\nGate preflight failed:\n');
-    console.error(
-        `  - Port ${String(PORT)} is busy, and the gate's \`vite preview\` needs it (strictPort).\n` +
-            `      A leftover preview from an earlier run is the common case.\n` +
-            `      Find it:  lsof -ti tcp:${String(PORT)}\n` +
-            `      Free it:  lsof -ti tcp:${String(PORT)} | xargs kill\n`
-    );
-    process.exit(1);
+    let cleared = false;
+    if (shouldKillPort) {
+        const pids = listeningPids(PORT);
+        for (const pid of pids) {
+            try {
+                process.kill(pid, 'SIGTERM');
+            } catch {
+                // Already gone, or not ours to signal — the re-probe below is the verdict.
+            }
+        }
+        if (pids.length > 0) {
+            await sleep(1500);
+            if (await portIsFree(PORT)) {
+                cleared = true;
+                console.log(
+                    `Cleared port ${String(PORT)}: killed stray listener pid ${pids.join(', ')} (the push gate owns its port; parallel lanes use run-on-free-port instead).`
+                );
+            }
+        }
+    }
+
+    if (!cleared) {
+        console.error('\nGate preflight failed:\n');
+        console.error(
+            `  - Port ${String(PORT)} is busy, and the gate's \`vite preview\` needs it (strictPort).\n` +
+                `      A leftover preview from an earlier run is the common case.\n` +
+                (shouldKillPort
+                    ? `      --kill-port could not clear it — look: lsof -nP -iTCP:${String(PORT)} -sTCP:LISTEN\n`
+                    : `      The push gate clears its own port (--kill-port); by hand: lsof -ti tcp:${String(PORT)} -sTCP:LISTEN | xargs kill\n`)
+        );
+        process.exit(1);
+    }
 }
