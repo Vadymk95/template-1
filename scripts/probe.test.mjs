@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
     hasRenderedContent,
@@ -118,13 +118,14 @@ describe('measureInPage', () => {
        pinning is the ARITHMETIC: an overflow reported as a negative number, or a "smallest control"
        picked by width instead of height, is the class of defect that makes a probe reading quietly
        wrong while still looking like data. */
+    // The jsdom environment exposes `document` as a getter-only global, so a plain assignment throws;
+    // `vi.stubGlobal` redefines the property and `unstubAllGlobals` restores the original.
     const withDocument = (documentStub, run) => {
-        const previous = globalThis.document;
-        globalThis.document = documentStub;
+        vi.stubGlobal('document', documentStub);
         try {
             return run();
         } finally {
-            globalThis.document = previous;
+            vi.unstubAllGlobals();
         }
     };
 
