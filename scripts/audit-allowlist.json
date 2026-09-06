@@ -1,11 +1,5 @@
 [
     {
-        "id": "GHSA-qwww-vcr4-c8h2",
-        "expires": "2026-11-01",
-        "reason": "React Router >=7.12.0 <8.3.0 executes an action before returning the 400 in RSC mode, bypassing CSRF protection. This template is a client-rendered Vite SPA using react-router-dom 7.x in declarative/data mode: there is no RSC entry, no createCallServer call, and no @react-router/dev in the tree, so the vulnerable path is not reachable here. A fork that adopts RSC mode must re-evaluate this allowance instead of inheriting it.",
-        "upstream": "Fixed in react-router 8.3.0, a major-version migration with its own breaking changes, so it is scheduled as its own task rather than folded into a tooling pass. npm's suggested remediation is react-router-dom@7.11.0, a downgrade below the vulnerable floor that also drops two minors of unrelated fixes."
-    },
-    {
         "id": "GHSA-jmr9-qjv8-65gv",
         "expires": "2026-11-01",
         "reason": "extract-zip <=2.0.1 mishandles symlinks during extraction (path traversal), and no fixed release exists in any major - every published version is inside the advisory range. Its only path here is @size-limit/preset-app -> @size-limit/time -> estimo -> find-chrome-bin -> @puppeteer/browsers downloading a Chrome archive for the size gate's TIME metric, a dev-only tool that never touches production code or the shipped bundle.",
