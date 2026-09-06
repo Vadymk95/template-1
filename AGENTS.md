@@ -209,7 +209,7 @@ The gate is **zero-warnings**: `eslint --max-warnings 0`, `oxlint --deny-warning
 
 **Complexity ratchet** — `complexity` 10 / `max-depth` 3 / `max-params` 4 / `max-lines-per-function` 120 / `max-lines` 200 over `src/**`, tests exempt. Thresholds sit above the measured ceiling (see `DECISIONS.md`), so a hit means new drift: split the function first; raising a number needs a fresh measurement and a `DECISIONS.md` line.
 
-**Mutation testing** — `npm run test:mutation` (StrykerJS, weekly `mutation.yml` CI job). Coverage proves code RUNS under tests; the mutation score proves tests would CATCH a wrong implementation — the two disagree here by design (57% coverage vs 44.5% baseline score). `thresholds.break` in `stryker.config.json` is a measured floor-of-record: raise it after a good run, never lower it to go green.
+**Mutation testing** — `npm run test:mutation` (StrykerJS, weekly `mutation.yml` CI job). Coverage proves code RUNS under tests; the mutation score proves tests would CATCH a wrong implementation — the two disagree here by design (73% coverage vs a 41.95 score after the Stryker 10 bump, 2026-09). `thresholds.break` in `stryker.config.json` is a measured floor-of-record: raise it after a good run, never lower it to go green.
 
 ## Version holds (do not "fix" by bumping)
 

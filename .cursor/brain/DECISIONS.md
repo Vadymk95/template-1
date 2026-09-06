@@ -1,5 +1,15 @@
 # Architectural Decisions
 
+## [2026-09] Test toolchain majors: vitest 5, Stryker 10, jsdom 30
+
+**Decision**: take the three majors in one pass, one commit each, measured on the same tree. TypeScript stays `~6.0.x` because `typescript-eslint@8.69` still peers `<6.1.0`.
+
+**What moved**: vitest 5 exposes `document` as a getter-only global in the jsdom environment, so a plain `globalThis.document = stub` throws — `scripts/probe.test.mjs` now uses `vi.stubGlobal` / `vi.unstubAllGlobals`. Stryker 10 changes the mutant set: the same tree scored 44.43 on 9.6.1 and 41.95 on 10.0.0, still above the `thresholds.break` floor of 40, which stays where it is (a floor is raised after a good run, never moved to fit a tool). jsdom 30 requires Node `^24.15.0`; `.nvmrc` says `24`, so `nvm use` resolves to the newest installed 24.x and the hooks run there — a machine on an older 24.x fails `engine-strict` at install, which is the intended signal, not a bug.
+
+**Why**: Dependabot kept opening grouped major bumps that the audit gate refused for unrelated reasons (new transitive advisories, a stale allowance). Taking the majors deliberately, with the mutation run and the coverage gate as proof, closes that queue instead of ignoring it.
+
+---
+
 ## [2026-07] The gate is `verify`; `verify` is a superset of CI
 
 **Decision.** Every check lives in `package.json`, never only in a workflow file. `verify` holds all
