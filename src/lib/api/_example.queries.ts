@@ -32,7 +32,7 @@ export const exampleKeys = {
 };
 
 const fetchExample = async (id: string, signal?: AbortSignal): Promise<{ id: string }> => {
-    void signal;
+    signal?.throwIfAborted();
     return Promise.resolve({ id });
 };
 
