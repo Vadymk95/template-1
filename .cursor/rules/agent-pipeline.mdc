@@ -108,14 +108,9 @@ npm run e2e:one -- e2e/<file>.spec.ts # only the spec the change affects — fre
 npm run verify:measure                # need to LOOK at a built result? legal at any time
 ```
 
-The full chain (`verify` / `verify:ci`) belongs to the pre-push hook and CI, and the push is
-phase-aware — see `scripts/gate-tiers.json`.
-
-`verify` is a strict SUPERSET of the offline checks CI runs, so a green `verify` predicts a green CI.
-That property is the point: **a new check belongs in the script, never only in the workflow file.**
-
-Individual commands (`npm run typecheck`, `npm run lint`, `npm run lint:oxlint`, `npm run fix`,
-`npm test`) are drill-downs on a specific failure — none of them is a moment.
+Everything else about the gate — the push and its phases, CI, what is forbidden by hand, the
+superset rule, which scripts are drill-downs rather than moments — is `AGENTS.md` § Commands / the
+gate › _The tier law_, and is not repeated here.
 
 ### 4.1a Verification Integrity
 

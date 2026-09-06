@@ -35,8 +35,9 @@ law: `AGENTS.md` § the gate):
 npm run verify:iter > /tmp/verify.log 2>&1; echo $?
 ```
 
-Exit code **without a pipe**: piping to `tail` returns the pipe's status, so a failed build reads as a
-pass.
+Exit code without a pipe, and the rest of the verification-integrity checklist (prove the gate can go
+red, name the condition under which a green would have been red): `.cursor/rules/agent-pipeline.mdc`
+§ 4.1a — the single home, not repeated here.
 
 ## 2. Leak hunt (React + browser)
 

@@ -120,16 +120,9 @@ Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
 
 ## Dev Tooling
 
-- **Which checks to run** — see `.cursor/brain/VERIFICATION.md`. Targeted checks are for the iteration loop; the gate is what says "done".
-- **The tier law lives in `AGENTS.md` § the gate; this list is a POINTER, not a second copy.**
-- `npm run verify:iter` — the iteration rung: oxlint → tsc (incremental) → `vitest --changed` (seconds). Run per change; one touched spec via `npm run e2e:one -- <spec>`; need to LOOK at a built result: `npm run verify:measure`.
-- The local push is PHASE-AWARE (`scripts/gate-tiers.json`): phase 0 skips build/chunks/size/e2e until the first deploy; CI always runs the full chain.
-- `npm run verify` — **the gate**, all offline checks: `check-hooks` → `check-gate-env` preflight (free preview port, prints the fix) → oxlint → format:check → typecheck → eslint (cached) → test:coverage → build → `verify:web-vitals-chunks` → `size:check` → `ensure-playwright` → **`test:e2e:prod`** (fresh preview; retries and the single worker stay on real `CI`).
-- `npm run verify:ci` — `audit:gate && verify`. Husky **pre-push** runs this, and the GitHub `validate` job is a single step over the same script. `verify` is a strict superset of CI's offline checks, so a green `verify` predicts a green CI — keep it that way by adding new checks to the SCRIPT, never only to the workflow. `ci:local` is an alias.
-- `npm run audit:gate` — fail-closed dependency audit (`scripts/audit-gate.mjs`): blocks every high/critical advisory, an expired or stale allowance in `scripts/audit-allowlist.json`, and its own inability to complete. Not inside `verify` because it needs the network.
-- `npm run fix` — the one remedy command: `oxlint --fix` → `eslint --fix` → `prettier --write`, repo-wide.
-- `npm run bench:verify` — the gate step by step with timings, to attribute a slow run.
-- `npm run test:e2e:prod` — Playwright against `vite preview` (same mode as CI / the gate). Browsers are installed on demand by `scripts/ensure-playwright.mjs`, which reads the exact build paths out of `playwright install --dry-run`.
+- **The gate, its moments and its scripts** — `AGENTS.md` § Commands / the gate is the only definition (which script belongs to which moment, the push phases, what is forbidden by hand). Stage timings and what was deliberately not added: `.cursor/brain/VERIFICATION.md`. The full script list: `package.json`. Nothing about the gate is repeated in this file.
+- `npm run audit:gate` — fail-closed dependency audit (`scripts/audit-gate.mjs`): blocks every high/critical advisory, an expired or stale allowance in `scripts/audit-allowlist.json`, and its own inability to complete.
+- `npm run test:e2e:prod` — Playwright against `vite preview` (same mode as CI / the gate); a fresh preview per run, retries and the single worker only on real `CI`. Browsers are installed on demand by `scripts/ensure-playwright.mjs`, which reads the exact build paths out of `playwright install --dry-run`.
 - `npm run dev` — Vite dev server (`vite.config.ts` pins port 3000). ESLint runs via the IDE extension (recommended in `.vscode/extensions.json`) and in `lint-staged` — no in-Vite linter.
 - `npm run build` — `tsc -b` then Vite production build (Rolldown)
 - `npm run verify:web-vitals-chunks` — asserts chunk split on the current `dist/` (run after `build`); `verify:web-vitals-chunks:full` — two production builds asserting standard vs attribution variants (use after changing `src/lib/vitals.ts` or env wiring)
@@ -140,5 +133,4 @@ Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
 - `npm run lint` — **ESLint 10** flat: `typescript-eslint` **strict + stylistic** (type-aware), `import-x` (**order**, **no-cycle**, **no-restricted-paths** for layer boundaries), `no-magic-numbers`, a raw-hex ban in `components`/`pages`, `i18next/no-literal-string`, parent-relative imports under `src/**` restricted (use `@/` or `@locales/`); `vite-plugins/**` may use `../src/**` (loads before Vite resolves `@/`). `settings.react.version` is pinned to a literal — `'detect'` crashes under ESLint 10, see `DECISIONS.md`.
 - **E2E** — Playwright (`e2e/`, `playwright.config.ts`): local default `npm run test:e2e` starts **`vite` dev** on port 3000; CI / `test:e2e:prod` / `PLAYWRIGHT_USE_PREVIEW=1` uses **`vite preview`** on 4173 after `build`.
 - **Security workflow** — `.github/workflows/security.yml`: gitleaks over full history plus CodeQL `security-extended`, on push, PR and a weekly cron. Runs in parallel with `validate`, not from `verify`. Exclusions live in `.github/codeql/codeql-config.yml` with their reason.
-- Pre-commit: `lint-staged` (oxlint fix → eslint fix → Prettier) on the staged set, then the TDD sibling gate, then **repo-wide** oxlint and `format:check` — because `lint-staged` restores unstaged hunks after fixing, which used to leave already-fixed files uncommitted.
 - **Agent commands** — `.claude/commands/`: `/onboard`, `/feat`, `/test`, `/review`, `/docs`, each mirrored by a shim in `.cursor/commands/`.

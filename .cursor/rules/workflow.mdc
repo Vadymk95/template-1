@@ -65,7 +65,7 @@ npm run verify:iter  # oxlint → tsc (incremental) → vitest --changed (only t
 
 Touched a Playwright-covered surface? Run that ONE spec: `npm run e2e:one -- e2e/<file>.spec.ts` (free port, traced).
 
-The full chain is the pre-push hook's and CI's, not an implementer's or a reviewer's — tier law in `AGENTS.md` § the gate, not restated here. Individual commands (`npm run typecheck`, `npm run lint`, `npm run lint:oxlint`, `npm run format:check`, `npm test`) stay as drill-downs on a specific failure.
+Everything else — the push, CI, prohibitions, drill-down scripts — is `AGENTS.md` § Commands / the gate › _The tier law_, not restated here.
 
 ## Git Commits
 

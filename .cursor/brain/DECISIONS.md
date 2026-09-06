@@ -213,6 +213,8 @@ message initialised and then unconditionally overwritten in both branches below 
 
 **Trade-off**: pre-push is slower. Accepted so e2e cannot be skipped by habit.
 
+**Superseded in part (2026-08-30)**: `.husky/pre-push` now runs `verify:push`, which is phase-aware (`scripts/gate-tiers.json`): phase 0 skips build, size and e2e until the first deploy, phase 1 runs the full `verify:ci`; CI always runs the full chain. The e2e-inside-`verify` half of this decision stands. Tier law: `AGENTS.md` § Commands / the gate.
+
 ---
 
 ## [2026-04] i18n init failure — English-only fallback

@@ -208,45 +208,40 @@ VITE_ENABLE_MSW=false
 
 ### Available Scripts
 
-| Command                            | Description                                                       |
-| ---------------------------------- | ----------------------------------------------------------------- |
-| `npm run dev`                      | Start Vite dev server (port 3000)                                 |
-| `npm run build`                    | `tsc -b` + Vite production build (Oxc + Brotli)                   |
-| `npm run preview`                  | Serve production build locally                                    |
-| `npm run typecheck`                | Runs `tsc -b` (no emit)                                           |
-| `npm run lint`                     | Run ESLint                                                        |
-| `npm run lint:oxlint`              | Fast Oxc-based lint pass (pre-ESLint)                             |
-| `npm run format`                   | Format codebase with Prettier                                     |
-| `npm run format:check`             | Check code formatting                                             |
-| `npm test`                         | Run unit tests (Vitest)                                           |
-| `npm run test:watch`               | Run tests in watch mode                                           |
-| `npm run test:coverage`            | Run tests with coverage report                                    |
-| `npm run test:e2e`                 | Playwright E2E (vite dev locally unless preview)                  |
-| `npm run test:e2e:prod`            | Playwright against `vite preview` (verify gate)                   |
-| `npm run test:e2e:ui`              | Playwright UI mode                                                |
-| `npm run fix`                      | The remedy: oxlint `--fix` → eslint `--fix` → prettier, repo-wide |
-| `npm run verify`                   | **The gate** — every offline check (see below)                    |
-| `npm run verify:ci`                | `audit:gate && verify` — what pre-push and CI both run            |
-| `npm run ci:local`                 | Alias of `verify:ci`                                              |
-| `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist       |
-| `npm run bench:verify`             | The gate step by step with timings                                |
-| `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job          |
-| `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                  |
-| `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks                  |
-| `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                                |
+| Command                            | Description                                                        |
+| ---------------------------------- | ------------------------------------------------------------------ |
+| `npm run dev`                      | Start Vite dev server (port 3000)                                  |
+| `npm run build`                    | `tsc -b` + Vite production build (Oxc + Brotli)                    |
+| `npm run preview`                  | Serve production build locally                                     |
+| `npm run typecheck`                | Runs `tsc -b` (no emit)                                            |
+| `npm run lint`                     | Run ESLint                                                         |
+| `npm run lint:oxlint`              | Fast Oxc-based lint pass (pre-ESLint)                              |
+| `npm run format`                   | Format codebase with Prettier                                      |
+| `npm run format:check`             | Check code formatting                                              |
+| `npm test`                         | Run unit tests (Vitest)                                            |
+| `npm run test:watch`               | Run tests in watch mode                                            |
+| `npm run test:coverage`            | Run tests with coverage report                                     |
+| `npm run test:e2e`                 | Playwright E2E (vite dev locally unless preview)                   |
+| `npm run test:e2e:prod`            | Playwright against `vite preview` (verify gate)                    |
+| `npm run test:e2e:ui`              | Playwright UI mode                                                 |
+| `npm run fix`                      | The remedy: oxlint `--fix` → eslint `--fix` → prettier, repo-wide  |
+| `npm run verify`                   | **The gate** — every offline check (see below)                     |
+| `npm run verify:ci`                | `audit:gate && verify` — the CI chain; the push runs it in phase 1 |
+| `npm run ci:local`                 | Alias of `verify:ci`                                               |
+| `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist        |
+| `npm run bench:verify`             | The gate step by step with timings                                 |
+| `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job           |
+| `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                   |
+| `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks                   |
+| `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                                 |
 
 ### The gate
 
-`npm run verify` runs, in order: `check-hooks` → `typecheck` → `lint:oxlint` → `lint` → `format:check`
-→ `test:coverage` → `build` → `verify:web-vitals-chunks` → `size:check` → `ensure-playwright` →
-`test:e2e:prod`.
-
-`npm run verify:ci` is `audit:gate && verify`. The audit gate is separate because it needs the network,
-so an offline contributor can still run the complete offline gate.
-
-**`verify` is a strict superset of the offline checks CI runs**, which is what makes a green local gate
-predict a green CI. Keeping that true is a rule: **a new check goes into the script, never only into the
-workflow file.** Adding one to CI alone is how this template's gate stopped predicting CI once already.
+`npm run verify` is every offline check; `npm run verify:ci` adds the network-bound `audit:gate` and is
+what CI runs. The gate is tiered by moment (iterate, measure, commit, push, CI), and the ONLY definition of
+which script belongs to which moment, what the push runs in each phase and what is never run by hand is
+`AGENTS.md` § Commands / the gate. Stage timings: `.cursor/brain/VERIFICATION.md`. The exact stage order:
+the `verify:inner` script in `package.json` — it is not repeated here on purpose.
 
 `npm test` deliberately does not enforce coverage — the thresholds in `vitest.config.ts` only apply with
 `--coverage`, which is why the gate uses `test:coverage`.
@@ -273,7 +268,8 @@ push, leaving files that were already fixed and never committed. On failure the 
 
 **Commit message** (Commitlint): `type(scope): subject`, max 96 chars.
 
-**Pre-push:** `npm run verify:ci`.
+**Pre-push:** `npm run verify:push` — phase-aware (`scripts/gate-tiers.json`): phase 0 runs the offline
+checks and loudly skips build, size and e2e until the first deploy; phase 1 runs the full `verify:ci`.
 
 ### CI (GitHub Actions)
 
