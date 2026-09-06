@@ -31,6 +31,8 @@ const parentRelativeImportPatternGroup = {
 export default defineConfig([
     globalIgnores([
         'dist',
+        // A crashed Stryker run leaves its sandbox behind; the gate must never lint a copy of the repo.
+        '.stryker-tmp/**',
         'coverage',
         'public/mockServiceWorker.js',
         'test-results/**',

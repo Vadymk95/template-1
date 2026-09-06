@@ -14,3 +14,6 @@ package-lock.json
 .eslintcache
 *.log
 logs
+
+# Stryker sandboxes: a crashed mutation run leaves one behind, and the gate must not lint a copy of the repo
+.stryker-tmp/
