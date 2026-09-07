@@ -1,0 +1,79 @@
+name: Agent task
+description: A change small and well-specified enough to hand to the Copilot coding agent. A human reviews and merges.
+title: '[agent] '
+labels: ['agent-task']
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Fill every field, then assign the issue to **Copilot**. The agent reads `AGENTS.md` and `.github/copilot-instructions.md`, works on its own branch and opens a draft pull request; CI runs the gate on that pull request once a human approves the workflow run. It cannot merge.
+
+              The brief decides the outcome: an underspecified issue produces a plausible wrong diff. The lane's contract (task class, what the agent may run) is `AGENTS.md` › Lanes.
+    - type: input
+      id: ticket
+      attributes:
+          label: Ticket link
+          description: Optional. A link, not a key in the title.
+    - type: textarea
+      id: goal
+      attributes:
+          label: Goal
+          description: What must be true when this is done, in one or two sentences. Behaviour, not implementation.
+      validations:
+          required: true
+    - type: textarea
+      id: scope
+      attributes:
+          label: Files and areas in scope
+          description: Paths the change is expected to touch. The agent should stop and ask before going outside them.
+          placeholder: |
+              src/features/...
+              src/lib/...
+      validations:
+          required: true
+    - type: textarea
+      id: do-not-touch
+      attributes:
+          label: Must not touch
+          description: Anything the diff must leave alone. The pre-filled list is this repository's mandatory-human-review set; keep it and add yours.
+          value: |
+              - The gate and its numbers: `scripts/gate-tiers.json`, coverage thresholds in `vitest.config.ts`, `stryker.config.json` thresholds, `.size-limit.json` budgets, `scripts/audit-allowlist.json` - a green that comes from moving a number is not green.
+              - Template scaffolding listed in `.cursor/brain/TEMPLATE_SEEDS.md` and every `// Template scaffolding` site.
+              - `engines.node`, `.npmrc` hardening flags, `.husky/`.
+              - `package.json` dependencies: new packages need approval first.
+      validations:
+          required: true
+    - type: textarea
+      id: acceptance
+      attributes:
+          label: Acceptance criteria
+          description: Observable checks a reviewer can run - which route or screen, which state, what is seen.
+      validations:
+          required: true
+    - type: textarea
+      id: tests
+      attributes:
+          label: Tests required
+          description: A regression test must fail without the change; the pre-commit TDD sibling gate requires a `*.test.*` next to every new `src` logic file. A happy-path snapshot does not count.
+      validations:
+          required: true
+    - type: dropdown
+      id: size
+      attributes:
+          label: Expected size
+          options:
+              - Under 100 changed lines
+              - Under 400 changed lines
+      validations:
+          required: true
+    - type: checkboxes
+      id: fit
+      attributes:
+          label: Fit for the agent
+          options:
+              - label: The result is verifiable by the gate (`verify:iter` while iterating; the push and CI run the chain) plus the tests named above.
+                required: true
+              - label: Nothing in scope is on the must-not-touch list.
+                required: true
+              - label: The contract (API shape, copy, design) is stated here or linked, not assumed.
+                required: true
