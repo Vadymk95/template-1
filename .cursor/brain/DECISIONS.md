@@ -504,3 +504,12 @@ copied files, ESLint "multiple candidate TSConfigRootDirs"). `.stryker-tmp` was 
 all four templates. It is now also in `.prettierignore` and in ESLint's global ignores here: a tool's temp
 directory belongs in every ignore list the gate reads, or a crashed tool run reddens the gate for an
 unrelated change and reads as a regression.
+
+## [2026-09] Gate hygiene: a test budget is set by what the test does
+
+The `verify-push` CLI cases in `scripts/verify-push.test.mjs` timed out at vitest's 5 s default inside the
+full coverage run while passing alone in ~260 ms each. Each case boots node → npm → node, and an npm boot
+on a machine with every vitest worker busy takes seconds, so the budget was a unit-test budget applied to a
+process-spawn test. The describe block now carries a 20 s budget with the measurement next to it. A
+quarantine (`skip`) was rejected: the cases prove the push dispatcher's phase routing and exit-code
+passthrough, the exact thing a silent pass would hide.

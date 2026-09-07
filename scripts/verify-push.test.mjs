@@ -105,7 +105,12 @@ describe('readConfiguredPhase', () => {
     });
 });
 
-describe('verify-push CLI (fixture package)', () => {
+/* Each case boots node → npm → node (the dispatcher spawns the fixture's npm script), so its budget is a
+   process-boot budget, not the 5 s unit default: measured ~260 ms per case alone, but under the full
+   coverage run with every worker busy an npm boot alone can take seconds, and the 5 s default timed out
+   on a clean tree (once in template-1, repeatedly in template-spa-pwa on the pre-pass baseline). The cases
+   are not flaky in what they assert; the budget was wrong for what they do. */
+describe('verify-push CLI (fixture package)', { timeout: 20_000 }, () => {
     it('phase 0: runs the scaffold chain, prints the skip notice and the flip instruction', () => {
         const dir = makeFixturePackage({ phase: 0 });
         cleanupDirs.push(dir);
