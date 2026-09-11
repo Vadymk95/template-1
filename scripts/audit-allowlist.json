@@ -1,8 +1,1 @@
-[
-    {
-        "id": "GHSA-jmr9-qjv8-65gv",
-        "expires": "2026-11-01",
-        "reason": "extract-zip <=2.0.1 mishandles symlinks during extraction (path traversal), and no fixed release exists in any major - every published version is inside the advisory range. Its only path here is @size-limit/preset-app -> @size-limit/time -> estimo -> find-chrome-bin -> @puppeteer/browsers downloading a Chrome archive for the size gate's TIME metric, a dev-only tool that never touches production code or the shipped bundle.",
-        "upstream": "npm's suggested remediation is @size-limit/preset-app 11.0.0, a semver-major DOWNGRADE, rejected per the capped-floor doctrine. Re-check for an extract-zip release or a puppeteer chain that drops it at expiry; if neither exists, re-date with a fresh reading."
-    }
-]
+[]

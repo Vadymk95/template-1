@@ -1,5 +1,15 @@
 # Architectural Decisions
 
+## [2026-09] `extract-zip` closed by one override: `@puppeteer/browsers`, not `puppeteer-core`
+
+**Decision**: a single root override, `"@puppeteer/browsers": ">=3.0.2 <4"`. Both `extract-zip` advisories (`GHSA-jmr9-qjv8-65gv` path traversal, `GHSA-7pqw-9j4j-h8q3`) reached this repo only through `@size-limit/preset-app → @size-limit/time → estimo`, which pins `find-chrome-bin@2.0.4` and `puppeteer-core@24.22.0` by exact version — both of which pinned `@puppeteer/browsers@2.10.10`, and every published `extract-zip` sits inside the advisory range. `@puppeteer/browsers` drops the dependency at 3.0.2 (the 2.x line never does), so overriding that one package removes `extract-zip` from the tree entirely and takes seven high findings to zero.
+
+**`puppeteer-core` must NOT be overridden — measured, not assumed.** npm's `fixAvailable` proposed `@size-limit/preset-app@11.0.0`, a semver-major downgrade, rejected per the capped-floor doctrine. The obvious alternative — force `puppeteer-core` past its own advisory range (`19.8.4 - 24.43.1`) — was tried and broke the size gate: `estimo/src/utils.js` deep-imports `puppeteer-core/lib/cjs/puppeteer/revisions.js`, and 25.0.2 moved that tree from `lib/cjs/puppeteer/` to `lib/puppeteer/`. Every `puppeteer-core` version that drops `extract-zip` is 25.x, so every one of them breaks `estimo`. With the browsers-only override `puppeteer-core` stays at 24.22.0 and leaves the audit anyway, because its only finding was *via* `@puppeteer/browsers`. Proof: `npm run size:check` launches headless Chrome and all five brotli budgets pass.
+
+**The allowance was removed in the same commit**, per the rule recorded under the gate decision below: the moment the override lands, `GHSA-jmr9-qjv8-65gv` disappears from the audit, which makes the allowance stale, which fails `audit:gate` by design. `scripts/audit-allowlist.json` is now empty, and the gate passes with 0 high and 0 critical (2 moderate remain, `qs` via `typed-rest-client` via `@stryker-mutator/core`).
+
+---
+
 ## [2026-09] Test toolchain majors: vitest 5, Stryker 10, jsdom 30
 
 **Decision**: take the three majors in one pass, one commit each, measured on the same tree. TypeScript stays `~6.0.x` because `typescript-eslint@8.69` still peers `<6.1.0`.
