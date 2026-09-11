@@ -180,10 +180,21 @@ scripts take the next free port. Only the push gate clears its own port.
 - **Review, any lane.** The diff plus `verify:iter`, never a re-run of the gate. Findings are correctness,
   test strength, security, readability; style belongs to the linters. A non-author human approves; an
   agent's own green is not an approval.
-- **Two tools, one file.** Claude Code reads `CLAUDE.md` -> `AGENTS.md` -> the `@`-imported brain; Cursor
-  reads `AGENTS.md` plus every `alwaysApply: true` rule; Copilot reads `.github/copilot-instructions.md`.
-  `AGENTS.md` is the only file all of them read, which is why the law lives here and everything else is a
-  pointer.
+- **Two tools, one file.** Claude Code reads `CLAUDE.md` -> `AGENTS.md` -> the brain files this guide
+  points at (read on demand; nothing beyond `AGENTS.md` is `@`-imported); Cursor reads `AGENTS.md` plus
+  every `alwaysApply: true` rule; Copilot reads `.github/copilot-instructions.md`. `AGENTS.md` is the only
+  file all of them read, which is why the law lives here and everything else is a pointer.
+
+### Before code - spec and plan
+
+A task bigger than a one-sentence diff gets two tracked files under `.cursor/<feature-slug>/` before the
+first edit: `SPEC.md` (WHAT and WHY: evidence per claim with its source kind, acceptance criteria as
+Given / When / Then, open questions with `blocking` and `evidence tried` - an unknown is parked there,
+never invented) and `PLAN.md` (HOW: changes per file with the code that was read, what is reused,
+sequencing in 2-7 slices each under ~400 changed lines, a test per acceptance criterion, risks, danger
+zones). Copy both from `.cursor/templates/`. Approval is a non-author review of the pull request that
+adds or changes them, never a phrase in a chat recorded by an agent. `/feat` starts from the plan; a plan
+that lives only in a conversation is not a plan.
 
 <!-- shared-harness:end -->
 

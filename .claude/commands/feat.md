@@ -43,6 +43,10 @@ discoverable there.
 Wait for approval when the task touches a danger zone, a Zustand store or TanStack Query contract, an
 API payload shape, or the router. Trivial leaf edits proceed with a brief note.
 
+**Bigger than a one-sentence diff?** Then the scope lives in `.cursor/<feature-slug>/SPEC.md` and
+`PLAN.md` (templates in `.cursor/templates/`, law in `AGENTS.md` § Before code). Create or update them
+before §3; a plan is approved as a pull-request review, never as a chat reply.
+
 ## 3. Build
 
 - **Logic first, test-first**: for stores, hooks and `src/lib` modules, write the failing test, then the
