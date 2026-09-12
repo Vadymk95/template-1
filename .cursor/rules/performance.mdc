@@ -39,7 +39,7 @@ const sortedUsers = useMemo(() => [...users].sort(byName), [users]); // large ar
 ## 4. Bundle Optimization
 
 - **Chunk strategy**: Defined in `vite.config.ts` via `build.rolldownOptions.output.codeSplitting.groups`. Current chunks: `react-vendor`, `ui-vendor`, `state-vendor`, `i18n-vendor`.
-- **DANGER ZONE — bundle budgets are a HARD gate, not a guideline**: `.size-limit.json` (brotli) caps `react-vendor` 90 KB, `i18n-vendor` 22 KB, `state-vendor` 15 KB, `ui-vendor` 12 KB, `index` entry 25 KB. `npm run size:check` runs inside `npm run ci:local` (and GitHub Actions) — **blowing any budget FAILS CI**. Before adding ANY new dependency: run `npm run build:analyze` to see where it lands, then `npm run size:check`. NEVER raise a budget in `.size-limit.json` to make a heavy import fit — dynamic-import the heavy code or pick a lighter library instead; bumping the cap requires explicit sign-off.
+- **DANGER ZONE — bundle budgets are a HARD gate, not a guideline**: `.size-limit.json` (brotli) is a HARD gate inside `npm run verify` (so pre-push in phase 1 and CI) — the budgets live there, not here. **Blowing any budget FAILS CI**. Before adding ANY new dependency: run `npm run build:analyze` to see where it lands, then `npm run size:check`. NEVER raise a budget in `.size-limit.json` to make a heavy import fit — dynamic-import the heavy code or pick a lighter library instead; bumping the cap requires explicit sign-off.
 - **Tree-shaking**: Use named imports only (`import { thing } from 'lib'`). Avoid default-import-then-destruct.
 
 ## 5. Audit Guard

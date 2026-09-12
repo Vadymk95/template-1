@@ -54,9 +54,8 @@ Don't add `tailwindcss-animate` as a dependency — it's a breaking conflict.
 
 ## husky + commitlint
 
-Pre-commit: lint + format on staged files (lint-staged)
-Commit-msg: commitlint (`type(scope): subject`, max 96 chars)
-Pre-push: TypeScript project check via `npx tsc -b --force --noEmit`
+Hook contents: `.husky/pre-commit`, `.husky/commit-msg`, `.husky/pre-push`; the moments they own:
+`AGENTS.md` § Commands / the gate.
 
 Skipping hooks (`--no-verify`) bypasses all checks — don't do it.
 

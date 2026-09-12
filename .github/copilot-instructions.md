@@ -8,6 +8,7 @@ style — style is ESLint's and Prettier's job, not a review finding.
 - `npm run verify` is the bar and it is zero-warnings (`eslint --max-warnings 0`,
   `oxlint --deny-warnings`). A change that needs a rule downgraded, a severity lowered, a coverage
   threshold moved, or an `eslint-disable` to pass is a finding, not a fix.
+- The gate's moments, phases and what is never run by hand: `AGENTS.md` § Commands / the gate.
 - The frontend is not a security boundary. Tokens come from the store via `getAuthToken`; nothing
   reads or writes credentials directly.
 - No secrets, keys or endpoints in committed files. `.env.example` carries placeholders; real values

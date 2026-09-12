@@ -18,10 +18,10 @@ Production-ready React SPA template. Copy, rename, start building. Includes all 
 | Routing      | React Router                      | 7                         |
 | Forms        | react-hook-form + zod             | 7 / 4                     |
 | i18n         | i18next + react-i18next           | 26 / 17                   |
-| Testing      | Vitest + Testing Library          | 4                         |
+| Testing      | Vitest + Testing Library          | 5                         |
 | Linting      | ESLint 10 flat + Oxlint (staged)  | 10 / 1.x                  |
 | Formatting   | Prettier                          | 3                         |
-| Git hooks    | Husky + commitlint + lint-staged  | 9 / 20                    |
+| Git hooks    | Husky + commitlint + lint-staged  | 9 / 21                    |
 
 ## Architecture
 
@@ -44,7 +44,6 @@ src/
     i18n/        # i18next setup, constants, resources
     webVitals/   # subscribeStandard / subscribeAttribution (loaded from vitals.ts)
     queryClient.ts  # TanStack Query client factory
-    env.ts       # @t3-oss/env-core validated public env
     vitals.ts, logger, utils  # observability + cn()
   pages/
     HomePage/       # Index route (not lazy); `index.ts` re-exports `HomePage.tsx`
@@ -61,6 +60,7 @@ src/
     utils/       # createSelectors
   test/
     setup.ts, server.ts, handlers.ts, test-utils
+  env.ts         # @t3-oss/env-core validated public env
 ```
 
 ## Key Patterns
@@ -129,7 +129,7 @@ Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
 - `npm run size:check` — per-chunk brotli budgets from `.size-limit.json`
 - `npm run build:analyze` — bundle visualizer (`ANALYZE=true`)
 - `npm run typecheck` — `tsc -b` only
-- `npm run test` — Vitest run. **The gate uses `test:coverage`**: thresholds in `vitest.config.ts` only enforce when `--coverage` is passed.
+- `npm run test` — Vitest run; the gate uses `test:coverage` (`AGENTS.md` § Commands).
 - `npm run lint` — **ESLint 10** flat: `typescript-eslint` **strict + stylistic** (type-aware), `import-x` (**order**, **no-cycle**, **no-restricted-paths** for layer boundaries), `no-magic-numbers`, a raw-hex ban in `components`/`pages`, `i18next/no-literal-string`, parent-relative imports under `src/**` restricted (use `@/` or `@locales/`); `vite-plugins/**` may use `../src/**` (loads before Vite resolves `@/`). `settings.react.version` is pinned to a literal — `'detect'` crashes under ESLint 10, see `DECISIONS.md`.
 - **E2E** — Playwright (`e2e/`, `playwright.config.ts`): local default `npm run test:e2e` starts **`vite` dev** on port 3000; CI / `test:e2e:prod` / `PLAYWRIGHT_USE_PREVIEW=1` uses **`vite preview`** on 4173 after `build`.
 - **Security workflow** — `.github/workflows/security.yml`: gitleaks over full history plus CodeQL `security-extended`, on push, PR and a weekly cron. Runs in parallel with `validate`, not from `verify`. Exclusions live in `.github/codeql/codeql-config.yml` with their reason.

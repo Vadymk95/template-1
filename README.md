@@ -98,7 +98,7 @@ After cloning, these are the exact files / symbols to edit to make the template 
 - **Prettier 3** — code formatting
 - **Husky + lint-staged** — git hooks for quality gates
 - **Commitlint** — conventional commits enforcement
-- **Vitest 4.1** — unit testing with Testing Library
+- **Vitest 5** — unit testing with Testing Library
 - **Playwright 1.62** — E2E tests; browsers installed on demand by `scripts/ensure-playwright.mjs`
 
 ## 🛠 Project Structure
@@ -118,8 +118,8 @@ src/
       Main/                # Main content wrapper
     ui/                    # Shadcn UI primitives (Button, Input, etc.)
   hocs/
-    ProtectedRoute/        # Auth gate for nested routes
-    WithSuspense/          # Suspense wrapper for lazy pages
+    ProtectedRoute.tsx     # Auth gate for nested routes
+    WithSuspense.tsx       # Suspense wrapper for lazy pages
   hooks/
     i18n/
       useI18nReload.ts     # i18n hot reload hook (dev-only)
@@ -134,7 +134,6 @@ src/
       constants.ts         # Language and namespace constants
       resources.ts         # TypeScript types for translations
     webVitals/             # subscribeStandard / subscribeAttribution
-    env.ts                 # @t3-oss/env-core validated public env
     queryClient.ts         # TanStack Query factory
     vitals.ts              # Web Vitals lazy reporting
     logger.ts, utils.ts    # observability + cn()
@@ -158,6 +157,7 @@ src/
     server.ts, handlers.ts # MSW node adapter
     test-utils.tsx         # renderWithProviders
   App.tsx                  # Layout shell
+  env.ts                   # @t3-oss/env-core validated public env
   main.tsx                 # Entry point
 ```
 
@@ -228,6 +228,14 @@ VITE_ENABLE_MSW=false
 | `npm run verify`                   | **The gate** — every offline check (see below)                     |
 | `npm run verify:ci`                | `audit:gate && verify` — the CI chain; the push runs it in phase 1 |
 | `npm run ci:local`                 | Alias of `verify:ci`                                               |
+| `npm run verify:iter`              | Iteration tier: oxlint → tsc → vitest --changed; run per change    |
+| `npm run verify:measure`           | MEASURE moment: build + look (`-- e2e/<f>.spec.ts` for one spec)   |
+| `npm run verify:full`              | `verify:ci` + `smoke:dev` — adds the content-variance fixture      |
+| `npm run smoke:dev`                | The content-stress fixture alone, against `vite dev`               |
+| `npm run e2e:one -- <spec>`        | One Playwright spec, FREE port, through the tracer                 |
+| `npm run probe -- <route>`         | LOOK: render, screenshot per width, print measured quantities      |
+| `npm run test:one -- <file>`       | One unit test file, through the tracer (not around it)             |
+| `npm run trace:report`             | Findings from `.gate-trace.log`: moments, budgets, worktrees       |
 | `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist        |
 | `npm run bench:verify`             | The gate step by step with timings                                 |
 | `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job           |
@@ -248,9 +256,8 @@ the `verify:inner` script in `package.json` — it is not repeated here on purpo
 
 ### Agent commands
 
-Five commands in `.claude/commands/`, each mirrored by a shim in `.cursor/commands/` so Cursor and
-Claude Code behave identically: `/onboard`, `/feat`, `/test`, `/review`, `/docs`. Each names this repo's
-own gate, danger zones and test infrastructure, so an agent does not have to guess or invent them.
+Five commands in `.claude/commands/` (`/onboard`, `/feat`, `/test`, `/review`, `/docs`); what each does:
+`AGENTS.md` § Commands / the gate.
 `.github/copilot-instructions.md` carries the same standards for GitHub Copilot code review.
 
 ### Git Hooks
@@ -259,12 +266,10 @@ own gate, danger zones and test infrastructure, so an agent does not have to gue
 
 1. `lint-staged` — oxlint `--fix` → ESLint `--fix` → Prettier on the **staged** files
 2. TDD gate — a staged `src` logic file with no co-located `*.test.*` blocks the commit
-3. **Repo-wide** `lint:oxlint` and `format:check`
+3. **Repo-wide** `lint:oxlint`, `format:check` and `typecheck`
 
-Step 3 exists because `lint-staged` only touches the staged set, and for a partially staged file it
-restores the unstaged hunks _after_ fixing — so formatting drift used to survive the commit and fail at
-push, leaving files that were already fixed and never committed. On failure the hook prints the remedy:
-`npm run fix && git add -u`.
+Why step 3 exists: `.cursor/brain/DECISIONS.md` [2026-07] § Pre-commit is repo-scoped. On failure the
+hook prints the remedy: `npm run fix && git add -u`.
 
 **Commit message** (Commitlint): `type(scope): subject`, max 96 chars.
 
@@ -274,8 +279,9 @@ checks and loudly skips build, size and e2e until the first deploy; phase 1 runs
 ### CI (GitHub Actions)
 
 **`ci.yml`** — on pull requests and pushes to `master` (Node 24.x, `npm ci --ignore-scripts`): a single
-`npm run verify:ci` step, plus the Playwright browser cache and artifact uploads. One step on purpose —
-see the gate rule above.
+`npm run verify:ci` step, plus the Playwright browser cache and artifact uploads, plus the `dev-smoke` job
+(content-variance fixture on a dev server) and the `cross-browser` job (Firefox + WebKit on the geometry
+specs). One `verify:ci` step on purpose — see the gate rule above.
 
 **`security.yml`** — on push, PR and a weekly cron: gitleaks over the full history (SHA-pinned action;
 tags are mutable and have been retargeted in supply-chain attacks) and CodeQL `security-extended`.
@@ -405,7 +411,7 @@ describe('Component', () => {
 
 ### E2E
 
-Playwright specs in `e2e/` run against Chromium. Local default: `npm run test:e2e` starts `vite dev` on port 3000. CI / `npm run test:e2e:prod` / `PLAYWRIGHT_USE_PREVIEW=1` uses `vite preview` on 4173 after `build`. The local **`npm run verify`** gate (and husky pre-push) runs `test:e2e:prod`.
+Playwright specs in `e2e/` run against Chromium. Local default: `npm run test:e2e` starts `vite dev` on port 3000. CI / `npm run test:e2e:prod` / `PLAYWRIGHT_USE_PREVIEW=1` uses `vite preview` on 4173 after `build`. The local **`npm run verify`** gate runs `test:e2e:prod`; the push runs it only in phase 1 (§ Git Hooks).
 
 ## 🏗️ Build & Deployment
 
@@ -480,6 +486,7 @@ This template does not ship automatic CSP nonce injection. If your production en
 - **Deployment:** `vercel.json` or `netlify.toml` for security headers
 - **CSS-in-JS:** Emotion or Styled-Components for advanced runtime styling (Tailwind covers the majority of cases)
 - **File-based Routing:** TanStack Router for 100+ routes or micro-frontend architectures
+- **Beyond the template** (auth providers, error monitoring, analytics, feature flags, data tables, deployment): [`.cursor/docs/enterprise-upgrade.md`](.cursor/docs/enterprise-upgrade.md)
 
 ## 🧹 Removed in v3.1.0 — Restore If Needed
 

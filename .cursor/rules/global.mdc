@@ -10,7 +10,7 @@ priority: 95
 ## Pipeline Initialization (CRITICAL)
 
 - **Any task MUST begin by initializing the protocol defined in `agent-pipeline.mdc`.**
-- The pipeline (Priority 100) orchestrates all phases: Discovery → Simulation → TDD Execution → Verification → Brain Sync → Confidence.
+- The pipeline (Priority 100) orchestrates all steps: Discovery → Simulation → TDD Execution → Verification → Brain Sync → Confidence.
 - Domain standards live in their respective rules. The pipeline enforces them — never bypass it.
 
 ## 0.1 Conditional Rule Routing
@@ -27,16 +27,14 @@ Do NOT assume Cursor auto-attaches every rule. The always-on rules (`alwaysApply
 - **Styling / render-perf / memo / list keys / bundle budgets** → `performance.mdc` + `react-patterns.mdc`
 - **Constants / magic strings / config values** → `constants.mdc`, `engineering-standards.mdc`
 
-## Language (chat vs codebase)
+## Language
 
-- **Chat with the user:** Russian by default unless the user switches language.
-- **New agent/session default:** First and all subsequent chat replies must be in Russian unless the user explicitly requests another language.
 - **Codebase:** English only — source, identifiers, comments, JSDoc, tests, and Git messages (`type(scope): subject`). Brain/docs under `.cursor/brain/` may be English for template consistency; do not mix Russian into production code or commits.
 
 ## Intelligence & Context
 
 - **Reasoning**: Use `sequential-thinking` (if available in your environment) for logic and `context7` for docs lookups.
-- **Authority**: `.cursor/brain/` (MAP, DECISIONS, SKELETONS, DICTIONARY) is the Source of Truth. Sync drifts immediately.
+- **Authority**: `AGENTS.md` § Source of truth — code is ground truth, `AGENTS.md` the canonical guide, `.cursor/brain/` the depth layer; sync drift in the same session.
 - **Stack**: Strict **TypeScript**. React 19. Prioritize existing libs over custom logic.
 - **Quality**: Minimalist code. No magic strings — use constants or i18n keys.
 - **Clean Code**: Descriptive naming, performance-oriented. Explain complex logic with single-line `//` only.

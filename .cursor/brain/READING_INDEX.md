@@ -6,11 +6,7 @@ job: the trigger, not the content. **It points and never restates** — a line s
 the moment that doc changes; a line naming the doc and its section does not. Where two files could
 answer, the entry says which one WINS.
 
-Why it exists, measured on a sibling project (2026-08-30): an agent's entry is dominated by READING
-SOURCE to find out where things are — roughly 93% of a lane's spend before it writes anything, while
-the auto-loaded docs are ~7%. The lever is precision of pointing, not smaller documents. The single
-biggest observed difference between a 33-tool lane and a 191-tool lane was how exactly the task
-named its files.
+Why it exists: `AGENTS.md` § Entering this repo cheaply.
 
 ## 1. Picking this repo up cold
 

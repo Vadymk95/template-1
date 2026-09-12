@@ -44,11 +44,8 @@ The push gate's preflight takes `--kill-port` (SIGTERM, re-probe, refuse if it w
   run it after every change. Two deliberate properties: while `package.json` or a vite/vitest config is
   dirty, `--changed` runs the FULL suite (those files are force-rerun triggers); and `--changed` follows
   the import graph only, so cross-cutting suites surface at the full-gate run, not during iteration.
-- **`npm run verify`** — every **offline** check, in order: `check-hooks` → `check-gate-env` (preflight:
-  the preview port is free — prints the fix) → `lint:oxlint` → `format:check` → `typecheck` → `lint`
-  (cached; cheap independent stages first) → `test:coverage` → `build` → `verify:web-vitals-chunks` →
-  `size:check` → `ensure-playwright` → `test:e2e:prod` (fresh `vite preview`, never an attached
-  leftover; retries and the single worker stay on real `CI`).
+- **`npm run verify`** — every **offline** check. Stage order: the `verify:inner` script; the superset
+  rule and the push/CI split: `AGENTS.md` § the gate; why: `DECISIONS.md` [2026-07].
 - **`npm run verify:ci`** — `audit:gate && verify`. The audit gate needs the network, which is why it
   is not inside `verify`: an offline implementer can still run the complete offline gate.
 - **`npm run verify:full`** — `verify:ci && smoke:dev`. `smoke:dev` measures the content-variance
@@ -56,13 +53,6 @@ The push gate's preflight takes `--kill-port` (SIGTERM, re-probe, refuse if it w
   `vite preview` run inside `verify`. It needs a second server on its own port, so it is not in
   `verify`; CI runs it as its own `dev-smoke` job, mandatory on every PR. Run `verify:full` locally
   before a PR that touched a shared UI primitive, the layout shell, or `src/index.css`.
-
-**`verify` is a strict superset of the offline checks CI runs**, so a green `verify` predicts a green
-CI. Husky **pre-push** runs `verify:push`, which dispatches by phase to `verify:ci` or the scaffold chain; the GitHub `validate` job is a single step over the same
-script. `ci:local` is an alias of `verify:ci`.
-
-The rule that keeps this true: **a new check goes into the script, never only into the workflow file.**
-Adding it to CI alone is how the gate stopped predicting CI once already — see `DECISIONS.md`.
 
 `npm run bench:verify` runs the same steps with per-step timings when the gate feels slow.
 
@@ -87,9 +77,7 @@ Targeted checks are for the iteration loop. The gate is what says "done".
   the unit suite cannot do it because jsdom has no layout. See "Content variance" below.
 - **A geometry invariant, a wrap guard, or anything about how text lays out** — additionally
   `CROSS_BROWSER=1 npm run smoke:dev` and `CROSS_BROWSER=1 npm run test:e2e:prod`. Engines disagree
-  here in ways reasoning does not predict: measured on this repo, Firefox reports `clientWidth: 0` for
-  an inline `<label>` (per CSSOM) where Chromium reports a box, so a rule about content overflow had to
-  learn that an inline box cannot answer the question at all.
+  here in ways reasoning does not predict (measured: `DECISIONS.md` § Cross-engine coverage).
 - **Touches `src/env.ts`, `vite.config.ts`, `src/lib/vitals.ts`, `src/lib/webVitals/`** — above, plus
   `npm run build && npm run verify:web-vitals-chunks`
 - **Added or bumped a dependency** — `npm run audit:gate` (fails closed on high/critical, on an expired
@@ -119,54 +107,24 @@ file-scoped override in `eslint.config.js`.
 
 ## Capturing results honestly
 
-```bash
-npm run verify:iter > /tmp/verify.log 2>&1; echo $?
-```
-
-**Without a pipe.** Piping to `tail` returns the pipe's exit status, so a failed build reads as a pass.
-This has bitten this project's own tooling work.
-
-Green also means nothing until you have seen the gate go red. When you add or change a check, break it
-once on purpose — an expired entry in `scripts/audit-allowlist.json`, a raw hex in a component, a staged
-`src` logic file with no test sibling, a `min-w-0` removed from a flex label, `outline-hidden` reverted
-to `outline-none`, an unparseable file inside the coverage scope — confirm it refuses, then revert the
-sabotage.
-
-**Before believing a green result, name the concrete condition under which it would have been RED.** If
-you cannot name one, the check proved nothing, and a check that cannot fail is worse than no check
-because it gets recorded as evidence. Two shapes to watch for here specifically: this app hides the
-document while i18next loads, so a measurement taken mid-boot sees NO visible element and every layout
-invariant passes vacuously (both geometry specs assert a non-empty measurement for exactly that reason);
-and a Playwright `testMatch` that selects nothing collects zero tests and reports success, which is why
-`scripts/check-cross-browser-selection.mjs` asks Playwright whether each engine actually has work.
+The checklist (exit code without a pipe, prove the gate can go red, name the condition under which a
+green would have been red): `.cursor/rules/agent-pipeline.mdc` § 4.1a — one home.
 
 ---
 
 ## Content variance
 
-Any component that renders authored copy must be proven against content it has not seen. The states are
-in `src/pages/DevPlayground/stressMatrix.ts`: `minimal` / `typical` / `long` / `unbroken` for text, and
-`none` / `one` / `many` for collections. `unbroken` is the one that finds a missing wrap guard — a long
-sentence wraps on its spaces and hides the defect.
-
-Two rules that come from having got this wrong:
-
-- **The RANGE a guard covers is part of its specification.** A guard proven at one viewport width proves
-  almost nothing: a defect "fixed" at 390 commonly just moves to 1024. Both geometry specs sweep
-  390 / 640 / 768 / 1024 / 1440, and a new one must too.
-- **A wrap class with no red-to-green proof gets deleted.** Remove the class, run the harness, and if
-  nothing goes red at any width in any state, it was decoration — and defensive decoration in a shared
-  component is what the next author copies.
+The rule: `AGENTS.md` § Critical rules › Content variance. Why and what it found: `DECISIONS.md`
+§ Content variance is measured in a browser.
 
 ---
 
 ## Pre-commit vs the gate
 
 Pre-commit is **repo-scoped**, not staged-scoped: `lint-staged` fixes and re-stages the staged set, then
-the hook runs `lint:oxlint` and `format:check` over the whole repo and refuses the commit if either
-fails. Reason: for a partially staged file `lint-staged` restores the unstaged hunks *after* fixing, so
-formatting drift used to survive the commit and fail at push, leaving files that were already fixed and
-never committed.
+the hook runs `lint:oxlint`, `format:check` and `typecheck` over the whole repo and refuses the commit if
+any fails. Why the repo-wide pass exists: `DECISIONS.md` [2026-07] § Pre-commit is repo-scoped. Remedy on
+refusal: `npm run fix && git add -u`.
 
 The same hook blocks a staged `src` logic file with no co-located `*.test.*`
 (`scripts/check-test-siblings.mjs`). It inspects only staged files, so it ratchets forward rather than
@@ -184,6 +142,5 @@ folder does not count.
 
 ## Brain sync
 
-If you add or change a script, a CI step or a hook, update this file **and** `PROJECT_CONTEXT.md`
-(Dev Tooling) **and** the `AGENTS.md` command list in the same change. Three places describe the gate,
-and all three have been stale at the same time before.
+If you add or change a script, a hook or a CI step: the `AGENTS.md` command table (the home) and, for
+mechanics or timings, this file.

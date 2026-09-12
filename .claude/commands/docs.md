@@ -14,6 +14,8 @@ until the operator approves them.**
 - `.cursor/brain/DECISIONS.md` — append an entry when a decision was made and has a rationale that
   git history does not capture.
 - `.cursor/brain/TEMPLATE_SEEDS.md` — what must not be deleted as dead code.
+- `.cursor/brain/VERIFICATION.md` — mechanics and measured timings.
+- `.cursor/brain/READING_INDEX.md` — situations, pointers only.
 - `README.md` — only when the setup or the commands changed.
 
 Nothing else. Source files are not in scope for this command.

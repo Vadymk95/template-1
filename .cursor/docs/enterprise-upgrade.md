@@ -31,19 +31,7 @@ npx storybook@latest init
 
 ## 2. E2E Testing — Playwright
 
-**Why Playwright over Cypress:**
-- Native multi-browser (Chromium, Firefox, WebKit)
-- No iframe restrictions
-- Faster parallel execution
-- Better TypeScript support
-- Free, no Dashboard paywall for parallelism
-
-```bash
-npm install -D @playwright/test
-npx playwright install
-```
-
-**Config:** `playwright.config.ts` at root, tests in `e2e/` directory.
+**Already in the template:** `@playwright/test` is installed, `playwright.config.ts` sits at the root, specs live in `e2e/`, and the prod-mode suite runs inside `npm run verify` (see `AGENTS.md` § the gate). Nothing to install.
 
 **Critical flows to test first:**
 1. Auth flow (login → redirect → logout) — shell already exists in `src/pages/LoginPage/`
@@ -220,16 +208,15 @@ npm install date-fns
 
 ## 11. CI/CD Enhancements
 
-Current CI covers: audit, lint (oxlint + ESLint), format, type-check, test with coverage enforcement, build.
+Current CI covers: the full `verify:ci` chain (audit gate, oxlint + ESLint, format, type-check, coverage, build, web-vitals chunks, size-limit, Playwright e2e) plus the `dev-smoke`, `cross-browser`, security and weekly mutation jobs.
 
 **Add for production:**
 
 ```yaml
 # .github/workflows/ci.yml additions
 
-# 1. Bundle size check — fail PR if a chunk exceeds budget
-- uses: andresz1/size-limit-action@v1
-  # requires size-limit config in package.json
+# 1. Bundle size check — ALREADY IN: `.size-limit.json` + `npm run size:check`
+#    run inside `verify`; nothing to add here
 
 # 2. Lighthouse CI — catch performance regressions
 - uses: treosh/lighthouse-ci-action@v10
@@ -274,7 +261,7 @@ Current CI covers: audit, lint (oxlint + ESLint), format, type-check, test with 
 
 **Dependency scanning:**
 - GitHub Dependabot is already configured ✅
-- `npm audit --audit-level=moderate` in CI ✅
+- `scripts/audit-gate.mjs` (fail-closed on high/critical, self-expiring allowlist) in `verify:ci` ✅
 - Consider `socket.dev` for supply chain attack detection
 
 ---
@@ -314,7 +301,7 @@ These are fully implemented — no action needed:
 |------|-------|-------|
 | **Logger** | `src/lib/logger.ts` | Dev: browser-styled console. Prod: structured JSON. Wire to Sentry in prod branch when ready. |
 | **Env validation** | `src/env.ts` | t3-env + zod. Add new `VITE_*` vars there + `.env.example`. |
-| **Coverage** | `vitest.config.ts` + CI | Enforced in CI via `test:coverage`. Thresholds: 45/45/40/40 (statements/lines/functions/branches). Raise as you add tests. |
+| **Coverage** | `vitest.config.ts` + CI | Enforced in CI via `test:coverage`. Thresholds: 57/57/48/48 (statements/lines/functions/branches). Raise as you add tests. |
 | **MSW** | `src/test/handlers.ts` + `src/test/server.ts` | Network-level mocking for unit tests. `@testing-library/user-event` also installed. |
 | **Web Vitals** | `src/lib/vitals.ts` | LCP, CLS, INP, FCP, TTFB. Lazy-loaded. Wire `reportToAnalytics` to your analytics provider. |
 | **Type-aware ESLint** | `eslint.config.js` | `strictTypeChecked` + `parserOptions.projectService`. Catches `no-floating-promises`, `no-misused-promises`, `prefer-nullish-coalescing`, etc. |

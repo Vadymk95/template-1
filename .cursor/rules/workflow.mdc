@@ -19,6 +19,8 @@ Gate by **risk, not LOC**.
 
 **FORBIDDEN**: Starting implementation of a non-trivial task before approval.
 
+For a task bigger than a one-sentence diff the approval is the non-author PR review of `SPEC.md`/`PLAN.md` (`AGENTS.md` › Before code); the table above is the chat-level gate for tasks below that size.
+
 ## Scope Discipline
 
 - **Flag unrequested work the MOMENT it appears**, not in the final write-up. A padding fix that
@@ -29,24 +31,13 @@ Gate by **risk, not LOC**.
   toward legacy lines; that temptation is how a one-file fix becomes a refactor. Discovered debt gets
   its own issue, never this diff.
 
-## Planning Requirements
+## Planning
 
-A plan must include:
-
-1. Files to be modified/created.
-2. Brief description of change per file.
-3. Test strategy: which parts use strict TDD, which use hybrid.
-4. Any SKELETONS zones touched.
+A plan is `.cursor/<feature-slug>/PLAN.md`, copied from `.cursor/templates/PLAN.md` (law: `AGENTS.md` › Before code).
 
 ## Implementation Workflow
 
-1. **Discover** — Brain scan + scope declaration (Phase 1 of agent-pipeline).
-2. **Simulate** — `sequential-thinking` for tasks > 3 steps. Architectural critique.
-3. **Approve** — Get approval by risk: SKELETONS zone, store / Query contract, API payload contract, or router touched.
-4. **Execute** — TDD for logic. Max 1–2 files per iteration.
-5. **Verify** — iterate with `npm run verify:iter`; the full chain belongs to the pre-push hook and CI, never to a hand-run (tier law: `AGENTS.md` § the gate).
-6. **Brain Sync** — Update brain docs in `.cursor/brain/` (`MAP.md`, `DECISIONS.md`, `SKELETONS.md`, `DICTIONARY.md`) as needed.
-7. **Confidence** — Declare HIGH | MEDIUM | LOW.
+The steps: `agent-pipeline.mdc` (Discover → Simulate → Execute → Verify → Brain Sync → Confidence); the Approve step sits between Simulate and Execute and is § The Approval Law above.
 
 ## Hook vs Utility Extraction Policy (MANDATORY)
 
@@ -57,15 +48,7 @@ A plan must include:
 
 ## Post-Edit Verification
 
-After every change run the iteration tier — seconds, not minutes:
-
-```bash
-npm run verify:iter  # oxlint → tsc (incremental) → vitest --changed (only the tests your uncommitted diff reaches)
-```
-
-Touched a Playwright-covered surface? Run that ONE spec: `npm run e2e:one -- e2e/<file>.spec.ts` (free port, traced).
-
-Everything else — the push, CI, prohibitions, drill-down scripts — is `AGENTS.md` § Commands / the gate › _The tier law_, not restated here.
+After every change: `agent-pipeline.mdc` § 4.1 (the iteration tier).
 
 ## Git Commits
 

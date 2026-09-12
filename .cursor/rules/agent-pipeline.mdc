@@ -11,11 +11,11 @@ priority: 100
 
 ---
 
-## Phase 1: Deep Discovery (mandatory)
+## Step 1: Deep Discovery (mandatory)
 
-### Phase 1 Fast-Track
+### Step 1 Fast-Track
 
-If the task targets **only** files matching `*.css`, `*.i18n.*`, `public/locales/**/*.json`, `*.spec.ts`, `*.test.ts`, or `*.md` — skip Brain reads and proceed directly to Phase 3. State: `"Phase 1 skipped — styling/i18n/test/docs task."` Still emit the **Rule Receipt** (step 7 below) for the conditional rules the task area maps to. When in doubt → run full Phase 1.
+If the task targets **only** files matching `*.css`, `*.i18n.*`, `public/locales/**/*.json`, `*.spec.ts`, `*.test.ts`, or `*.md` — skip Brain reads and proceed directly to Step 3. State: `"Step 1 skipped — styling/i18n/test/docs task."` Still emit the **Rule Receipt** (step 7 below) for the conditional rules the task area maps to. When in doubt → run full Step 1.
 
 ---
 
@@ -29,11 +29,11 @@ Before any reasoning about implementation:
 6. **Rule Receipt**: List the conditional `.mdc` rules actually loaded (e.g. `Rules loaded: react-patterns, performance, engineering-standards`). If none apply, state `"Rules loaded: none (always-on only)."`
 7. **Explicit declaration**: State in one message: scope + SKELETONS zones touched (or "none"). Do not code before this.
 
-> **Gate**: If task touches a SKELETONS zone — flag the risk and propose mitigation before Phase 2.
+> **Gate**: If task touches a SKELETONS zone — flag the risk and propose mitigation before Step 2.
 
 ---
 
-## Phase 2: Architectural Simulation
+## Step 2: Architectural Simulation
 
 ### Inference-Time Scaling
 
@@ -58,11 +58,11 @@ After the critique, generate **1–2 mental test cases** per non-trivial functio
 - Trace execution: "Given X, step 1 does A, step 2 does B, result is Y."
 - If trace reveals unexpected result — revise plan **before writing code**.
 
-> **Gate**: Present Architectural Critique. Gate by **risk, not LOC** — if the task touches a SKELETONS danger zone, a Zustand store / TanStack Query contract, an API payload contract, or the router: wait for approval (**The Approval Law** from `workflow.mdc`). Trivial leaf edits proceed with brief notification.
+> **Gate**: Present Architectural Critique. Gate by **risk, not LOC** (the risk list: `workflow.mdc` § The Approval Law). Trivial leaf edits proceed with brief notification.
 
 ---
 
-## Phase 3: TDD-First Execution
+## Step 3: TDD-First Execution
 
 ### For Business Logic (stores, hooks, utils)
 
@@ -77,7 +77,7 @@ Implement directly → write integration tests via `renderWithProviders`.
 
 ### Iteration Protocol
 
-- **Batch size**: 1–2 files per iteration. Never modify > 2 files without intermediate verification.
+- **Batch size**: 1–2 files per iteration (an iteration is what sits between two `verify:iter` runs, INSIDE one PLAN slice — the slice is the 2-7 × <400-line unit of `AGENTS.md` › Before code). Never modify > 2 files without intermediate verification.
 - **Ghost Principle enforcement**: After each edit — "Did I modify ONLY what the task requires?"
 - **Pattern check**: Before writing new code — confirm no existing pattern already solves it.
 - **Style lock**: Match exact indentation (4 spaces), naming, formatting of surrounding code. Zero drift.
@@ -95,7 +95,7 @@ Implement directly → write integration tests via `renderWithProviders`.
 
 ---
 
-## Phase 4: Autonomous Verification Loop
+## Step 4: Autonomous Verification Loop
 
 ### 4.1 Automated Checks
 
@@ -120,7 +120,7 @@ Green means nothing until you know the gate can go red.
    to `tail` returns the PIPE's status, so a failed build reads as a pass.
 2. **Mutation-check the tests (revert to prove failure)** — the manual discipline, not the
    `npm run test:mutation` StrykerJS gate: if mentally reverting your change leaves the suite green,
-   the test is worthless. Writing a test is Phase 3; proving it would have failed is this step.
+   the test is worthless. Writing a test is Step 3; proving it would have failed is this step.
 3. **Prove a new gate gates**: break it on purpose once — an expired entry in
    `scripts/audit-allowlist.json`, a raw hex in a component, a staged `src` logic file with no
    `*.test.*` sibling — and watch it refuse. Then revert the sabotage.
@@ -138,9 +138,7 @@ Green means nothing until you know the gate can go red.
    `npm run smoke:dev` for the dev-only fixture; `npm test` cannot see any of it, because jsdom has
    no layout.
 7. **Do not reason about what a browser does — run it.** `CROSS_BROWSER=1` adds Firefox and WebKit to
-   the geometry specs. Measured here rather than predicted: Firefox reports `clientWidth: 0` for an
-   inline `<label>` (CSSOM says an inline box has no client box) while Chromium reports a box, so a rule
-   about content overflow was asking a question one engine cannot answer.
+   the geometry specs (measured: `DECISIONS.md` § Cross-engine coverage).
 
 ### 4.2 Self-Correction with Root Cause Analysis
 
@@ -162,13 +160,13 @@ If any check fails:
 
 Re-read every changed file and verify:
 
-1. **Plan alignment**: Does diff match Phase 2 simulation? Flag unplanned additions.
+1. **Plan alignment**: Does diff match Step 2 simulation? Flag unplanned additions.
 2. **Ghost Principle final check**: Anything outside original scope?
 3. **Regression scan**: Could any removed/changed line break an existing caller?
 
 ---
 
-## Phase 5: Brain Auto-Sync
+## Step 5: Brain Auto-Sync
 
 Before marking task complete:
 
@@ -184,7 +182,7 @@ Before marking task complete:
 
 ---
 
-## Phase 6: Confidence Declaration
+## Step 6: Confidence Declaration
 
 Every task MUST end with:
 

@@ -150,6 +150,8 @@ message initialised and then unconditionally overwritten in both branches below 
 
 ## [2026-05] `size-limit` per-chunk brotli budget — `ci:local` gate
 
+**Superseded by "[2026-07] The gate is `verify`; `verify` is a superset of CI" above — `ci:local` is now an alias of `verify:ci`; kept for the reasoning.**
+
 **Decision**: add `size-limit@^12.1.0` + `@size-limit/preset-app@^12.1.0` devDeps + `npm run size:check` script + `.size-limit.json` config with per-chunk brotli budgets. Wired into `ci:local` AFTER `verify:web-vitals-chunks` (asserts size, not composition — orthogonal to existing script). Per /consilium 2026-05-23 APPLY Item 6 (5/6 YES, 1 COND satisfied by pre-flight overlap check).
 
 **Why**: `scripts/check-web-vitals-chunks.mjs` asserts chunk _composition_ (subscribeStandard vs subscribeAttribution split correctness), NOT chunk _size_. `chunkSizeWarningLimit: 600` (KB raw) in `vite.config.ts` is a Vite _warning_, not a CI fail. No per-chunk byte-budget gate currently exists. `size-limit` 868K weekly DLs is ~10× over `bundlesize@85K` (May 2026 npm registry direct) — clear winner.
@@ -218,6 +220,8 @@ message initialised and then unconditionally overwritten in both branches below 
 ---
 
 ## [2026-04] Verification guide (`.cursor/brain/VERIFICATION.md`) + `ci:local`
+
+**Superseded by "[2026-07] The gate is `verify`; `verify` is a superset of CI" above — `ci:local` is now an alias of `verify:ci`; kept for the reasoning.**
 
 **Decision**: `.cursor/brain/VERIFICATION.md` defines minimal checks per task type; `npm run ci:local` mirrors CI with extras (audit, size). Agents should read it and avoid running audit/build/vitals-analyze for every trivial edit.
 
@@ -342,6 +346,8 @@ to be `settings.react.version: 'detect'`. Kept for the reasoning, not as current
 ---
 
 ## [2026-03] CI: production build + audit + Dependabot
+
+**Superseded by "[2026-07] The gate is `verify`; `verify` is a superset of CI" above — CI is one `verify:ci` step and `ci:local` an alias of it; kept for the reasoning.**
 
 **Decision**: GitHub Actions runs `npm ci` → audit → `typecheck` → `lint:oxlint` → `lint` (ESLint) → `format:check` → `test:coverage` → **`npm run build`** → **Web Vitals chunk verification** (`node scripts/check-web-vitals-chunks.mjs` on `dist/`). Triggers on PR and push to `master`. Dependabot opens weekly npm update PRs (capped at 8 open).
 

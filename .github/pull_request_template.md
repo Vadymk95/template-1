@@ -11,7 +11,7 @@
 <!-- Not "the gate is green" — what did you actually run and observe?
      Include the failure you reproduced first, if this is a fix. -->
 
-- [ ] `npm run verify` green locally (exit code checked without a pipe: `npm run verify > log 2>&1; echo $?`)
+- [ ] The push gate ran and printed its stages (`verify:push`; silence is a failure) — exit code read without a pipe
 - [ ] New behaviour is covered by a test that FAILS when the change is reverted
 - [ ] Visual check at 390 / 768 / 1440 in both themes, if any UI changed
 

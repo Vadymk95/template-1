@@ -83,7 +83,7 @@ describe('userStore', () => {
 ## 7. Commands
 
 ```bash
-npm test              # vitest run (CI)
+npm test              # vitest run (the gate runs test:coverage)
 npm run test:watch    # vitest watch (development)
 npm run test:coverage # coverage report
 ```

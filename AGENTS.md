@@ -14,7 +14,7 @@ Production-ready React 19 + Vite 8 (Rolldown) + TypeScript 6.0 SPA template — 
 
 ## Stack
 
-React 19 · TypeScript 6.0 strict · Vite 8 (Rolldown) · Tailwind **v4** · shadcn/ui · Zustand 5 · TanStack Query 5 · React Router 7 · i18next · Vitest 4.1 · Playwright
+React 19 · TypeScript 6.0 strict · Vite 8 (Rolldown) · Tailwind **v4** · shadcn/ui · Zustand 5 · TanStack Query 5 · React Router 7 · i18next · Vitest 5 · Playwright
 
 ## Critical rules
 
@@ -207,8 +207,8 @@ a mandatory `dev-smoke` job instead, so it cannot be forgotten.
 **Pre-commit is repo-scoped, not staged-scoped.** `lint-staged` fixes and re-stages what you are
 committing, but for a partially staged file it restores the unstaged hunks _after_ fixing — so
 formatting drift used to survive a commit and only fail at push, leaving "already fixed but never
-committed" files in the tree. The hook now also runs `lint:oxlint` and `format:check` over the whole
-repo and refuses the commit, naming the remedy: `npm run fix && git add -u`.
+committed" files in the tree. The hook now also runs `lint:oxlint`, `format:check` and `typecheck` over
+the whole repo and refuses the commit, naming the remedy: `npm run fix && git add -u`.
 
 **Bootstrap after clone**: `npm run prepare` (once) — `.npmrc` disables lifecycle
 scripts as a supply-chain guard, so husky hooks don't install themselves; the
