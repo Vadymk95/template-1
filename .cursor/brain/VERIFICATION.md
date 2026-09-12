@@ -18,6 +18,10 @@ always runs the full chain — the phase gates only the LOCAL hook.
 | dev-server smoke (content variance) | CI `dev-smoke` job, every PR | unchanged by phases |
 | mutation score | weekly CI | unchanged by phases |
 
+Measured here (`.gate-trace.log`, 2026-09-06 / 2026-09-11): a phase-0 push 16-26 s; the full chain
+(`GATE_PHASE=full`, or phase 1) 73.7 / 77.6 s — which is why the `push` budget in `gate-tiers.json` is 90 s;
+`verify:iter` 4.6-12.6 s; `verify:measure` 5.0 s; the mutation run 3m25s (`mutation.yml`).
+
 ## The tracer — how it works (the RULES it enforces are the tier law)
 
 Every `verify*` and `test:e2e` run appends one TSV row to `.gate-trace.log` (gitignored);

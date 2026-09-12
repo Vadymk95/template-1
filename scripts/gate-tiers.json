@@ -92,7 +92,7 @@
             "description": "Husky pre-push -> verify:push (phase-aware). Runs unconditionally, never shortened by what the diff touched.",
             "expected": ["verify:push"],
             "forbidden": [],
-            "budgetSeconds": 60,
+            "budgetSeconds": 90,
             "runsRegardlessOfDiff": true,
             "requiresMainCheckout": true
         }
