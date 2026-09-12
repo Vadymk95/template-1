@@ -239,9 +239,6 @@ VITE_ENABLE_MSW=false
 | `npm run docs:check`               | Mechanical doc drift: paths, scripts, sentinels, versions, dead docs |
 | `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist          |
 | `npm run bench:verify`             | The gate step by step with timings                                   |
-| `npm run build:analyze`            | Production build plus the bundle analysis report                     |
-| `npm run verify:web-vitals-chunks` | The web-vitals chunk guard (`:full` variant runs the full analysis)  |
-| `npm run size:check`               | Brotli size budgets from `.size-limit.json`                          |
 | `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job             |
 | `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                     |
 | `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks                     |
