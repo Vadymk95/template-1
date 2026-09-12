@@ -63,7 +63,12 @@ describe('resolvePushPlan (pure)', () => {
     it('phase 0 routes to the scaffold chain and names every skipped stage', () => {
         const plan = resolvePushPlan({ phase: 0, override: undefined });
         expect(plan.target).toBe('verify:scaffold:push');
-        expect(plan.skipped).toEqual(['build', 'test:e2e:prod', 'smoke:dev']);
+        expect(plan.skipped).toEqual([
+            'build',
+            'verify:web-vitals-chunks',
+            'size:check',
+            'test:e2e:prod'
+        ]);
     });
 
     it('phase 1 routes to the full verify:ci chain with nothing skipped', () => {
@@ -117,7 +122,9 @@ describe('verify-push CLI (fixture package)', { timeout: 20_000 }, () => {
         const verdict = runDispatcher(dir);
         expect(verdict.code).toBe(0);
         expect(verdict.output).toContain('PHASE 0');
-        expect(verdict.output).toContain('build, test:e2e:prod, smoke:dev');
+        expect(verdict.output).toContain(
+            'build, verify:web-vitals-chunks, size:check, test:e2e:prod'
+        );
         expect(verdict.output).toContain('"phase": 1');
     });
 

@@ -1,7 +1,7 @@
 {
     "_description": "The gate discipline as data. scripts/trace-report.mjs reads this instead of hardcoding stage names; scripts/verify-push.mjs reads `phase`. Editing THIS file is how the discipline changes; the analyser names no stage. Docs: .cursor/brain/VERIFICATION.md (phases + triggers).",
     "phase": 0,
-    "_phaseMeaning": "0 = scaffold (pre-deploy): the push gate runs audit + hooks + format + types + lint + coverage and SKIPS build/web-vitals-chunks/size/e2e \u2014 there is no prod boundary to guard before the first deploy. 1 = deployed: the push gate runs the full verify:ci chain. Flip with a one-line commit at the FIRST DEPLOY; GATE_PHASE=full overrides per run (template maintainers push gate machinery with it).",
+    "_phaseMeaning": "0 = scaffold (pre-deploy): the push gate runs audit + hooks + oxlint + format + types + lint + coverage and SKIPS build/web-vitals-chunks/size/e2e \u2014 there is no prod boundary to guard before the first deploy. 1 = deployed: the push gate runs the full verify:ci chain. Flip with a one-line commit at the FIRST DEPLOY; GATE_PHASE=full overrides per run (template maintainers push gate machinery with it).",
     "checks": {
         "verify:iter": {
             "class": "code",
@@ -50,12 +50,20 @@
         "smoke:dev": {
             "class": "code",
             "description": "dev-server smoke on its own port"
+        },
+        "e2e:one": {
+            "class": "code",
+            "description": "one Playwright spec on a free port"
+        },
+        "test:one": {
+            "class": "code",
+            "description": "one vitest file"
         }
     },
     "moments": {
         "iterate": {
             "description": "The desk. Run per change.",
-            "expected": ["verify:iter"],
+            "expected": ["verify:iter", "e2e:one", "test:one"],
             "forbidden": [
                 "verify",
                 "verify:ci",

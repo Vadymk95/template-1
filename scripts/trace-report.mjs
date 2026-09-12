@@ -5,9 +5,9 @@
  * budgets and class; nothing here names a stage. That is what lets the discipline change by
  * editing the JSON alone.
  *
- * What this CAN see, proved by scripts/trace-report.test.ts against the three failures named in
+ * What this CAN see, proved by scripts/trace-report.test.mjs against the three failures named in
  * the founder's request:
- *   1. a stage forbidden at the moment it ran in (e.g. verify:enterprise run standalone, not
+ *   1. a stage forbidden at the moment it ran in (e.g. build run standalone, not
  *      nested inside a push) — flagged both as "forbidden" and, separately, as over budget.
  *   2. a push-moment run whose toplevel was a linked worktree rather than the main checkout.
  *   3. a code-class check run against a docs-only change, at a moment whose own rule is that
@@ -94,7 +94,7 @@ export const parseLog = (content) =>
 /**
  * A run is NESTED when another run at the same toplevel fully contains its time window and took
  * strictly longer — the shape every `npm run` chain in this repo produces (verify:full contains
- * verify:ci contains verify contains verify:enterprise contains lint and build). A nested run is
+ * verify:ci contains verify contains build). A nested run is
  * a sub-step of something already accounted for, not a standalone decision to check.
  */
 export const isNested = (candidate, siblingRows) =>
