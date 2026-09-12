@@ -29,6 +29,9 @@ updates:
       # eslint: the repo IS on 10.x. The floor is `>=11` so patches and minors
       # inside 10 still arrive; a major would again outrun the plugin peers that
       # `overrides` currently map to `$eslint`.
+      #
+      # @types/node: aligned with `engines.node >=24` (Node 24 LTS), not the newest
+      # type defs. Re-evaluate when `engines.node` bumps.
       ignore:
           - dependency-name: typescript
             versions: ['>=6.1']
@@ -36,6 +39,8 @@ updates:
             versions: ['>=11']
           - dependency-name: '@eslint/js'
             versions: ['>=11']
+          - dependency-name: '@types/node'
+            versions: ['>=25']
 
     - package-ecosystem: github-actions
       directory: '/'
