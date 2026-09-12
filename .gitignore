@@ -57,6 +57,7 @@ reports
 !.claude/commands/**
 .claude/settings.local.json
 .claude/settings.json
+.claude/worktrees/
 
 .gate-trace.log
 
