@@ -166,7 +166,7 @@ message initialised and then unconditionally overwritten in both branches below 
 
 **Conditions** (Pragma + Mini /consilium): budgets live in standalone `.size-limit.json` (not `package.json` `"size-limit"` key) to keep diff noise low and isolate budget changes from dep-bump churn. Pre-flight verified zero overlap with `verify:web-vitals-chunks.mjs` (different verification axis).
 
-**Revisit trigger (60-day, 2026-07-23)**: if a fork hits ≥3 false-positive budget bumps from legitimate feature work in 60 days, recalibrate budgets to p75 of fork-distribution OR move size-limit out of `ci:local` into PR-comment-only (size-limit GH Action). If size-limit `--why` flag reports same vendor exceeding budget across 3 forks, raise the budget structurally.
+**Revisit trigger (60-day, 2026-07-23; checked 2026-09-12, no fork data yet, re-armed 2026-12-01)**: if a fork hits ≥3 false-positive budget bumps from legitimate feature work in 60 days, recalibrate budgets to p75 of fork-distribution OR move size-limit out of `ci:local` into PR-comment-only (size-limit GH Action). If size-limit `--why` flag reports same vendor exceeding budget across 3 forks, raise the budget structurally.
 
 ## [2026-05] REJECT list — explicit non-adoption (2026-05-23 /consilium)
 
@@ -175,22 +175,22 @@ message initialised and then unconditionally overwritten in both branches below 
 ### React Compiler enable in template-1 (VETOED)
 
 **Status**: skip. **Why**: /consilium 2026-05-23 Item 2 (`babel-plugin-react-compiler@1.0.0` + `@rolldown/plugin-babel`) — 1 YES / 3 NO / 2 COND + **Adversarial killer Q VETO** ("Name one Compiler-enabled production app at >100K MAU where #35105 or #35644 reproducers have been ruled out as of 2026-05-23" — unanswerable) + **ADR conflict**: reverses `[2026-03] @vitejs/plugin-react v6` Oxc-no-Babel decision. [Vite team Mar 2026 blog](https://vite.dev/blog/announcing-vite8) warns "adding babel-loader will eliminate most Oxc gains" — build-speed regression is concrete, Compiler benefit (Makarevich N=1 mixed-positive: 1-2 of 8-10 re-renders fixed) is workload-dependent. Open silent-bailout bugs: [facebook/react#35105](https://github.com/facebook/react/issues/35105), [#35644](https://github.com/facebook/react/issues/35644) (`Status: Unconfirmed`, no assignees, May 2026).
-**Revisit (quarterly, 2026-08-23)**: if either bug closes AND ≥1 named >100K-MAU Compiler-enabled Vite app publishes "ruled out" retro AND Vite team blesses Babel-Compiler-Vite path explicitly, re-evaluate. `eslint-plugin-react-hooks@7.1.1` already loaded in `eslint.config.js` (`flat['recommended-latest']`) — Compiler correctness rules already fire as lint-only signal (no Compiler runtime needed for lint).
+**Revisit (quarterly, 2026-08-23; checked 2026-09-12: #35105 and #35644 both still open, hold stands, next 2026-12-01)**: if either bug closes AND ≥1 named >100K-MAU Compiler-enabled Vite app publishes "ruled out" retro AND Vite team blesses Babel-Compiler-Vite path explicitly, re-evaluate. `eslint-plugin-react-hooks@7.1.1` already loaded in `eslint.config.js` (`flat['recommended-latest']`) — Compiler correctness rules already fire as lint-only signal (no Compiler runtime needed for lint).
 
 ### Lighthouse CI in template-1 (not currently proposed, deferred)
 
 **Status**: skip. **Why**: template-1 is enterprise SPA without PWA contract — synthetic Lighthouse perf gate adds CI-time cost (see sibling `template-spa-pwa` LHCI for cost profile) without proportional signal. Sibling `template-spa-pwa` ships LHCI because PWA install + offline contracts depend on it.
-**Revisit (60-day, 2026-07-23)**: if a fork ships perf-critical SLA AND consumer requests LHCI gate, lift sibling template-spa-pwa lighthouserc as starting point.
+**Revisit (60-day, 2026-07-23; checked 2026-09-12, no fork with a perf SLA, re-armed 2026-12-01)**: if a fork ships perf-critical SLA AND consumer requests LHCI gate, lift sibling template-spa-pwa lighthouserc as starting point.
 
 ### React Doctor `lint-staged --staged --fail-on warning` PR-gate (REJECTED)
 
 **Status**: skip. **Why**: /consilium 2026-05-23 Item 1 — 0 YES / 4 NO / 2 COND. Pragma+Mini gang-of-two NO + Ergo category error ("Doctor is project-level scan, not staged-file linter") + Adversarial flagged [typicode/husky#1462](https://github.com/typicode/husky/issues/1462) Windows-path issues on cross-platform forks.
-**Revisit (60-day, 2026-07-23)**: if React Doctor 1.0 ships AND ≥1 dated bug observed in a fork that Doctor would have caught, re-evaluate scoped to ad-hoc `npm run doctor` + GitHub Action `millionco/react-doctor@<commit-sha>` (NOT `@main`) with `--offline` + PR comment only (NOT lint-staged blocking).
+**Revisit (60-day, 2026-07-23; checked 2026-09-12: react-doctor 0.9.14, no 1.0, re-armed 2026-12-01)**: if React Doctor 1.0 ships AND ≥1 dated bug observed in a fork that Doctor would have caught, re-evaluate scoped to ad-hoc `npm run doctor` + GitHub Action `millionco/react-doctor@<commit-sha>` (NOT `@main`) with `--offline` + PR comment only (NOT lint-staged blocking).
 
 ### memlab (Meta heap-snapshot leak detector)
 
 **Status**: skip by default. **Why**: 158K weekly DLs (May 2026), ZERO published GitHub releases ([facebook/memlab/releases](https://github.com/facebook/memlab/releases)), 0 of 8 React Doctor leaderboard flagship repos use in CI.
-**Revisit (90-day, 2026-08-23)**: if memlab ships v2.0+ with formal releases AND ≥1 named React app at >10K MAU publishes a memlab-CI case study, re-evaluate.
+**Revisit (90-day, 2026-08-23; checked 2026-09-12: still zero GitHub releases, re-armed 2026-12-01)**: if memlab ships v2.0+ with formal releases AND ≥1 named React app at >10K MAU publishes a memlab-CI case study, re-evaluate.
 
 ### why-did-you-render (WDYR)
 
@@ -290,7 +290,7 @@ to be `settings.react.version: 'detect'`. Kept for the reasoning, not as current
 
 **Why**: `eslint-plugin-react@7.37.5` uses `context.getFilename()` + `sourceCode.isSpaceBetweenTokens` + `sourceCode.getAllComments` + RuleTester `type` field — all removed in ESLint 10 (runtime crash, not peer-warn). PR #3979 blocked transitively by `import-js/eslint-plugin-import#3230`. `eslint-plugin-jsx-a11y@6.10.2` peer caps `^9`, PR #1081 awaiting `ljharb` review since Mar 2026.
 
-**Revisit when**: monthly review starting 2026-07-01 (1-month buffer pre-EOL) (2026-07 cycle missed - next check 2026-08-01). Either (a) `eslint-plugin-react` ships release widening peer to `^10`, OR (b) `eslint-plugin-jsx-a11y@7.x` ships, OR (c) we adopt forks:
+**Closed 2026-09-12** (superseded, ESLint 10 is installed; the monthly review planned from 2026-07-01 no longer applies). The exit conditions were: either (a) `eslint-plugin-react` ships release widening peer to `^10`, OR (b) `eslint-plugin-jsx-a11y@7.x` ships, OR (c) we adopt forks:
 
 - `@eslint-react/eslint-plugin@5.8.4+` (peer `eslint ^10.3.0`, requires Node ≥22, NOT drop-in — rule rewrite)
 - `eslint-plugin-jsx-a11y-x@0.2.0+` (es-tooling org, peer `^9 || ^10`, drop-in)

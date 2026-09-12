@@ -92,7 +92,7 @@ If you adopt a nonce-based CSP, you must add the nonce attributes and matching C
 
 ### CI/CD Implementation Requirements
 
-This template is **not prewired** with CSP nonce automation. There is no built-in `postbuild` hook, `scripts/inject-nonce.js`, or nonce placeholder in `index.html`. Choose the approach based on your hosting platform and implement it in your delivery pipeline.
+This template is **not prewired** with CSP nonce automation. There is no built-in `postbuild` hook, a `scripts/<inject-nonce>.js` of your own, or nonce placeholder in `index.html`. Choose the approach based on your hosting platform and implement it in your delivery pipeline.
 
 #### Option 1: Static Hosting (Build-time Nonce)
 

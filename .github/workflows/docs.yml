@@ -1,0 +1,33 @@
+name: Docs
+
+# The mechanical half of doc drift (scripts/docs-check.mjs) runs in pre-commit when docs are
+# staged; this weekly job adds the one check that must not block a commit: revisit / trigger
+# dates that have passed. A missing trace log here is a loud skip, not a pass.
+
+on:
+    schedule:
+        # Weekly, offset from Security (Sunday 06:00) and Mutation (Monday 06:00).
+        - cron: '0 6 * * 2'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    docs:
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        env:
+            HUSKY: '0'
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 24.x
+                  cache: 'npm'
+            - run: npm ci --ignore-scripts
+            - run: npm run docs:check -- --weekly

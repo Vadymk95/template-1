@@ -58,12 +58,47 @@
         "test:one": {
             "class": "code",
             "description": "one vitest file"
+        },
+        "docs:check": {
+            "class": "docs",
+            "description": "mechanical doc drift: paths, scripts, sentinels, versions, command table, dead docs; the push budget vs traced pushes of the same phase (report only)"
+        }
+    },
+    "docs": {
+        "_description": "Data for scripts/docs-check.mjs. sentinels = verbatim fragments of the tier law that may live only in AGENTS.md; versions = doc names -> package names compared with package-lock.json (node -> .nvmrc).",
+        "sentinels": [
+            "never shortened by what the diff touched",
+            "Legal at any time, in any lane, never a violation",
+            "the pre-commit hook owns it",
+            "Parallel lanes never run heavy stages",
+            "A skipped stage is printed, never silent"
+        ],
+        "internalScripts": [
+            ":raw$",
+            "^verify:scaffold",
+            "^lint:staged$",
+            "^verify:web-vitals-chunks:full$"
+        ],
+        "versions": {
+            "Vitest": "vitest",
+            "Vite": "vite",
+            "React": "react",
+            "TypeScript": "typescript",
+            "Tailwind": "tailwindcss",
+            "Playwright": "@playwright/test",
+            "Zustand": "zustand",
+            "StrykerJS": "@stryker-mutator/core",
+            "Stryker": "@stryker-mutator/core",
+            "ESLint": "eslint",
+            "Prettier": "prettier",
+            "oxlint": "oxlint",
+            "Node": "node"
         }
     },
     "moments": {
         "iterate": {
             "description": "The desk. Run per change.",
-            "expected": ["verify:iter", "e2e:one", "test:one"],
+            "expected": ["verify:iter", "e2e:one", "test:one", "docs:check"],
             "forbidden": [
                 "verify",
                 "verify:ci",
@@ -82,7 +117,7 @@
         },
         "commit": {
             "description": "Husky pre-commit: staged autofix, TDD sibling gate, then repo-wide oxlint/format/tsc. Those run as direct commands, not traced npm scripts, so this moment is declared for completeness.",
-            "expected": [],
+            "expected": ["docs:check"],
             "forbidden": [],
             "budgetSeconds": 15,
             "runsRegardlessOfDiff": false,

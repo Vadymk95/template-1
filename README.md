@@ -99,7 +99,7 @@ After cloning, these are the exact files / symbols to edit to make the template 
 - **Husky + lint-staged** — git hooks for quality gates
 - **Commitlint** — conventional commits enforcement
 - **Vitest 5** — unit testing with Testing Library
-- **Playwright 1.62** — E2E tests; browsers installed on demand by `scripts/ensure-playwright.mjs`
+- **Playwright 1.63** — E2E tests; browsers installed on demand by `scripts/ensure-playwright.mjs`
 
 ## 🛠 Project Structure
 
@@ -208,40 +208,44 @@ VITE_ENABLE_MSW=false
 
 ### Available Scripts
 
-| Command                            | Description                                                        |
-| ---------------------------------- | ------------------------------------------------------------------ |
-| `npm run dev`                      | Start Vite dev server (port 3000)                                  |
-| `npm run build`                    | `tsc -b` + Vite production build (Oxc + Brotli)                    |
-| `npm run preview`                  | Serve production build locally                                     |
-| `npm run typecheck`                | Runs `tsc -b` (no emit)                                            |
-| `npm run lint`                     | Run ESLint                                                         |
-| `npm run lint:oxlint`              | Fast Oxc-based lint pass (pre-ESLint)                              |
-| `npm run format`                   | Format codebase with Prettier                                      |
-| `npm run format:check`             | Check code formatting                                              |
-| `npm test`                         | Run unit tests (Vitest)                                            |
-| `npm run test:watch`               | Run tests in watch mode                                            |
-| `npm run test:coverage`            | Run tests with coverage report                                     |
-| `npm run test:e2e`                 | Playwright E2E (vite dev locally unless preview)                   |
-| `npm run test:e2e:prod`            | Playwright against `vite preview` (verify gate)                    |
-| `npm run test:e2e:ui`              | Playwright UI mode                                                 |
-| `npm run fix`                      | The remedy: oxlint `--fix` → eslint `--fix` → prettier, repo-wide  |
-| `npm run verify`                   | **The gate** — every offline check (see below)                     |
-| `npm run verify:ci`                | `audit:gate && verify` — the CI chain; the push runs it in phase 1 |
-| `npm run ci:local`                 | Alias of `verify:ci`                                               |
-| `npm run verify:iter`              | Iteration tier: oxlint → tsc → vitest --changed; run per change    |
-| `npm run verify:measure`           | MEASURE moment: build + look (`-- e2e/<f>.spec.ts` for one spec)   |
-| `npm run verify:full`              | `verify:ci` + `smoke:dev` — adds the content-variance fixture      |
-| `npm run smoke:dev`                | The content-stress fixture alone, against `vite dev`               |
-| `npm run e2e:one -- <spec>`        | One Playwright spec, FREE port, through the tracer                 |
-| `npm run probe -- <route>`         | LOOK: render, screenshot per width, print measured quantities      |
-| `npm run test:one -- <file>`       | One unit test file, through the tracer (not around it)             |
-| `npm run trace:report`             | Findings from `.gate-trace.log`: moments, budgets, worktrees       |
-| `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist        |
-| `npm run bench:verify`             | The gate step by step with timings                                 |
-| `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job           |
-| `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                   |
-| `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks                   |
-| `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                                 |
+| Command                            | Description                                                          |
+| ---------------------------------- | -------------------------------------------------------------------- |
+| `npm run dev`                      | Start Vite dev server (port 3000)                                    |
+| `npm run build`                    | `tsc -b` + Vite production build (Oxc + Brotli)                      |
+| `npm run preview`                  | Serve production build locally                                       |
+| `npm run typecheck`                | Runs `tsc -b` (no emit)                                              |
+| `npm run lint`                     | Run ESLint                                                           |
+| `npm run lint:oxlint`              | Fast Oxc-based lint pass (pre-ESLint)                                |
+| `npm run format`                   | Format codebase with Prettier                                        |
+| `npm run format:check`             | Check code formatting                                                |
+| `npm test`                         | Run unit tests (Vitest)                                              |
+| `npm run test:watch`               | Run tests in watch mode                                              |
+| `npm run test:coverage`            | Run tests with coverage report                                       |
+| `npm run test:e2e`                 | Playwright E2E (vite dev locally unless preview)                     |
+| `npm run test:e2e:prod`            | Playwright against `vite preview` (verify gate)                      |
+| `npm run test:e2e:ui`              | Playwright UI mode                                                   |
+| `npm run fix`                      | The remedy: oxlint `--fix` → eslint `--fix` → prettier, repo-wide    |
+| `npm run verify`                   | **The gate** — every offline check (see below)                       |
+| `npm run verify:ci`                | `audit:gate && verify` — the CI chain; the push runs it in phase 1   |
+| `npm run ci:local`                 | Alias of `verify:ci`                                                 |
+| `npm run verify:iter`              | Iteration tier: oxlint → tsc → vitest --changed; run per change      |
+| `npm run verify:measure`           | MEASURE moment: build + look (`-- e2e/<f>.spec.ts` for one spec)     |
+| `npm run verify:full`              | `verify:ci` + `smoke:dev` — adds the content-variance fixture        |
+| `npm run smoke:dev`                | The content-stress fixture alone, against `vite dev`                 |
+| `npm run e2e:one -- <spec>`        | One Playwright spec, FREE port, through the tracer                   |
+| `npm run probe -- <route>`         | LOOK: render, screenshot per width, print measured quantities        |
+| `npm run test:one -- <file>`       | One unit test file, through the tracer (not around it)               |
+| `npm run trace:report`             | Findings from `.gate-trace.log`: moments, budgets, worktrees         |
+| `npm run docs:check`               | Mechanical doc drift: paths, scripts, sentinels, versions, dead docs |
+| `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist          |
+| `npm run bench:verify`             | The gate step by step with timings                                   |
+| `npm run build:analyze`            | Production build plus the bundle analysis report                     |
+| `npm run verify:web-vitals-chunks` | The web-vitals chunk guard (`:full` variant runs the full analysis)  |
+| `npm run size:check`               | Brotli size budgets from `.size-limit.json`                          |
+| `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job             |
+| `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                     |
+| `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks                     |
+| `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                                   |
 
 ### The gate
 

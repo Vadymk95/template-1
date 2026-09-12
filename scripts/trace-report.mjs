@@ -34,17 +34,19 @@ const LOG_FIELD_NAMES = [
     'branch',
     'toplevel',
     'worktreeKind',
-    'changeClass'
+    'changeClass',
+    'phase'
 ];
+const LEGACY_FIELD_COUNT = LOG_FIELD_NAMES.length - 1;
 
 export const parseLogLine = (line, lineNumber) => {
     const fields = line.split('\t');
-    if (fields.length !== LOG_FIELD_NAMES.length) {
+    if (fields.length !== LOG_FIELD_NAMES.length && fields.length !== LEGACY_FIELD_COUNT) {
         return {
             malformed: true,
             lineNumber,
             raw: line,
-            reason: `expected ${LOG_FIELD_NAMES.length} tab-separated fields, got ${fields.length}`
+            reason: `expected ${LEGACY_FIELD_COUNT} or ${LOG_FIELD_NAMES.length} tab-separated fields, got ${fields.length}`
         };
     }
 

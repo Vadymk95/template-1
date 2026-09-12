@@ -18,7 +18,7 @@
  * Usage: node scripts/gate-trace.mjs <label> -- <command> [args...]
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const LOG_FILE_NAME = '.gate-trace.log';
@@ -79,6 +79,24 @@ export const resolveMainCheckoutRoot = (cwd, exec = gitOutput) =>
 export const resolveLogPath = (cwd, exec = gitOutput) =>
     path.join(resolveMainCheckoutRoot(cwd, exec), LOG_FILE_NAME);
 
+/**
+ * The gate phase this run happened in: `full` when GATE_PHASE=full overrides, else the `phase` of
+ * scripts/gate-tiers.json at the repo root, else `unknown`. Logged as the ninth column so a budget
+ * can be compared with runs of the SAME phase — a phase-0 push and a full-chain push are two
+ * different measurements, and their mix has no meaningful p90.
+ */
+export const readPhase = (root, environment = process.env) => {
+    if (environment.GATE_PHASE === 'full') {
+        return 'full';
+    }
+    try {
+        const tiers = JSON.parse(readFileSync(path.join(root, 'scripts/gate-tiers.json'), 'utf8'));
+        return String(tiers.phase ?? '');
+    } catch {
+        return 'unknown';
+    }
+};
+
 /** Everything a log line needs, gathered once, before the traced command runs. */
 export const gatherRunContext = (cwd, exec = gitOutput) => {
     try {
@@ -91,7 +109,8 @@ export const gatherRunContext = (cwd, exec = gitOutput) => {
             branch,
             toplevel,
             worktreeKind: gitDir === gitCommonDir ? 'main' : 'worktree',
-            changeClass: classifyChange(status)
+            changeClass: classifyChange(status),
+            phase: readPhase(toplevel)
         };
     } catch {
         // A tree this script cannot introspect (no git on PATH, not a repo at all) still gets a
@@ -100,7 +119,8 @@ export const gatherRunContext = (cwd, exec = gitOutput) => {
             branch: 'unknown',
             toplevel: cwd,
             worktreeKind: 'unknown',
-            changeClass: 'unknown'
+            changeClass: 'unknown',
+            phase: 'unknown'
         };
     }
 };
@@ -114,7 +134,8 @@ export const formatLogLine = ({ timestamp, label, durationMs, exitCode, context 
         context.branch,
         context.toplevel,
         context.worktreeKind,
-        context.changeClass
+        context.changeClass,
+        context.phase ?? ''
     ].join('\t');
 
 /**

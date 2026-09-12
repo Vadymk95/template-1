@@ -20,7 +20,7 @@ src/router/
 
 ## Adding a Route
 
-1. Create page: `src/pages/FooPage/FooPage.tsx` + `index.ts` (lazy export).
+1. Create page: `src/pages/<Page>/<Page>.tsx` + `index.ts` (lazy export).
 2. Add route path constant to `src/router/routes.ts`.
 3. Add to `src/router/modules/base.routes.tsx` (or create new module).
 4. Wrap lazy page element with `WithSuspense`.

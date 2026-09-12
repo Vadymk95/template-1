@@ -14,7 +14,7 @@
 1. Create page files: lazy routes use `FooPage.tsx` + `index.ts` with `lazy()`; the index route (`HomePage`) is eager — export the page from `index.ts` (re-exporting `HomePage.tsx`; see `pages/HomePage/`)
 2. Add route to `src/router/modules/base.routes.tsx` (or new module)
 3. Wrap with `WithSuspense` in route element
-4. Add translations: `public/locales/en/foo.json`
+4. Add translations: `public/locales/en/<namespace>.json`
 5. Add route name constant to `src/router/routes.ts`
 
 ## Adding a New Feature
