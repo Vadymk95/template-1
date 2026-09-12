@@ -108,3 +108,10 @@ export const useUpdateUserMutation = () => {
 - ❌ Untyped API responses (`any`).
 - ❌ Hardcoded endpoint strings in component files.
 - ❌ Missing error state handling in query consumers.
+
+## 7. Boundary adapter
+
+- A response is parsed **once**, at the boundary: `safeFetch` / `safeFetchQueryFn` + a Zod schema (`src/lib/api/safeFetch.ts`; live example `greeting.queries.ts`).
+- Defaults and renames live in the schema or a mapper next to it — `.default()`, `.catch()`, `.transform()`, or a `toViewModel(dto)` function in `lib/api/<domain>.ts` — never in a component.
+- Components and page hooks receive the parsed view model: they never see a raw DTO and never supply their own fallbacks (`data?.x ?? ''` in JSX is the smell).
+- A schema change is a payload-contract change: the Approval Law applies (`workflow.mdc`).

@@ -41,6 +41,7 @@ export const Input: FunctionComponent<InputProps> = ({ label, ref, ...props }) =
 - **Extract pure deterministic computation to utilities** (`src/lib/` or local utility file).
 - **Mixed logic rule**: split pure computation out first; keep the hook as a thin orchestration layer.
 - Component imports hook: `import { useComponentName } from './useComponentName'`.
+- **Folder ladder (this template, flat — not FSD):** `src/components/{ui,common,layout}` → `hocs/` → `hooks/<domain>/` → `pages/<Page>/` (with its page-local `use<Page>.ts`) → `router/`; `lib/` and `store/<domain>/` sit beneath the UI layers and never import `components` or `pages` (`import-x/no-restricted-paths` in `eslint.config.js`).
 
 ```
 UserCard/
@@ -113,3 +114,19 @@ export const NotFoundPage = lazy(() => import('./NotFoundPage'));
 - **States must be PERCEPTIBLY DISTINCT, not merely present.** A hover / active / focus / selection colour must not resolve to ≈ the element's own default or background colour — verify it is VISIBLE. Failure modes seen in the wild: a base link colour equal to its `hover:` colour (zero visible hover — only the cursor changes); a `::selection` highlight built on a near-background token (invisible selection). Chrome/nav links default to a neutral (`text-muted-foreground`) so the `hover:text-primary` shift shows.
 - **Compound states must stay COHERENT.** When two states co-occur (focus+invalid, hover+selected, disabled+focus) they must not visually fight — the more urgent state owns the shared channel (e.g. an invalid field recolours its focus ring, `aria-invalid:focus-visible:ring-destructive`, so focused+invalid reads as one error state; disabled cancels hover). Check state PAIRS, not just singles.
 - **Base-layer globals** (`::selection`, base links, `:focus-visible`) must be perceptibly distinct AND must NOT be built on quiet near-background tokens (`--muted`, or an `--accent` that is a slate-3-style near-background neutral). System feedback (selection, focus ring) is built on `--primary` / `--ring`, never the quiet hover token. If you define `::selection`, use `background-color: hsl(var(--primary)); color: hsl(var(--primary-foreground));` — a quiet token renders the highlight invisible.
+
+## 9. Composition over props
+
+- **Trigger**: a component is about to gain a third boolean prop, or a second variant axis next to its `cva` variants. Stop adding props.
+- **Prefer slots**: `children`, named slot props (`icon`, `footer`), or `asChild` render delegation via `@radix-ui/react-slot` — the shadcn `Button` in `src/components/ui/button.tsx` already does this.
+- **Or a compound component**: the parent owns state in a context, sub-components read it (`Panel` / `Panel.Header` / `Panel.Body`).
+- A new prop is right only when it changes the component's own behaviour, not what it renders.
+
+```tsx
+// Before: <Panel title="…" showIcon iconLeft compact />  — every combination is a branch inside Panel
+// After: the caller composes what the panel renders (sketch, not a shipped component)
+<Panel>
+    <Panel.Header icon={<Star />}>{title}</Panel.Header>
+    <Panel.Body>{children}</Panel.Body>
+</Panel>
+```
