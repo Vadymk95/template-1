@@ -7,6 +7,7 @@ import {
     checkQuarantine,
     checkPathsAndScripts,
     checkRevisitDates,
+    checkSuiteBudgets,
     checkSentinels,
     checkVersions,
     classifyToken,
@@ -272,5 +273,46 @@ describe('listTestFiles', () => {
         const files = listTestFiles(process.cwd());
         expect(files).toContain('scripts/docs-check.test.mjs');
         expect(files.some((file) => file.includes('node_modules'))).toBe(false);
+    });
+});
+
+describe('checkSuiteBudgets', () => {
+    const root = process.cwd();
+    const suite = { dir: 'scripts', match: '\\.test\\.mjs$', count: 'files' };
+    /* The fixture derives the count from this repo's own script suites: a hand-written number would go
+       stale the next time a script test is added. */
+    const overCeiling = checkSuiteBudgets({ root, suites: { unit: { ...suite, max: 0 } } })[0];
+    const count = Number(/: (\d+) file/.exec(overCeiling)?.[1] ?? 0);
+    it('passes a suite inside its ceiling', () => {
+        expect(count).toBeGreaterThan(0);
+        expect(checkSuiteBudgets({ root, suites: { unit: { ...suite, max: count + 1 } } })).toEqual(
+            []
+        );
+    });
+    it('reports a suite over the ceiling and names the remedy', () => {
+        const findings = checkSuiteBudgets({ root, suites: { unit: { ...suite, max: 1 } } });
+        expect(findings).toHaveLength(1);
+        expect(findings[0]).toContain('over the ceiling of 1');
+        expect(findings[0]).toContain('DECISIONS.md');
+    });
+    it('reports a ceiling more than twice the measurement, and a missing directory', () => {
+        const generous = checkSuiteBudgets({ root, suites: { unit: { ...suite, max: 500 } } });
+        expect(generous[0]).toContain('flags nothing');
+        const missing = checkSuiteBudgets({
+            root,
+            suites: { gone: { dir: 'nowhere', match: '.', count: 'files', max: 1 } }
+        });
+        expect(missing[0]).toContain('does not exist');
+    });
+    it('ignores the _description key and counts test calls when asked', () => {
+        const findings = checkSuiteBudgets({
+            root,
+            suites: {
+                _description: 'not a suite',
+                calls: { dir: 'scripts', match: 'docs-check\\.test\\.mjs$', count: 'tests', max: 0 }
+            }
+        });
+        expect(findings).toHaveLength(1);
+        expect(findings[0]).toContain('test(s)');
     });
 });

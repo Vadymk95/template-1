@@ -71,6 +71,7 @@ Targeted checks are for the iteration loop. The gate is what says "done".
   overflow for new copy lengths belong to the content-variance tier, not to a per-edit run
 - **TS/TSX / tests** (logic, components, hooks, stores) — `npm run verify:iter`
 - **Docs, rules, commands, brain, tier data** (`*.md`, `*.mdc`, `scripts/gate-tiers.json`) — `npm run docs:check` (the pre-commit hook runs it when such files are staged; `--weekly` adds past revisit dates; it also refuses a focused test and an unconditional skip without `quarantine until YYYY-MM-DD` + reason)
+- **Proposing a new browser spec** — the suite is counted in invariants, not screens (`AGENTS.md` § the gate); `npm run docs:check` reports the suite against the ceiling in `scripts/gate-tiers.json` § suites
 - **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing) — `npm run e2e:one -- <spec>`
 - **A shared UI primitive, the layout shell, or `src/index.css`** — the MEASURE moment:
   `npm run verify:measure -- e2e/layout-geometry.spec.ts`, or `npm run smoke:dev` for the dev-only

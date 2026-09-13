@@ -95,6 +95,16 @@
             "Node": "node"
         }
     },
+    "suites": {
+        "_description": "Ceilings on the browser suite. It is counted in INVARIANTS, not screens (AGENTS.md \u00a7 the gate): a route earns a browser test only when it brings an invariant the existing specs do not measure. A suite over its ceiling is a finding, and so is a ceiling more than twice the measurement \u2014 that high it flags nothing. Raise a number on a measurement plus a DECISIONS.md line, like a size budget.",
+        "e2e": {
+            "dir": "e2e",
+            "match": "\\.spec\\.ts$",
+            "count": "tests",
+            "max": 10,
+            "_measured": "7 on 2026-09-13"
+        }
+    },
     "moments": {
         "iterate": {
             "description": "The desk. Run per change.",
@@ -136,6 +146,12 @@
             "expected": ["verify:push"],
             "forbidden": [],
             "budgetSeconds": 90,
+            "budgetSecondsByPhase": {
+                "0": 25,
+                "1": 45,
+                "full": 45
+            },
+            "_budgetMeasured": "2026-09-13, p90 from .gate-trace.log: phase 0 25s ceiling, phase 1 45s ceiling, phase full 45s ceiling",
             "runsRegardlessOfDiff": true,
             "requiresMainCheckout": true
         }

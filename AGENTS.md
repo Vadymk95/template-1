@@ -149,6 +149,13 @@ acceptance does not re-run the gate, the push does. Parallel lanes never run hea
 shared caches): heavy work serialises at the push. Individual scripts (`typecheck`, `lint`, `test`, `fix`)
 are drill-downs on a specific failure; none of them is a moment.
 
+**What earns a browser test.** The browser suite is counted in INVARIANTS, not in screens. A new route
+or a new component earns a browser test only when it brings an invariant the existing specs do not
+already measure: a different layout shell, an engine-dependent behaviour, the first instance of a flow
+class. Everything else is a unit test against a mocked network, which runs in the iterate moment and
+costs the push nothing. `gate-tiers.json` declares the suite's ceiling and `docs:check` reports a suite
+that outgrew it, so that number moves on a measurement and a `DECISIONS.md` line, never on habit.
+
 **`verify` is a strict superset of the offline checks CI runs**, so a green `verify` predicts a green CI.
 Keeping that true is a rule: a new check goes into the script, never only into the workflow file.
 `audit:gate` sits in `verify:ci` rather than `verify` because it needs the network, so an offline agent can

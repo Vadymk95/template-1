@@ -17,6 +17,8 @@
  *              script families must exist in package.json
  *   sentinels  the tier-law sentinel sentences (gate-tiers.json → docs.sentinels) appear only in
  *              AGENTS.md — a copy elsewhere is a restatement, which is how rules go stale in place
+ *   suites     the browser suite has not outgrown the ceiling in gate-tiers.json, and that
+ *              ceiling is not more than twice the measurement
  *   tests      no focused test (`.only`) lands; an unconditional `.skip`/`.fixme` carries
  *              `quarantine until YYYY-MM-DD` and a reason, and that date is not past
  *   versions   "Vitest 5" / "React 19.3" in a doc matches the installed version (package-lock.json)
@@ -273,6 +275,19 @@ const SKIPPED_DIRS = new Set([
     'playwright-report',
     'test-results'
 ]);
+const listFilesRecursively = (dir) => {
+    const found = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            if (!SKIPPED_DIRS.has(entry.name)) found.push(...listFilesRecursively(full));
+        } else {
+            found.push(full);
+        }
+    }
+    return found;
+};
+
 export const listTestFiles = (root) => {
     const found = [];
     const walk = (dir) => {
@@ -326,6 +341,47 @@ export const checkQuarantine = ({ tests, today }) => {
                 );
             }
         });
+    }
+    return findings;
+};
+
+const TEST_CALL = /(?<![.\w])(?:test|it)\s*\(/g;
+
+/**
+ * Ceilings on the browser suite, from `gate-tiers.json` § suites. The suite is counted in invariants,
+ * not screens (AGENTS.md § the gate), so it grows slowly by design and a ceiling is how that intent
+ * becomes checkable: a suite over its ceiling is a finding, and so is a ceiling more than twice the
+ * measurement, because a ceiling that far above the number stops flagging anything.
+ */
+export const checkSuiteBudgets = ({ root, suites }) => {
+    const findings = [];
+    for (const [label, suite] of Object.entries(suites)) {
+        if (label.startsWith('_')) continue;
+        const dir = path.join(root, suite.dir);
+        if (!existsSync(dir)) {
+            findings.push(`gate-tiers.json § suites.${label}: \`${suite.dir}\` does not exist`);
+            continue;
+        }
+        const pattern = new RegExp(suite.match);
+        const files = listFilesRecursively(dir).filter((file) => pattern.test(file));
+        const measured =
+            suite.count === 'files'
+                ? files.length
+                : files.reduce(
+                      (total, file) =>
+                          total + (readFileSync(file, 'utf8').match(TEST_CALL)?.length ?? 0),
+                      0
+                  );
+        const unit = suite.count === 'files' ? 'file(s)' : 'test(s)';
+        if (measured > suite.max) {
+            findings.push(
+                `gate-tiers.json § suites.${label}: ${String(measured)} ${unit} in \`${suite.dir}\` over the ceiling of ${String(suite.max)} — fold the new case into an existing invariant, or raise the ceiling with a measurement and a DECISIONS.md line`
+            );
+        } else if (suite.max > measured * 2 && measured > 0) {
+            findings.push(
+                `gate-tiers.json § suites.${label}: the ceiling ${String(suite.max)} is more than twice the ${String(measured)} ${unit} measured in \`${suite.dir}\` — a ceiling that high flags nothing; lower it`
+            );
+        }
     }
     return findings;
 };
@@ -475,13 +531,19 @@ export const run = ({ root, weekly, today }) => {
         readFileSync(path.join(root, file), 'utf8')
     ]);
     findings.push(...checkQuarantine({ tests, today }));
+    if (tiers.suites) findings.push(...checkSuiteBudgets({ root, suites: tiers.suites }));
     if (weekly) findings.push(...checkRevisitDates({ docs, today }));
 
     const pushLabel = tiers.moments?.push?.expected?.[0] ?? 'verify:push';
-    const budgetSeconds = tiers.moments?.push?.budgetSeconds ?? 0;
+
     const logPath = path.join(root, '.gate-trace.log');
     const rows = existsSync(logPath) ? parseTraceRows(readFileSync(logPath, 'utf8')) : [];
     const phase = process.env.GATE_PHASE === 'full' ? 'full' : String(tiers.phase ?? '');
+    /* One number cannot serve both phases: phase 0 skips the heavy stages, so its push is a different
+       measurement from the full chain. `budgetSecondsByPhase` holds the per-phase numbers where they
+       have been measured; `budgetSeconds` stays the fallback. */
+    const pushMoment = tiers.moments?.push ?? {};
+    const budgetSeconds = pushMoment.budgetSecondsByPhase?.[phase] ?? pushMoment.budgetSeconds ?? 0;
     const budget =
         rows.length === 0
             ? {
@@ -507,7 +569,7 @@ const main = () => {
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {
         console.log(
-            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, test quarantines'
+            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, quarantines, suite ceilings'
         );
         process.exit(0);
     }
