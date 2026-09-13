@@ -241,11 +241,21 @@ The gate is **zero-warnings**: `eslint --max-warnings 0`, `oxlint --deny-warning
 
 Committed configs must never contain absolute local paths. The VS Code i18next extension rewrites `i18next.i18nPaths` with absolute paths when it can't resolve the configured ones — keep them relative and existing.
 
+**Nor a DURATION measured on one machine.** A committed number of seconds is the same mistake in a different costume: it describes the hardware that measured it, and a fork on slower hardware inherits a ceiling it may be unable to meet. Measured spread between this workstation and a two-core CI runner, same two suites: 5.6x and 10.5x. So the push budget in `scripts/gate-tiers.json` holds a RATIO and a sample size, never seconds; the gate calibrates its own baseline from its own first runs into the gitignored `.gate-budget.json`, ratchets it down when the gate gets faster, and reports drift. A clone starts with no baseline, no red reading, and no number belonging to someone else.
+
 ## Out of scope (ask before touching)
 
 - Weakening the verify gate, lint severities, or coverage thresholds to get green.
 - Removing template scaffolding listed in `.cursor/brain/TEMPLATE_SEEDS.md`.
 - Node engine bump (`engines.node`).
+
+## Changes reach master through a pull request
+
+Branch, run the gate, push the branch, open a PR, merge when CI is green.
+
+In THIS repository that is not only a habit: `master` carries a ruleset requiring the `validate` check, and a direct push bypasses it, because the owner role always may. A rule bypassed on every change is worse than no rule — it reads as protection to the next person and to every agent, and protects nothing.
+
+**In YOUR fork the habit is all there is, until you set the rest up.** Rulesets, branch protection and required checks are repository SETTINGS, and settings do not travel with a fork — only files do. So a fork arrives with the whole gate and none of the enforcement: the hooks still run locally, CI still runs on pull requests, and nothing at all stops a push straight to your default branch. `README.md` § "What your fork does not inherit" lists what to switch on and in what order.
 
 ## Commit format
 

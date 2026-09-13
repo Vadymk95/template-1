@@ -199,60 +199,125 @@ describe('budget', () => {
         expect(rows[0].phase).toBe('');
         expect(rows[1].phase).toBe('0');
     });
-    it('skips below three runs in the phase, warns above the budget or when the budget is twice the p90', () => {
-        const row = (ms, phase = '0') => ({
+    const row = (durationMs, phase = '0', exitCode = '0') => ({
+        label: 'verify:push',
+        durationMs,
+        exitCode,
+        phase
+    });
+    const many = (count, ms) => Array.from({ length: count }, () => row(ms));
+
+    it('calibrates to this machine instead of judging it by a number from another', () => {
+        const first = budgetReport({
+            rows: many(10, 24000),
             label: 'verify:push',
-            durationMs: ms,
-            exitCode: '0',
-            phase
+            phase: '0',
+            minRuns: 8
         });
-        const report = (rows) =>
-            budgetReport({ rows, label: 'verify:push', budgetSeconds: 60, phase: '0' }).kind;
-        expect(report([row(1000)])).toBe('skip');
-        expect(report([row(70000), row(75000), row(80000)])).toBe('warn');
-        expect(report([row(10000), row(11000), row(12000)])).toBe('warn');
-        expect(report([row(50000), row(55000), row(58000)])).toBe('ok');
-        expect(report([row(70000, 'full'), row(75000, 'full'), row(80000, 'full')])).toBe('skip');
+
+        expect(first.kind).toBe('ok');
+        expect(first.baselineMs).toBe(24000);
+        expect(first.message).toContain('calibrated to THIS machine');
     });
 
-    /*
-     * The window is what lets the budget RECOVER. Without it one bad day stays in the number until
-     * enough good runs dilute it, and the tempting fix is then to raise the budget - which is what a
-     * budget exists to prevent. Observed in a sibling repository on 2026-09-13: the reported p90 rose
-     * through 350.8s, 359.3s and 382.0s in one afternoon while the suite it measures got faster.
-     */
-    it('takes p90 over the last N runs when a window is set, and names the window', () => {
-        const row = (durationMs) => ({
+    /* The whole point of the rewrite, and it matters most in a template: the same gate on slower
+       hardware must not read red. Two machines, one three times the other, both fine. */
+    it('reports the same verdict on fast and slow hardware', () => {
+        const fast = budgetReport({
+            rows: many(10, 20000),
             label: 'verify:push',
-            durationMs,
-            exitCode: '0',
-            phase: '0'
-        });
-        // Ten slow runs, then twenty fast ones: the window must see only the fast regime.
-        const rows = [
-            ...Array.from({ length: 10 }, () => row(120000)),
-            ...Array.from({ length: 20 }, () => row(40000))
-        ];
-        const args = { rows, label: 'verify:push', budgetSeconds: 60, phase: '0' };
-
-        const unwindowed = budgetReport(args);
-        expect(unwindowed.kind).toBe('warn');
-        expect(unwindowed.message).toContain('30 runs');
-
-        const windowed = budgetReport({ ...args, budgetWindow: 20 });
-        expect(windowed.kind).toBe('ok');
-        expect(windowed.message).toContain('the last 20 of 30 runs');
-
-        // Fewer rows than the window uses them all, and the scope line says so plainly.
-        const few = budgetReport({
-            rows: [row(20000), row(21000), row(22000)],
-            label: 'verify:push',
-            budgetSeconds: 30,
             phase: '0',
+            minRuns: 8
+        });
+        const slow = budgetReport({
+            rows: many(10, 60000),
+            label: 'verify:push',
+            phase: '0',
+            minRuns: 8
+        });
+
+        expect(fast.kind).toBe('ok');
+        expect(slow.kind).toBe('ok');
+        expect(
+            budgetReport({
+                rows: many(10, 60000),
+                label: 'verify:push',
+                phase: '0',
+                minRuns: 8,
+                baselineMs: slow.baselineMs
+            }).kind
+        ).toBe('ok');
+    });
+
+    it('waits for enough runs of its own before it judges anything', () => {
+        const report = budgetReport({
+            rows: many(7, 24000),
+            label: 'verify:push',
+            phase: '0',
+            minRuns: 8
+        });
+
+        expect(report.kind).toBe('skip');
+        expect(report.message).toContain('CALIBRATING');
+    });
+
+    it('finds drift past the ratio and names both numbers, without moving the baseline up', () => {
+        const report = budgetReport({
+            rows: many(10, 40000),
+            label: 'verify:push',
+            phase: '0',
+            minRuns: 8,
+            driftRatio: 1.3,
+            baselineMs: 24000
+        });
+
+        expect(report.kind).toBe('warn');
+        expect(report.message).toContain('1.67x');
+        expect(report.baselineMs).toBe(24000);
+    });
+
+    /* Down-only ratchet: a gate that genuinely got faster lowers the bar it is held to next time,
+       with no edit and no decision. */
+    it('lowers the baseline by itself when the gate gets faster', () => {
+        const report = budgetReport({
+            rows: many(10, 15000),
+            label: 'verify:push',
+            phase: '0',
+            minRuns: 8,
+            baselineMs: 24000
+        });
+
+        expect(report.baselineMs).toBe(15000);
+        expect(report.message).toContain('is faster');
+    });
+
+    it('keeps the phases apart, because a phase-0 push is a different measurement', () => {
+        const rows = [...many(10, 20000), ...many(10, 90000).map((r) => ({ ...r, phase: 'full' }))];
+
+        expect(
+            budgetReport({ rows, label: 'verify:push', phase: '0', minRuns: 8 }).baselineMs
+        ).toBe(20000);
+        expect(
+            budgetReport({ rows, label: 'verify:push', phase: 'full', minRuns: 8 }).baselineMs
+        ).toBe(90000);
+    });
+
+    it('takes p90 over the last N runs when a window is set, and names the window', () => {
+        const rows = [...many(10, 60000), ...many(20, 24000)];
+
+        expect(
+            budgetReport({ rows, label: 'verify:push', phase: '0', minRuns: 8 }).baselineMs
+        ).toBe(60000);
+
+        const windowed = budgetReport({
+            rows,
+            label: 'verify:push',
+            phase: '0',
+            minRuns: 8,
             budgetWindow: 20
         });
-        expect(few.kind).toBe('ok');
-        expect(few.message).toContain('3 runs');
+        expect(windowed.baselineMs).toBe(24000);
+        expect(windowed.message).toContain('the last 20 of 30 runs');
     });
 });
 
