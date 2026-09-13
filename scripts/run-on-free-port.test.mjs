@@ -72,8 +72,15 @@ describe('run-on-free-port CLI', () => {
             ],
             { encoding: 'utf8', env: { ...process.env, PORT: String(base) } }
         );
-        expect(output).toContain(`Port ${String(base)} is busy`);
-        const reassigned = base + 1;
+        /* The lane lands on the NEXT FREE port, not necessarily base + 1: the base is an
+           OS-assigned ephemeral port, so its neighbours may be taken by any other process — a
+           fixed `base + 1` assertion was flaky for exactly that reason. Read the port the script
+           announced and check the child received the same one. */
+        const announced = output.match(/is busy — this lane runs on (\d+)\./);
+        expect(announced, output).not.toBeNull();
+        const reassigned = Number(announced[1]);
+        expect(reassigned).toBeGreaterThan(base);
+        expect(reassigned).toBeLessThanOrEqual(base + 20);
         expect(output).toContain(`${String(reassigned)} http://localhost:${String(reassigned)}`);
     });
 

@@ -12,7 +12,10 @@
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
 
-const PORT = 4173;
+/* The preview port the gate's Playwright run binds (playwright.config.ts). GATE_PREFLIGHT_PORT is a
+   test seam only: the suite points the preflight at an ephemeral port so it never touches the
+   machine's real 4173 — a suite that binds the gate's own port races every other lane for it. */
+const PORT = Number(process.env.GATE_PREFLIGHT_PORT ?? 4173);
 
 /**
  * --kill-port: the PUSH GATE owns the machine while it runs — heavy stages are serialised at the
