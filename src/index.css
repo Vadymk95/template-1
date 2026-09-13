@@ -135,6 +135,13 @@
  *
  * Descendants may set visibility: visible — used for #i18n-boot (spinner) only.
  */
+/* The scrollbar keeps its gutter on every page, so a route with less content than the viewport
+   does not shift the layout by the scrollbar's width when navigating from one that scrolls.
+   Baseline 2024 (Chrome 94, Firefox 97, Safari 17.4); older engines ignore it and keep the shift. */
+html {
+    scrollbar-gutter: stable;
+}
+
 html.i18n-loading {
     visibility: hidden;
 }
