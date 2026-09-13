@@ -17,3 +17,10 @@ logs
 
 # Stryker sandboxes: a crashed mutation run leaves one behind, and the gate must not lint a copy of the repo
 .stryker-tmp/
+
+# release-please OWNS this file and rewrites it on every release, in its own markdown dialect
+# (`*` bullets, no blank line after the heading). Prettier prefers `-`, so format:check rejected it
+# on the first push after the 2026-09-13 release in all four templates - a red gate on a file nobody
+# edited. Reformatting it here would be undone by the next release, so the generator keeps its own
+# output and the checker stops reading it.
+CHANGELOG.md
