@@ -26,13 +26,15 @@ const runPreflight = (port, extraArgs = []) => {
     }
 };
 
-const listenOn = async (port) =>
+const listenOn = async (port, host) =>
     new Promise((resolvePromise, reject) => {
         const server = createServer();
         server.once('error', reject);
-        server.listen(port, () => {
+        const ready = () => {
             resolvePromise(server);
-        });
+        };
+        if (host === undefined) server.listen(port, ready);
+        else server.listen(port, host, ready);
     });
 
 const freePort = async () => {
@@ -127,6 +129,16 @@ describe('gate preflight', () => {
                 /* already dead — the expected case */
             }
         }
+    });
+
+    /* A hand-run dev server often binds the IPv6 loopback alone, and a bind-only probe cannot see
+       it: the preflight passed and the suite refused minutes later, on a sibling repo, 2026-09-13. */
+    it('sees a listener bound to the IPv6 loopback alone', async () => {
+        const port = await freePort();
+        held = await listenOn(port, '::1');
+        const verdict = runPreflight(port);
+        expect(verdict.code).toBe(1);
+        expect(verdict.output).toContain(`Port ${String(port)} is busy`);
     });
 
     it('--kill-port on a FREE port stays silent and passes', async () => {

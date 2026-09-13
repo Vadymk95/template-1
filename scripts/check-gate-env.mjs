@@ -10,7 +10,7 @@
  * fails the suite minutes in — or, before that rule, silently measured a preview from another branch.
  */
 import { spawnSync } from 'node:child_process';
-import { createServer } from 'node:net';
+import { connect, createServer } from 'node:net';
 
 /* The preview port the gate's Playwright run binds (playwright.config.ts). GATE_PREFLIGHT_PORT is a
    test seam only: the suite points the preflight at an ephemeral port so it never touches the
@@ -46,8 +46,41 @@ const listeningPids = (port) => {
         .filter((pid) => pid !== process.pid);
 };
 
-const portIsFree = async (port) =>
+const CONNECT_TIMEOUT_MS = 300;
+
+/** Something answers here: the port is taken for anyone who dials it by name. */
+const someoneAnswers = async (host, port) =>
     new Promise((resolve) => {
+        const socket = connect({ host, port });
+        const settle = (answered) => {
+            socket.destroy();
+            resolve(answered);
+        };
+        socket.setTimeout(CONNECT_TIMEOUT_MS, () => {
+            settle(false);
+        });
+        socket.once('connect', () => {
+            settle(true);
+        });
+        socket.once('error', () => {
+            settle(false);
+        });
+    });
+
+/*
+ * Both loopback families, then the bind — the same probe `run-on-free-port.mjs` uses, and for the
+ * same two reasons: 127.0.0.1 alone misses a server bound on all interfaces, and a bind alone misses
+ * one bound on `[::1]` only, which is what a dev server run by hand often is. Playwright reaches ::1
+ * first when it fetches `http://localhost:<port>`, so a bind-only probe passes the preflight and the
+ * suite then refuses minutes later.
+ */
+const portIsFree = async (port) => {
+    for (const host of ['127.0.0.1', '::1']) {
+        if (await someoneAnswers(host, port)) {
+            return false;
+        }
+    }
+    return new Promise((resolve) => {
         const server = createServer();
         server.once('error', () => {
             resolve(false);
@@ -57,10 +90,9 @@ const portIsFree = async (port) =>
                 resolve(true);
             });
         });
-        // ALL interfaces, the way the preview server binds. Probing 127.0.0.1 alone reports a
-        // port free while a server is plainly holding it.
         server.listen(port);
     });
+};
 
 if (!(await portIsFree(PORT))) {
     let cleared = false;

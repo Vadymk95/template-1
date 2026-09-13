@@ -12,12 +12,47 @@
  * Usage: node scripts/run-on-free-port.mjs <command> [args...]
  */
 import { spawnSync } from 'node:child_process';
-import { createServer } from 'node:net';
+import { connect, createServer } from 'node:net';
 
 const PROBE_LIMIT = 20;
 
-const portIsFree = async (port) =>
-    new Promise((resolvePort) => {
+const CONNECT_TIMEOUT_MS = 300;
+
+/** Something answers here: the port is taken for anyone who dials it by name. */
+const someoneAnswers = async (host, port) =>
+    new Promise((resolveAnswer) => {
+        const socket = connect({ host, port });
+        const settle = (answered) => {
+            socket.destroy();
+            resolveAnswer(answered);
+        };
+        socket.setTimeout(CONNECT_TIMEOUT_MS, () => {
+            settle(false);
+        });
+        socket.once('connect', () => {
+            settle(true);
+        });
+        socket.once('error', () => {
+            settle(false);
+        });
+    });
+
+/*
+ * The probe asks what its CALLERS ask, which took two corrections. Binding on ALL interfaces is the
+ * first half: a 127.0.0.1-only probe reported a port free while a dev server plainly held it. The
+ * second half, measured 2026-09-13 on a sibling repo: a server listening on `[::1]` ONLY still lets a
+ * bind on the unspecified address succeed, so a bind-only probe called the port free while Playwright,
+ * which fetches `http://localhost:<port>` and reaches ::1 first, refused with "already used" and took
+ * a whole gate with it. A port is free only when nothing answers on either loopback family AND the
+ * bind succeeds.
+ */
+const portIsFree = async (port) => {
+    for (const host of ['127.0.0.1', '::1']) {
+        if (await someoneAnswers(host, port)) {
+            return false;
+        }
+    }
+    return new Promise((resolvePort) => {
         const server = createServer();
         server.once('error', () => {
             resolvePort(false);
@@ -27,10 +62,9 @@ const portIsFree = async (port) =>
                 resolvePort(true);
             });
         });
-        // ALL interfaces, the way `next start` binds: a 127.0.0.1-only probe reports the port
-        // free while a dev server plainly holds it.
         server.listen(port);
     });
+};
 
 export const findFreePort = async (basePort, isFree = portIsFree) => {
     for (let candidate = basePort; candidate < basePort + PROBE_LIMIT; candidate += 1) {

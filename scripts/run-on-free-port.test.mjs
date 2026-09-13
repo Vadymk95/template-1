@@ -8,13 +8,15 @@ import { buildChildEnv, findFreePort } from './run-on-free-port.mjs';
 
 const SCRIPT = resolve(process.cwd(), 'scripts/run-on-free-port.mjs');
 
-/** Holds a real port on all interfaces so the probe meets a genuinely busy socket. */
-const occupyPort = () =>
+/** Holds a real port so the probe meets a genuinely busy socket; `host` narrows which family. */
+const occupyPort = (host) =>
     new Promise((resolveServer) => {
         const server = createServer();
-        server.listen(0, () => {
+        const ready = () => {
             resolveServer(server);
-        });
+        };
+        if (host === undefined) server.listen(0, ready);
+        else server.listen(0, host, ready);
     });
 
 let heldServer = null;
@@ -41,6 +43,18 @@ describe('findFreePort', () => {
         const port = await findFreePort(base);
         expect(port).toBeGreaterThan(base);
         expect(port).toBeLessThanOrEqual(base + 20);
+    });
+
+    /*
+     * The case that cost a whole gate on a sibling repo, 2026-09-13: a dev server on the IPv6
+     * loopback ONLY. A bind on the unspecified address still succeeds there, so a bind-only probe
+     * called the port free — while Playwright, which fetches `http://localhost:<port>` and reaches
+     * ::1 first, refused with "already used".
+     */
+    it('sees a listener bound to the IPv6 loopback alone, which a bind probe does not', async () => {
+        heldServer = await occupyPort('::1');
+        const base = heldServer.address().port;
+        expect(await findFreePort(base)).toBeGreaterThan(base);
     });
 
     it('throws with a diagnostic when nothing in range is free, instead of hanging', async () => {
