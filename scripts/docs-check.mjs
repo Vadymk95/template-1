@@ -62,6 +62,8 @@ export const SHIM_DIR = '.cursor/commands';
 const DOC_EXTENSIONS = new Set(['.md', '.mdc']);
 const OUTPUT_DIRS = new Set(['dist', 'build', 'coverage', 'node_modules', '.probe', 'reports']);
 const TOKEN_PATTERN = /`([^`\n]+)`/g;
+/** Relative markdown link targets, `[text](.cursor/brain/MAP.md#anchor)`; URLs and pure anchors are skipped. */
+const LINK_PATTERN = /\]\((?!https?:|mailto:|#)([^)\s#]+)(?:#[^)]*)?\)/g;
 const VERSION_PATTERN = /\b([A-Za-z][A-Za-z.]*[A-Za-z])\s+v?(\d+)(?:\.(\d+))?(?:\.(\d+))?\b/g;
 const DATE_PATTERN = /\b(20\d\d)-(\d\d)-(\d\d)\b/g;
 const REVISIT_PATTERN = /\b(revisit|re-check|recheck|checkpoint|trigger|re-measure|re-evaluate)\b/i;
@@ -100,6 +102,9 @@ export const extractTokens = (text) => {
         }
         if (fenced) return;
         for (const match of line.matchAll(TOKEN_PATTERN)) {
+            tokens.push({ token: match[1], line: index + 1 });
+        }
+        for (const match of line.matchAll(LINK_PATTERN)) {
             tokens.push({ token: match[1], line: index + 1 });
         }
     });

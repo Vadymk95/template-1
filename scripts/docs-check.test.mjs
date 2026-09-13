@@ -30,6 +30,11 @@ describe('extractTokens', () => {
             { token: 'two', line: 5 }
         ]);
     });
+    it('reads relative markdown link targets and skips URLs and anchors', () => {
+        const text =
+            'see [map](.cursor/brain/MAP.md#wiring), [site](https://example.test/x), [top](#top)';
+        expect(extractTokens(text)).toEqual([{ token: '.cursor/brain/MAP.md', line: 1 }]);
+    });
 });
 
 describe('classifyToken', () => {
