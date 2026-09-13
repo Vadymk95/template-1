@@ -527,6 +527,20 @@ Bump the floor to whatever version `npm audit` currently recommends.
 
 Versions follow the commit types (commitlint enforces Conventional Commits): `feat` → minor, `fix` → patch, a `!` or a `BREAKING CHANGE` footer → major. `.github/workflows/release.yml` keeps one release pull request open with the next version, the `CHANGELOG.md` entry, `package.json` and the lock file; merging it tags `v<version>` and publishes the GitHub release. Nothing goes to npm — a template is forked, not installed. The starting point is `.release-please-manifest.json` (keep it equal to `package.json`); commits before `bootstrap-sha` in `release-please-config.json` are not part of the first changelog.
 
+## What your fork does not inherit
+
+Files travel with a fork. Settings do not. Everything the gate needs is in the files — the husky hooks, the `verify` chain, the CI workflows, the agent docs — so a fork is fully working after `npm install && npm run prepare`. What it is NOT is protected, and nothing on screen says so.
+
+Not inherited, and each one is a switch in your own repository's settings:
+
+- **Rulesets and branch protection**, including the required `validate` check. Until you add one, your default branch accepts any push, and the pull-request discipline this repository documents is a habit rather than a rule.
+- **Actions permissions.** A fork starts with workflows disabled; GitHub asks you to enable them once, in the Actions tab. Until you do, the CI described here never runs, and a green screen means nobody looked.
+- **Secret scanning and push protection**, **CodeQL**, and **Dependabot alerts.** The Dependabot CONFIG file travels; the alerts it feeds are a setting.
+
+The order that costs least: enable Actions, open one pull request so the checks register their names, then add a ruleset on your default branch requiring the `validate` check. That last step is what turns the rest of this README from description into enforcement.
+
+One thing that is NOT a setting and is easy to miss: `.npmrc` disables lifecycle scripts on purpose, so `npm install` alone leaves you with no git hooks. `npm run prepare` once after cloning is what installs them.
+
 ## 📝 Additional Notes
 
 - **Meta Tags:** add description and robots meta tags in `index.html`

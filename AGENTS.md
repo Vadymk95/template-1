@@ -251,9 +251,11 @@ Committed configs must never contain absolute local paths. The VS Code i18next e
 
 ## Changes reach master through a pull request
 
-Branch, run the gate, push the branch, open a PR, merge when CI is green. Not because a solo author needs the ceremony, but because `master` carries an active ruleset requiring the `validate` check and a direct push BYPASSES it — the owner role always may. A rule that is bypassed on every change is worse than no rule: it reads as protection to the next person and to every agent, and protects nothing.
+Branch, run the gate, push the branch, open a PR, merge when CI is green.
 
-This is also the discipline the template is meant to demonstrate. A reference repository that carries a required check and pushes straight past it teaches the opposite of what it documents.
+In THIS repository that is not only a habit: `master` carries a ruleset requiring the `validate` check, and a direct push bypasses it, because the owner role always may. A rule bypassed on every change is worse than no rule — it reads as protection to the next person and to every agent, and protects nothing.
+
+**In YOUR fork the habit is all there is, until you set the rest up.** Rulesets, branch protection and required checks are repository SETTINGS, and settings do not travel with a fork — only files do. So a fork arrives with the whole gate and none of the enforcement: the hooks still run locally, CI still runs on pull requests, and nothing at all stops a push straight to your default branch. `README.md` § "What your fork does not inherit" lists what to switch on and in what order.
 
 ## Commit format
 
