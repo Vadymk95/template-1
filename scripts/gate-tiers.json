@@ -145,17 +145,12 @@
             "description": "Husky pre-push -> verify:push (phase-aware). Runs unconditionally, never shortened by what the diff touched.",
             "expected": ["verify:push"],
             "forbidden": [],
-            "budgetSeconds": 90,
-            "budgetSecondsByPhase": {
-                "0": 25,
-                "1": 45,
-                "full": 45
-            },
-            "_budgetMeasured": "2026-09-13, p90 from .gate-trace.log: phase 0 25s ceiling, phase 1 45s ceiling, phase full 45s ceiling",
             "runsRegardlessOfDiff": true,
             "requiresMainCheckout": true,
             "budgetWindow": 20,
-            "_budgetWindow": "p90 is taken over the last 20 successful runs in the phase, not over the whole log. Without a window one bad day poisons the number until enough good runs dilute it, and the tempting fix is then to raise the budget - which is exactly what a budget exists to prevent. 20 is long enough that one slow run does not swing it and short enough that the number describes the current regime."
+            "budgetDriftRatio": 1.3,
+            "budgetBaselineMinRuns": 8,
+            "_budget": "NO SECONDS HERE, deliberately, and this matters more in a template than anywhere else. A committed number of seconds describes ONE machine and nothing in the file says which, so every fork inherits a ceiling it may be unable to meet and reads red from its third push - measured ratio between the workstation that set the old numbers and a two-core runner: 5.6x and 10.5x on the same two suites. The gate calibrates a baseline from its OWN first `budgetBaselineMinRuns` runs, per phase, keeps it in the gitignored .gate-budget.json beside the tracer log, and reports drift past `budgetDriftRatio`. The baseline ratchets DOWN by itself when the gate gets faster, the same shape a lint or type baseline uses; it rises only when someone deletes the file, which is the honest way to say this is the new normal. `budgetWindow` keeps one bad day from poisoning p90. A fresh clone starts with no baseline, no red reading, and calibrates to its own hardware."
         }
     }
 }

@@ -59,6 +59,12 @@ reports
 .claude/settings.json
 .claude/worktrees/
 
+# The gate's cost baseline, calibrated from THIS machine's own runs. Never committed, for the same
+# reason the trace log is not: what the gate costs is a property of the hardware, not of the
+# project, and a number measured on one machine is a ceiling a fork may be unable to meet. A fresh
+# clone has neither file and calibrates itself. See scripts/docs-check.mjs § budgetReport.
+/.gate-budget.json
+
 .gate-trace.log
 
 .probe/

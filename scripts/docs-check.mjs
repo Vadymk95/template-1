@@ -35,7 +35,7 @@
  * Usage: node scripts/docs-check.mjs [--weekly] [--root <dir>]
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const DOC_FILES = [
@@ -408,14 +408,37 @@ export const parseTraceRows = (text) =>
         }));
 
 /**
- * A budget with no recency window can never recover from a bad day. Measured in a sibling repository
- * on 2026-09-13, in one afternoon and in order: p90 350.8s over 33 runs, 359.3s over 34, 382.0s over
- * 35 - while the suite it measures got 192s of cumulative browser time FASTER in the same window.
- * The tail that moved it was two runs taken on a workstation that was running four other gates. The
- * budget then reads red on a healthy suite, and the tempting fix is to raise it, which is exactly
- * what a budget exists to prevent. A window makes the number describe the CURRENT regime instead.
+ * THE GATE'S COST IS MEASURED AGAINST ITSELF, NEVER AGAINST A NUMBER SOMEONE ELSE MEASURED.
+ *
+ * This used to compare p90 with a fixed number of seconds committed in `gate-tiers.json`. That is
+ * the wrong shape for a template above all: the number described ONE machine, nothing in the file
+ * said which, and every fork inherited a ceiling it might be unable to meet - red from its third
+ * push onward, with only two remedies, raise the number or stop looking. The hardware spread is not
+ * small: the same two suites measured 5.6x and 10.5x slower on a two-core runner than on the
+ * workstation that set these numbers.
+ *
+ * So there are no seconds in git any more. The gate calibrates a baseline from its OWN first runs,
+ * per phase, keeps it in a gitignored file beside the tracer log it already writes, and reports
+ * DRIFT against it. What is committed is a ratio and a sample size, which mean the same thing on
+ * every machine.
+ *
+ * The baseline ratchets DOWN by itself, the same shape a lint or type baseline uses: a gate that
+ * gets genuinely faster lowers the bar it will be held to next time, with no edit and no decision.
+ * It rises only when someone deletes the file, which is the honest way to say "this is the new
+ * normal and I mean it".
+ *
+ * Pure by design: it reads no file and writes none. The caller passes the stored baseline and
+ * persists the one this returns, so the arithmetic stays testable without a filesystem.
  */
-export const budgetReport = ({ rows, label, budgetSeconds, phase, budgetWindow = 0 }) => {
+export const budgetReport = ({
+    rows,
+    label,
+    phase,
+    budgetWindow = 0,
+    driftRatio = 1.3,
+    minRuns = 8,
+    baselineMs = null
+}) => {
     const successful = rows
         .filter((row) => row.label === label && row.exitCode === '0' && row.phase === phase)
         .map((row) => row.durationMs);
@@ -424,30 +447,46 @@ export const budgetReport = ({ rows, label, budgetSeconds, phase, budgetWindow =
         budgetWindow > 0 && successful.length > durations.length
             ? `the last ${String(durations.length)} of ${String(successful.length)} runs`
             : `${String(durations.length)} runs`;
-    if (durations.length < 3) {
+
+    if (successful.length < minRuns) {
         return {
             kind: 'skip',
-            message: `budget: SKIPPED — ${durations.length} traced "${label}" run(s) in phase ${phase}; need 3 (the tracer records the phase since the 9-column format)`
+            baselineMs,
+            message: `budget: CALIBRATING — ${successful.length} of ${minRuns} traced "${label}" runs in phase ${phase} needed before this machine has a baseline of its own`
         };
     }
+
     const p90 = percentile90(durations);
     const seconds = (p90 / 1000).toFixed(1);
-    const budgetMs = budgetSeconds * 1000;
-    if (p90 > budgetMs) {
+
+    if (baselineMs === null) {
         return {
-            kind: 'warn',
-            message: `budget: "${label}" p90 is ${seconds}s over ${scope} in phase ${phase}, above the ${budgetSeconds}s budget — re-measure and set the budget in gate-tiers.json`
+            kind: 'ok',
+            baselineMs: p90,
+            message: `budget: "${label}" calibrated to THIS machine at ${seconds}s in phase ${phase}, from ${scope}. Drift above ${String(driftRatio)}x that is a finding from now on.`
         };
     }
-    if (budgetMs > 2 * p90) {
+
+    if (p90 < baselineMs) {
         return {
-            kind: 'warn',
-            message: `budget: "${label}" p90 is ${seconds}s in phase ${phase} but the budget is ${budgetSeconds}s — a budget twice the measurement no longer flags a slow run`
+            kind: 'ok',
+            baselineMs: p90,
+            message: `budget: "${label}" is faster in phase ${phase} — p90 ${seconds}s over ${scope}, under the ${(baselineMs / 1000).toFixed(1)}s baseline, which now moves down to match`
         };
     }
+
+    if (p90 > baselineMs * driftRatio) {
+        return {
+            kind: 'warn',
+            baselineMs,
+            message: `budget: "${label}" p90 is ${seconds}s in phase ${phase} over ${scope}, ${(p90 / baselineMs).toFixed(2)}x this machine's ${(baselineMs / 1000).toFixed(1)}s baseline and past the ${String(driftRatio)}x line — find what grew, or delete .gate-budget.json to accept this as the new normal`
+        };
+    }
+
     return {
         kind: 'ok',
-        message: `budget: "${label}" p90 ${seconds}s over ${scope} in phase ${phase}, within ${budgetSeconds}s`
+        baselineMs,
+        message: `budget: "${label}" p90 ${seconds}s in phase ${phase} over ${scope}, ${(p90 / baselineMs).toFixed(2)}x this machine's ${(baselineMs / 1000).toFixed(1)}s baseline`
     };
 };
 
@@ -552,20 +591,45 @@ export const run = ({ root, weekly, today }) => {
     const logPath = path.join(root, '.gate-trace.log');
     const rows = existsSync(logPath) ? parseTraceRows(readFileSync(logPath, 'utf8')) : [];
     const phase = process.env.GATE_PHASE === 'full' ? 'full' : String(tiers.phase ?? '');
-    /* One number cannot serve both phases: phase 0 skips the heavy stages, so its push is a different
-       measurement from the full chain. `budgetSecondsByPhase` holds the per-phase numbers where they
-       have been measured; `budgetSeconds` stays the fallback. */
+    /* One baseline cannot serve both phases: phase 0 skips the heavy stages, so its push is a
+       different measurement from the full chain. The stored file is keyed by label AND phase. */
     const pushMoment = tiers.moments?.push ?? {};
-    const budgetSeconds = pushMoment.budgetSecondsByPhase?.[phase] ?? pushMoment.budgetSeconds ?? 0;
-    const budgetWindow = tiers.moments?.push?.budgetWindow ?? 0;
+    const budgetWindow = pushMoment.budgetWindow ?? 0;
+    const driftRatio = pushMoment.budgetDriftRatio ?? 1.3;
+    const minRuns = pushMoment.budgetBaselineMinRuns ?? 8;
+    /* Beside the tracer log it reads, and gitignored for the same reason: what the gate costs is a
+       property of THIS machine, not of the template, so a fork calibrates itself instead of
+       inheriting a ceiling it may be unable to meet. */
+    const baselinePath = path.join(root, '.gate-budget.json');
+    const storedBaselines = existsSync(baselinePath)
+        ? JSON.parse(readFileSync(baselinePath, 'utf8'))
+        : {};
+    const baselineKey = `${pushLabel}@${phase}`;
+    const baselineMs = storedBaselines[baselineKey] ?? null;
     const budget =
         rows.length === 0
             ? {
                   kind: 'skip',
+                  baselineMs,
                   message:
                       'budget: SKIPPED — no .gate-trace.log here (CI never has one; locally, run a push first)'
               }
-            : budgetReport({ rows, label: pushLabel, budgetSeconds, phase, budgetWindow });
+            : budgetReport({
+                  rows,
+                  label: pushLabel,
+                  phase,
+                  budgetWindow,
+                  driftRatio,
+                  minRuns,
+                  baselineMs
+              });
+
+    if (budget.baselineMs !== null && budget.baselineMs !== baselineMs) {
+        writeFileSync(
+            baselinePath,
+            `${JSON.stringify({ ...storedBaselines, [baselineKey]: budget.baselineMs }, null, 4)}\n`
+        );
+    }
 
     return { findings, budget };
 };

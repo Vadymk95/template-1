@@ -241,11 +241,19 @@ The gate is **zero-warnings**: `eslint --max-warnings 0`, `oxlint --deny-warning
 
 Committed configs must never contain absolute local paths. The VS Code i18next extension rewrites `i18next.i18nPaths` with absolute paths when it can't resolve the configured ones — keep them relative and existing.
 
+**Nor a DURATION measured on one machine.** A committed number of seconds is the same mistake in a different costume: it describes the hardware that measured it, and a fork on slower hardware inherits a ceiling it may be unable to meet. Measured spread between this workstation and a two-core CI runner, same two suites: 5.6x and 10.5x. So the push budget in `scripts/gate-tiers.json` holds a RATIO and a sample size, never seconds; the gate calibrates its own baseline from its own first runs into the gitignored `.gate-budget.json`, ratchets it down when the gate gets faster, and reports drift. A clone starts with no baseline, no red reading, and no number belonging to someone else.
+
 ## Out of scope (ask before touching)
 
 - Weakening the verify gate, lint severities, or coverage thresholds to get green.
 - Removing template scaffolding listed in `.cursor/brain/TEMPLATE_SEEDS.md`.
 - Node engine bump (`engines.node`).
+
+## Changes reach master through a pull request
+
+Branch, run the gate, push the branch, open a PR, merge when CI is green. Not because a solo author needs the ceremony, but because `master` carries an active ruleset requiring the `validate` check and a direct push BYPASSES it — the owner role always may. A rule that is bypassed on every change is worse than no rule: it reads as protection to the next person and to every agent, and protects nothing.
+
+This is also the discipline the template is meant to demonstrate. A reference repository that carries a required check and pushes straight past it teaches the opposite of what it documents.
 
 ## Commit format
 
