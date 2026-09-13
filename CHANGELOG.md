@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.2.1](https://github.com/Vadymk95/template-1/compare/v3.2.0...v3.2.1) (2026-09-13)
+
+
+### Bug fixes
+
+* **gate:** give the push budget a recency window so it can recover ([7f0673c](https://github.com/Vadymk95/template-1/commit/7f0673cecf6d05d7c3ed410e19986b800a06dd65))
+* **gate:** let release-please own the changelog format instead of the checker ([151eaaa](https://github.com/Vadymk95/template-1/commit/151eaaa7802f9b608767cd889fb221b3853490a5))
+* **gate:** make eslint blind to an agent worktree inside the repository ([bcc58d8](https://github.com/Vadymk95/template-1/commit/bcc58d8a5628cbd4348d6841ca528647b823739d))
+* **gate:** the push budget calibrates to the machine it runs on, not to mine ([#69](https://github.com/Vadymk95/template-1/issues/69)) ([ced0239](https://github.com/Vadymk95/template-1/commit/ced02393dae5c25ec8e966a4a63e1d27405780de))
+
 ## [3.2.0](https://github.com/Vadymk95/template-1/compare/v3.1.0...v3.2.0) (2026-09-13)
 
 
