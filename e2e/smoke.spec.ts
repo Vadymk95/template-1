@@ -6,9 +6,11 @@ test.describe('Smoke', () => {
         await expect(page).toHaveTitle(/React Enterprise Foundation/);
     });
 
-    test('home exposes main landmark and welcome heading', async ({ page }) => {
+    test('home exposes main landmark and the start-page heading', async ({ page }) => {
         await page.goto('/');
         await expect(page.getByRole('main')).toBeVisible();
-        await expect(page.getByRole('heading', { level: 1, name: /welcome/i })).toBeVisible();
+        await expect(
+            page.getByRole('heading', { level: 1, name: /gate already wired/i })
+        ).toBeVisible();
     });
 });

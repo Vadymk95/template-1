@@ -1,23 +1,67 @@
 {
-    "title": "Welcome",
-    "description": "This is your enterprise-grade React template",
-    "subtitle": "Get started by editing the pages in src/pages/",
-    "greeting": {
+    "title": "A React foundation with the gate already wired",
+    "description": "React, Vite on Rolldown, TypeScript strict, Tailwind v4, Vitest and Playwright — plus the hooks, CI and agent flow that keep a fork honest from the first commit.",
+    "seed": "This page is the template seed: replace it with the first real screen and keep the sections you still need.",
+    "stackCheck": {
+        "title": "Stack check",
+        "description": "TanStack Query fetched this through MSW in development and through your API in production:",
         "error": "Could not load greeting"
     },
-    "features": {
-        "title": "Features",
-        "react": "React 19 with automatic JSX",
-        "vite": "Vite 8 with Rolldown",
-        "typescript": "TypeScript 6.0 strict mode",
-        "routing": "React Router v7",
-        "state": "Zustand + TanStack Query",
-        "styling": "Tailwind CSS + Shadcn UI"
+    "inside": {
+        "title": "What's inside",
+        "react": "React with the compiler-ready hooks rules",
+        "vite": "Vite on Rolldown, one dev server and one production build",
+        "typescript": "TypeScript strict with type-aware ESLint and oxlint",
+        "styling": "Tailwind v4 tokens and shadcn/ui primitives",
+        "state": "Zustand for UI state, TanStack Query for server state",
+        "routing": "React Router with lazy pages and route error boundaries",
+        "i18n": "i18next with namespaces and a language switcher seed",
+        "testing": "Vitest with MSW, Playwright, StrykerJS on a weekly schedule"
     },
-    "gettingStarted": {
-        "title": "Getting Started",
-        "step1": "Configure your environment variables",
-        "step2": "Customize components for your needs",
-        "step3": "Start building your SaaS application"
+    "flow": {
+        "title": "How work flows",
+        "iterate": {
+            "title": "Iterate",
+            "text": "Per change, seconds: oxlint, tsc and the changed tests. One spec through the tracer when the change has one."
+        },
+        "commit": {
+            "title": "Commit",
+            "text": "The pre-commit hook owns it: staged autofix, the TDD sibling gate, the repo-wide cheap checks, the docs check when docs are staged."
+        },
+        "push": {
+            "title": "Push",
+            "text": "The pre-push hook runs the gate once, phase-aware: before the first deploy it skips the heavy stages out loud; after it, the full chain."
+        },
+        "ci": {
+            "title": "CI",
+            "text": "The same chain, phase-blind, plus what only CI can do: security scans, the dev smoke, the cross-browser run, the weekly mutation score."
+        }
+    },
+    "agents": {
+        "title": "Agent flow",
+        "lead": "One file every tool reads. Cursor, Claude Code and Copilot all start from it; the brain files it points at hold the depth.",
+        "commands": {
+            "onboard": "read the brain, verify it against the code, report drift, stop",
+            "feat": "reuse check, scope, plan, test-first, gate, report",
+            "test": "tests that hunt corner cases at the seams, not the happy path",
+            "review": "senior review of the diff: leaks, security, bug hunt",
+            "docs": "bring the guide and the brain back in line with the code"
+        },
+        "spec": "Anything bigger than a one-sentence diff starts with a spec and a plan, copied from the templates folder, reviewed before the first edit."
+    },
+    "reading": {
+        "title": "Where to read",
+        "index": "a situation mapped to the two or three files that answer it",
+        "map": "entry points, state boundaries, the route table",
+        "skeletons": "danger zones learned from real incidents",
+        "verification": "what to run per kind of change",
+        "decisions": "why the stack is the way it is, with dates and revisit triggers"
+    },
+    "steps": {
+        "title": "First steps",
+        "prepare": "installs the git hooks; lifecycle scripts are off by design",
+        "dev": "starts the dev server",
+        "iter": "the iteration tier, run per change",
+        "graduate": "then follow the graduation guide to turn the template into a product"
     }
 }

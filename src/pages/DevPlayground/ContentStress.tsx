@@ -147,7 +147,7 @@ export const ContentStress: FunctionComponent = () => {
     // the TYPICAL state is genuinely typical and the LONG state is a real string tripled.
     const sourceText = t('home:description');
     const sourceLabel = t('common:button.submit');
-    const sourceHeading = t('home:features.title');
+    const sourceHeading = t('home:inside.title');
     const sourceMessage = t('errors:validation.maxLength');
     const iconLabel = t('common:success');
 
@@ -159,8 +159,8 @@ export const ContentStress: FunctionComponent = () => {
             data-stress-total={CONTENT_STRESS_TOTAL}
         >
             <div className="space-y-2">
-                <h1 className="text-3xl font-bold">{t('home:features.title')}</h1>
-                <p className="text-muted-foreground">{t('home:subtitle')}</p>
+                <h1 className="text-3xl font-bold">{t('home:inside.title')}</h1>
+                <p className="text-muted-foreground">{t('home:seed')}</p>
             </div>
 
             <div className="grid min-w-0 gap-6">
