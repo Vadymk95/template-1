@@ -18,9 +18,9 @@ name: Security
 
 on:
     pull_request:
-        branches: [master]
+        branches: [main, master]
     push:
-        branches: [master]
+        branches: [main, master]
     schedule:
         # Sunday 06:00 UTC — weekly catch-up scan picks up CVEs published mid-week.
         - cron: '0 6 * * 0'

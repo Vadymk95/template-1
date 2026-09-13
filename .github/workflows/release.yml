@@ -7,13 +7,21 @@ name: Release
 # published to npm — a template is forked, not installed.
 #
 # Config: release-please-config.json (what to bump, from which commit); .release-please-manifest.json
-# (the version the tool starts from — keep it equal to package.json). The PR is opened with the workflow's
-# own token, so no CI runs on it (a GitHub rule for GITHUB_TOKEN-created events); it only changes the
-# version, the changelog and the lock file, so merge it as the repository owner. To get CI on release PRs,
-# add a fine-grained PAT as the RELEASE_PLEASE_TOKEN secret and pass it as `token:` below.
+# (the version the tool starts from — keep it equal to package.json).
+#
+# The PR is opened with this workflow's own token, and that has a consequence worth knowing before it
+# costs an hour: the runs it triggers are created in the `action_required` state and report NOTHING until
+# a human approves them. A required status check that never reports is Pending forever, so the release PR
+# sits at "Merging is blocked" with zero checks listed — which reads like a broken rule and is not one.
+# Measured 2026-09-13: every run on the release branch came back `conclusion: action_required`.
+# Two ways out. Click "Approve and run" on the runs in the Actions tab (or
+# `gh api --method POST repos/OWNER/REPO/actions/runs/<id>/approve`) — one click per release, nothing is
+# weakened. Or add a fine-grained PAT as the RELEASE_PLEASE_TOKEN secret and pass it as `token:` below,
+# which removes the click for good. Do NOT reach for an admin bypass merge instead: bypass is not
+# selective, it skips the status checks, the pull-request rule and the force-push rule together.
 on:
     push:
-        branches: [master]
+        branches: [main, master]
 
 permissions:
     contents: write
