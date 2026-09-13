@@ -4,6 +4,7 @@ import {
     budgetReport,
     checkCommandTable,
     checkDeadDocs,
+    checkQuarantine,
     checkPathsAndScripts,
     checkRevisitDates,
     checkSentinels,
@@ -11,6 +12,7 @@ import {
     classifyToken,
     compareVersion,
     extractTokens,
+    listTestFiles,
     parseTraceRows,
     pathExists,
     percentile90,
@@ -225,5 +227,50 @@ describe('checkRevisitDates', () => {
         expect(findings).toEqual([
             'x.md:2: revisit/trigger dated 2026-01-01 is in the past — act on it or re-date it'
         ]);
+    });
+});
+
+describe('checkQuarantine', () => {
+    const today = '2026-09-13';
+    it('flags a focused test, an unconditional skip without a marker and an expired quarantine', () => {
+        const tests = [
+            /* Assembled so this file's own source never matches the patterns it tests. */
+            ['a.test.ts', `${'it'}.only('x', () => {});`],
+            ['b.spec.ts', `${'test'}.skip('flaky', async () => {});`],
+            [
+                'c.test.ts',
+                `// quarantine until 2026-09-01: waits on the upstream fix\n${'describe'}.skip('x', () => {});`
+            ]
+        ];
+        const findings = checkQuarantine({ tests, today });
+        expect(findings).toHaveLength(3);
+        expect(findings[0]).toContain('a.test.ts:1');
+        expect(findings[1]).toContain('quarantine until YYYY-MM-DD');
+        expect(findings[2]).toContain('has expired');
+    });
+    it('accepts a conditional skip on the same or the next line, and a live quarantine', () => {
+        const tests = [
+            [
+                'd.spec.ts',
+                "test.skip(({ browserName }) => browserName !== 'chromium', 'chromium only');"
+            ],
+            [
+                'e.spec.ts',
+                "test.skip(\n    ({ baseURL }) => !baseURL?.includes(':4173'),\n    'preview only'\n);"
+            ],
+            [
+                'f.test.ts',
+                "// quarantine until 2099-01-01: the fixture is rewritten in the next slice\nit.skip('x', () => {});"
+            ]
+        ];
+        expect(checkQuarantine({ tests, today })).toEqual([]);
+    });
+});
+
+describe('listTestFiles', () => {
+    it('finds this suite and never looks inside node_modules', () => {
+        const files = listTestFiles(process.cwd());
+        expect(files).toContain('scripts/docs-check.test.mjs');
+        expect(files.some((file) => file.includes('node_modules'))).toBe(false);
     });
 });

@@ -17,6 +17,8 @@
  *              script families must exist in package.json
  *   sentinels  the tier-law sentinel sentences (gate-tiers.json → docs.sentinels) appear only in
  *              AGENTS.md — a copy elsewhere is a restatement, which is how rules go stale in place
+ *   tests      no focused test (`.only`) lands; an unconditional `.skip`/`.fixme` carries
+ *              `quarantine until YYYY-MM-DD` and a reason, and that date is not past
  *   versions   "Vitest 5" / "React 19.3" in a doc matches the installed version (package-lock.json)
  *   table      every non-internal package.json script is documented in AGENTS.md or README.md
  *   dead       every doc file has an inbound reference (platform-discovered files exempt)
@@ -255,6 +257,79 @@ export const checkDeadDocs = ({ docs, extraText = '' }) => {
     return findings;
 };
 
+/** Test files (`*.test.*`, `*.spec.*`) outside dependencies and build output. */
+const TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/;
+const SKIPPED_DIRS = new Set([
+    'node_modules',
+    'dist',
+    'build',
+    'coverage',
+    '.next',
+    '.expo',
+    '.git',
+    '.probe',
+    '.atlas',
+    '.atlas-android',
+    'playwright-report',
+    'test-results'
+]);
+export const listTestFiles = (root) => {
+    const found = [];
+    const walk = (dir) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+            if (entry.isDirectory()) {
+                if (!SKIPPED_DIRS.has(entry.name)) walk(path.join(dir, entry.name));
+            } else if (TEST_FILE.test(entry.name)) {
+                found.push(path.relative(root, path.join(dir, entry.name)));
+            }
+        }
+    };
+    walk(root);
+    return found.sort();
+};
+
+const FOCUS_PATTERN = /\b(test|it|describe)\.only\(/;
+const SKIP_PATTERN = /\b(test|it|describe)\.(skip|fixme)\((.*)$/;
+const QUARANTINE_PATTERN = /quarantined? until (20\d\d-\d\d-\d\d)/i;
+/** A skip is conditional when its first argument is an expression rather than a string or nothing. */
+const isConditionalSkip = (firstArgument) =>
+    firstArgument.length > 0 && !/^['"`)]/.test(firstArgument);
+
+/**
+ * Flaky tests are fixed or quarantined, never silently skipped: an unconditional skip names its
+ * reason and an expiry (`quarantine until YYYY-MM-DD`) on the line or the two above; a focused test
+ * never lands, because `.only` shrinks the suite for every later run.
+ */
+export const checkQuarantine = ({ tests, today }) => {
+    const findings = [];
+    for (const [file, text] of tests) {
+        const lines = text.split('\n');
+        lines.forEach((line, index) => {
+            if (FOCUS_PATTERN.test(line)) {
+                findings.push(
+                    `${file}:${index + 1}: a focused test (\`.only\`) shrinks the suite for everyone — remove it`
+                );
+            }
+            const skip = line.match(SKIP_PATTERN);
+            if (!skip) return;
+            const firstArgument = skip[3].trim() || (lines[index + 1] ?? '').trim();
+            if (isConditionalSkip(firstArgument)) return;
+            const window = lines.slice(Math.max(0, index - 2), index + 1).join('\n');
+            const quarantine = window.match(QUARANTINE_PATTERN);
+            if (!quarantine) {
+                findings.push(
+                    `${file}:${index + 1}: an unconditional \`.${skip[2]}\` needs "quarantine until YYYY-MM-DD" plus the reason (flaky tests are fixed or quarantined, never silently skipped)`
+                );
+            } else if (quarantine[1] < today) {
+                findings.push(
+                    `${file}:${index + 1}: quarantine until ${quarantine[1]} has expired — fix the test or re-date it with the reason`
+                );
+            }
+        });
+    }
+    return findings;
+};
+
 export const percentile90 = (values) => {
     if (values.length === 0) return null;
     const sorted = [...values].sort((a, b) => a - b);
@@ -395,6 +470,11 @@ export const run = ({ root, weekly, today }) => {
         }),
         ...checkDeadDocs({ docs, extraText: workflowText })
     ];
+    const tests = listTestFiles(root).map((file) => [
+        file,
+        readFileSync(path.join(root, file), 'utf8')
+    ]);
+    findings.push(...checkQuarantine({ tests, today }));
     if (weekly) findings.push(...checkRevisitDates({ docs, today }));
 
     const pushLabel = tiers.moments?.push?.expected?.[0] ?? 'verify:push';
@@ -427,7 +507,7 @@ const main = () => {
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {
         console.log(
-            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs'
+            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, test quarantines'
         );
         process.exit(0);
     }
