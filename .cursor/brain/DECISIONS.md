@@ -170,6 +170,8 @@ message initialised and then unconditionally overwritten in both branches below 
 
 **Revisit trigger (60-day, 2026-07-23; checked 2026-09-12, no fork data yet, re-armed 2026-12-01)**: if a fork hits ≥3 false-positive budget bumps from legitimate feature work in 60 days, recalibrate budgets to p75 of fork-distribution OR move size-limit out of `ci:local` into PR-comment-only (size-limit GH Action). If size-limit `--why` flag reports same vendor exceeding budget across 3 forks, raise the budget structurally.
 
+**Re-measured 2026-09-13**: the `index entry` budget 25 → 27 KB. The in-range update took `zod` 4.5.4 → 4.6.4, which alone grew the entry chunk by ~1.5 kB brotli (bisected by pinning each updated package back: zod restored 24.15 kB; react-hook-form, tailwind-merge and vite changed nothing). No app code changed; measured 25.65 kB against the 25 KB budget, so the number moves once with the cause named, not the rule.
+
 ## [2026-05] REJECT list — explicit non-adoption (2026-05-23 /consilium)
 
 **Decision**: explicit DO-NOT-ADOPT register so future agents + forks don't re-litigate. Per /consilium 2026-05-23 APPLY Item 14 (6/6 voters YES). Sibling templates carry equivalent sections.
