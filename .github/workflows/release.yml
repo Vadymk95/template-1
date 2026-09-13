@@ -1,0 +1,35 @@
+name: Release
+
+# Release Please reads the Conventional Commits on master (commitlint enforces them at commit time) and
+# keeps ONE open "release" pull request up to date: the next version by the commit types (feat → minor,
+# fix → patch, a `!` or a BREAKING CHANGE footer → major), the CHANGELOG entry, package.json and the lock
+# file. Merging that PR is the release: it tags `v<version>` and publishes the GitHub release. Nothing is
+# published to npm — a template is forked, not installed.
+#
+# Config: release-please-config.json (what to bump, from which commit); .release-please-manifest.json
+# (the version the tool starts from — keep it equal to package.json). The PR is opened with the workflow's
+# own token, so no CI runs on it (a GitHub rule for GITHUB_TOKEN-created events); it only changes the
+# version, the changelog and the lock file, so merge it as the repository owner. To get CI on release PRs,
+# add a fine-grained PAT as the RELEASE_PLEASE_TOKEN secret and pass it as `token:` below.
+on:
+    push:
+        branches: [master]
+
+permissions:
+    contents: write
+    issues: write
+    pull-requests: write
+
+concurrency:
+    group: release-please
+    cancel-in-progress: false
+
+jobs:
+    release-please:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: googleapis/release-please-action@v4
+              with:
+                  config-file: release-please-config.json
+                  manifest-file: .release-please-manifest.json

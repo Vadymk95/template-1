@@ -523,6 +523,10 @@ Bump the floor to whatever version `npm audit` currently recommends.
 
 ---
 
+## Releases
+
+Versions follow the commit types (commitlint enforces Conventional Commits): `feat` → minor, `fix` → patch, a `!` or a `BREAKING CHANGE` footer → major. `.github/workflows/release.yml` keeps one release pull request open with the next version, the `CHANGELOG.md` entry, `package.json` and the lock file; merging it tags `v<version>` and publishes the GitHub release. Nothing goes to npm — a template is forked, not installed. The starting point is `.release-please-manifest.json` (keep it equal to `package.json`); commits before `bootstrap-sha` in `release-please-config.json` are not part of the first changelog.
+
 ## 📝 Additional Notes
 
 - **Meta Tags:** add description and robots meta tags in `index.html`
