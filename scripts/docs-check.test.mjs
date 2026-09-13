@@ -12,6 +12,7 @@ import {
     compareVersion,
     extractTokens,
     parseTraceRows,
+    pathExists,
     percentile90,
     scriptFamilies
 } from './docs-check.mjs';
@@ -38,6 +39,7 @@ describe('classifyToken', () => {
             value: 'verify:iter'
         });
         expect(classifyToken('verify:iter', ctx)).toEqual({ kind: 'script', value: 'verify:iter' });
+        expect(classifyToken('npm run perf:*', ctx)).toEqual({ kind: 'family', value: 'perf:' });
         expect(classifyToken('hover:text-primary', ctx).kind).toBe('other');
         expect(classifyToken('npm:rolldown-vite', ctx).kind).toBe('other');
     });
@@ -47,6 +49,11 @@ describe('classifyToken', () => {
             value: '.cursor/brain/MAP.md'
         });
         expect(classifyToken('./src/env.ts', ctx)).toEqual({ kind: 'path', value: 'src/env.ts' });
+        expect(classifyToken('src/env.ts:12', ctx)).toEqual({ kind: 'path', value: 'src/env.ts' });
+        expect(classifyToken('src/env.ts:12-14', ctx)).toEqual({
+            kind: 'path',
+            value: 'src/env.ts'
+        });
         expect(classifyToken('src/pages/<Page>/', ctx).kind).toBe('other');
         expect(classifyToken('/dev/ui', ctx).kind).toBe('other');
         expect(classifyToken('msw/node', ctx).kind).toBe('other');
@@ -71,6 +78,7 @@ describe('checkPathsAndScripts', () => {
     it('flags a missing script and a missing anchored path, skips history files', () => {
         const docs = [
             ['README.md', 'run `npm run nope` then open `scripts/missing.mjs` or `PLAN.md`'],
+            ['AGENTS.md', '`npm run verify:*` is fine, `npm run gone:*` is not'],
             ['.cursor/brain/DECISIONS.md', 'old `scripts/gone.mjs`']
         ];
         const findings = checkPathsAndScripts({
@@ -79,9 +87,18 @@ describe('checkPathsAndScripts', () => {
             scripts: { 'verify:iter': 'x' },
             topDirs: new Set(['scripts'])
         });
-        expect(findings).toHaveLength(2);
+        expect(findings).toHaveLength(3);
         expect(findings[0]).toContain('npm run nope');
         expect(findings[1]).toContain('scripts/missing.mjs');
+        expect(findings[2]).toContain('npm run gone:*');
+    });
+});
+
+describe('pathExists', () => {
+    it('accepts a module named without its extension, rejects a missing one', () => {
+        expect(pathExists(process.cwd(), 'scripts/docs-check')).toBe(true);
+        expect(pathExists(process.cwd(), 'scripts/docs-check.mjs')).toBe(true);
+        expect(pathExists(process.cwd(), 'scripts/nope')).toBe(false);
     });
 });
 
@@ -142,18 +159,21 @@ describe('checkCommandTable', () => {
 });
 
 describe('checkDeadDocs', () => {
-    it('reports a doc nothing points at; accepts a basename reference, a workflow reference, shims and platform files', () => {
+    it('reports a doc nothing points at; accepts a basename reference, a workflow reference, shims, platform files and attached rules', () => {
         const docs = [
             ['AGENTS.md', 'see MAP.md'],
             ['.cursor/brain/MAP.md', ''],
             ['.cursor/brain/ORPHAN.md', ''],
             ['.cursor/docs/guide.md', ''],
             ['.cursor/commands/feat.md', ''],
-            ['.github/pull_request_template.md', '']
+            ['.github/pull_request_template.md', ''],
+            ['.cursor/rules/attached.mdc', '---\nglobs: ["**/*.ts"]\nalwaysApply: false\n---'],
+            ['.cursor/rules/orphan.mdc', '---\nglobs: []\nalwaysApply: false\n---']
         ];
         const findings = checkDeadDocs({ docs, extraText: 'cat .cursor/docs/guide.md' });
         expect(findings).toEqual([
-            '.cursor/brain/ORPHAN.md: no other doc, script or workflow points at it (dead, or a pointer is missing)'
+            '.cursor/brain/ORPHAN.md: no other doc, script or workflow points at it (dead, or a pointer is missing)',
+            '.cursor/rules/orphan.mdc: no other doc, script or workflow points at it (dead, or a pointer is missing)'
         ]);
     });
 });

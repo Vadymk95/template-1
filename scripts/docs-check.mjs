@@ -116,8 +116,12 @@ export const scriptFamilies = (scripts) =>
  * subpath), `PageName.tsx` (an example) and `dist/x.html` (build output) are all "other".
  */
 export const classifyToken = (rawToken, { topDirs, families }) => {
-    const token = rawToken.replace(/[:,.]+$/, '').replace(/^\.\//, '');
-    const npmRun = token.match(/^npm run ([a-z][a-z0-9:-]*)/);
+    const token = rawToken
+        .replace(/[:,.]+$/, '')
+        .replace(/:\d+(?:-\d+)?$/, '')
+        .replace(/^\.\//, '');
+    const npmRun = token.match(/^npm run ([a-z][a-z0-9:-]*)(\*)?/);
+    if (npmRun && npmRun[2]) return { kind: 'family', value: npmRun[1] };
     if (npmRun) return { kind: 'script', value: npmRun[1] };
     if (/^[a-z][a-z0-9-]*(:[a-z0-9-]+)+$/.test(token) && families.has(token.split(':')[0])) {
         return { kind: 'script', value: token };
@@ -130,6 +134,11 @@ export const classifyToken = (rawToken, { topDirs, families }) => {
     return { kind: 'other', value: token };
 };
 
+/** A doc may name a module without its extension (`shared/lib/logger`) or a folder by its index. */
+const MODULE_EXTENSIONS = ['', '.ts', '.tsx', '.mjs', '.js', '/index.ts', '/index.tsx'];
+export const pathExists = (root, value) =>
+    MODULE_EXTENSIONS.some((ext) => existsSync(path.join(root, value + ext)));
+
 export const checkPathsAndScripts = ({ docs, root, scripts, topDirs }) => {
     const findings = [];
     const families = scriptFamilies(scripts);
@@ -137,11 +146,15 @@ export const checkPathsAndScripts = ({ docs, root, scripts, topDirs }) => {
         if (HISTORY_FILES.includes(file)) continue;
         for (const { token, line } of extractTokens(text)) {
             const { kind, value } = classifyToken(token, { topDirs, families });
-            if (kind === 'script' && !(value in scripts)) {
+            if (kind === 'family' && !Object.keys(scripts).some((name) => name.startsWith(value))) {
+                findings.push(
+                    `${file}:${line}: \`${token}\` names a script family that package.json does not have`
+                );
+            } else if (kind === 'script' && !(value in scripts)) {
                 findings.push(
                     `${file}:${line}: \`${token}\` names an npm script that package.json does not have`
                 );
-            } else if (kind === 'path' && !existsSync(path.join(root, value))) {
+            } else if (kind === 'path' && !pathExists(root, value)) {
                 findings.push(`${file}:${line}: \`${token}\` does not exist in the tree`);
             }
         }
@@ -215,11 +228,15 @@ export const checkCommandTable = ({
     return findings;
 };
 
+/** A Cursor rule with globs or alwaysApply is attached by the editor, so no doc has to point at it. */
+const ATTACHED_RULE = /^(globs:\s*(?!\[\]\s*$)\S|alwaysApply:\s*true)/m;
+
 export const checkDeadDocs = ({ docs, extraText = '' }) => {
     const findings = [];
     const entries = [...docs];
-    for (const [file] of entries) {
+    for (const [file, text] of entries) {
         if (PLATFORM_DISCOVERED.includes(file) || file.startsWith(`${SHIM_DIR}/`)) continue;
+        if (file.startsWith('.cursor/rules/') && ATTACHED_RULE.test(text)) continue;
         const basename = path.basename(file);
         const referenced = entries.some(
             ([other, text]) => other !== file && (text.includes(file) || text.includes(basename))

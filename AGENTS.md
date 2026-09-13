@@ -143,7 +143,7 @@ that file disagree, the file wins and the prose is fixed in the same commit.
   (the security workflow, the scheduled mutation job, a mandatory dev-smoke job where the repo has one).
 
 **Prohibitions, stated as such.** An implementer or a reviewer NEVER runs `verify`, `verify:ci`,
-`verify:full`, `build` or the e2e suite by hand: the full chain belongs to the push hook and CI, and a
+the fuller `verify:*` variants, `build` or the e2e suite by hand: the full chain belongs to the push hook and CI, and a
 result an agent cannot act on is not worth its minutes. A review round gets the diff plus `verify:iter`;
 acceptance does not re-run the gate, the push does. Parallel lanes never run heavy stages (one machine,
 shared caches): heavy work serialises at the push. Individual scripts (`typecheck`, `lint`, `test`, `fix`)
