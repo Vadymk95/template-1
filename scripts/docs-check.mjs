@@ -430,6 +430,15 @@ export const parseTraceRows = (text) =>
  * Pure by design: it reads no file and writes none. The caller passes the stored baseline and
  * persists the one this returns, so the arithmetic stays testable without a filesystem.
  */
+/** Reads a JSON file that may be absent or half-written; either way the answer is "nothing stored". */
+const readJsonOrEmpty = (file) => {
+    try {
+        return JSON.parse(readFileSync(file, 'utf8'));
+    } catch {
+        return {};
+    }
+};
+
 export const budgetReport = ({
     rows,
     label,
@@ -601,9 +610,11 @@ export const run = ({ root, weekly, today }) => {
        property of THIS machine, not of the template, so a fork calibrates itself instead of
        inheriting a ceiling it may be unable to meet. */
     const baselinePath = path.join(root, '.gate-budget.json');
-    const storedBaselines = existsSync(baselinePath)
-        ? JSON.parse(readFileSync(baselinePath, 'utf8'))
-        : {};
+    /* Read and catch, never check-then-read: the two-step form is a file-system race, and CodeQL
+       says so out loud (js/file-system-race, high). It also folds in the case the check never
+       handled - a file left half-written by an interrupted run - and both mean the same thing here,
+       which is that this machine has no baseline yet. Neither is worth failing a docs check for. */
+    const storedBaselines = readJsonOrEmpty(baselinePath);
     const baselineKey = `${pushLabel}@${phase}`;
     const baselineMs = storedBaselines[baselineKey] ?? null;
     const budget =
