@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.2](https://github.com/Vadymk95/template-1/compare/v3.2.1...v3.2.2) (2026-09-13)
+
+
+### Bug fixes
+
+* **ci:** a fork that renames its default branch no longer loses CI and protection ([#70](https://github.com/Vadymk95/template-1/issues/70)) ([6e47f3d](https://github.com/Vadymk95/template-1/commit/6e47f3d94567379e0ed71ad08e3bf8e1ee511d6c))
+
 ## [3.2.1](https://github.com/Vadymk95/template-1/compare/v3.2.0...v3.2.1) (2026-09-13)
 
 
