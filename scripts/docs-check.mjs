@@ -407,10 +407,23 @@ export const parseTraceRows = (text) =>
             phase: phase ?? ''
         }));
 
-export const budgetReport = ({ rows, label, budgetSeconds, phase }) => {
-    const durations = rows
+/**
+ * A budget with no recency window can never recover from a bad day. Measured in a sibling repository
+ * on 2026-09-13, in one afternoon and in order: p90 350.8s over 33 runs, 359.3s over 34, 382.0s over
+ * 35 - while the suite it measures got 192s of cumulative browser time FASTER in the same window.
+ * The tail that moved it was two runs taken on a workstation that was running four other gates. The
+ * budget then reads red on a healthy suite, and the tempting fix is to raise it, which is exactly
+ * what a budget exists to prevent. A window makes the number describe the CURRENT regime instead.
+ */
+export const budgetReport = ({ rows, label, budgetSeconds, phase, budgetWindow = 0 }) => {
+    const successful = rows
         .filter((row) => row.label === label && row.exitCode === '0' && row.phase === phase)
         .map((row) => row.durationMs);
+    const durations = budgetWindow > 0 ? successful.slice(-budgetWindow) : successful;
+    const scope =
+        budgetWindow > 0 && successful.length > durations.length
+            ? `the last ${String(durations.length)} of ${String(successful.length)} runs`
+            : `${String(durations.length)} runs`;
     if (durations.length < 3) {
         return {
             kind: 'skip',
@@ -423,7 +436,7 @@ export const budgetReport = ({ rows, label, budgetSeconds, phase }) => {
     if (p90 > budgetMs) {
         return {
             kind: 'warn',
-            message: `budget: "${label}" p90 is ${seconds}s over ${durations.length} runs in phase ${phase}, above the ${budgetSeconds}s budget — re-measure and set the budget in gate-tiers.json`
+            message: `budget: "${label}" p90 is ${seconds}s over ${scope} in phase ${phase}, above the ${budgetSeconds}s budget — re-measure and set the budget in gate-tiers.json`
         };
     }
     if (budgetMs > 2 * p90) {
@@ -434,7 +447,7 @@ export const budgetReport = ({ rows, label, budgetSeconds, phase }) => {
     }
     return {
         kind: 'ok',
-        message: `budget: "${label}" p90 ${seconds}s over ${durations.length} runs in phase ${phase}, within ${budgetSeconds}s`
+        message: `budget: "${label}" p90 ${seconds}s over ${scope} in phase ${phase}, within ${budgetSeconds}s`
     };
 };
 
@@ -544,6 +557,7 @@ export const run = ({ root, weekly, today }) => {
        have been measured; `budgetSeconds` stays the fallback. */
     const pushMoment = tiers.moments?.push ?? {};
     const budgetSeconds = pushMoment.budgetSecondsByPhase?.[phase] ?? pushMoment.budgetSeconds ?? 0;
+    const budgetWindow = tiers.moments?.push?.budgetWindow ?? 0;
     const budget =
         rows.length === 0
             ? {
@@ -551,7 +565,7 @@ export const run = ({ root, weekly, today }) => {
                   message:
                       'budget: SKIPPED — no .gate-trace.log here (CI never has one; locally, run a push first)'
               }
-            : budgetReport({ rows, label: pushLabel, budgetSeconds, phase });
+            : budgetReport({ rows, label: pushLabel, budgetSeconds, phase, budgetWindow });
 
     return { findings, budget };
 };

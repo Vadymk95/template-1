@@ -153,7 +153,9 @@
             },
             "_budgetMeasured": "2026-09-13, p90 from .gate-trace.log: phase 0 25s ceiling, phase 1 45s ceiling, phase full 45s ceiling",
             "runsRegardlessOfDiff": true,
-            "requiresMainCheckout": true
+            "requiresMainCheckout": true,
+            "budgetWindow": 20,
+            "_budgetWindow": "p90 is taken over the last 20 successful runs in the phase, not over the whole log. Without a window one bad day poisons the number until enough good runs dilute it, and the tempting fix is then to raise the budget - which is exactly what a budget exists to prevent. 20 is long enough that one slow run does not swing it and short enough that the number describes the current regime."
         }
     }
 }
