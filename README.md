@@ -533,13 +533,20 @@ Files travel with a fork. Settings do not. Everything the gate needs is in the f
 
 Not inherited, and each one is a switch in your own repository's settings:
 
-- **Rulesets and branch protection**, including the required `validate` check. Until you add one, your default branch accepts any push, and the pull-request discipline this repository documents is a habit rather than a rule.
+- **Rulesets and branch protection**, including every required status check. Until you add one, your default branch accepts any push, and the pull-request discipline this repository documents is a habit rather than a rule.
 - **Actions permissions.** A fork starts with workflows disabled; GitHub asks you to enable them once, in the Actions tab. Until you do, the CI described here never runs, and a green screen means nobody looked.
 - **Secret scanning and push protection**, **CodeQL**, and **Dependabot alerts.** The Dependabot CONFIG file travels; the alerts it feeds are a setting.
 
-The order that costs least: enable Actions, open one pull request so the checks register their names, then add a ruleset on your default branch requiring the `validate` check. That last step is what turns the rest of this README from description into enforcement.
+`.github/ruleset.json` is the protection this repository runs, written down so you can reproduce it with one command instead of clicking through a form:
 
-One thing that is NOT a setting and is easy to miss: `.npmrc` disables lifecycle scripts on purpose, so `npm install` alone leaves you with no git hooks. `npm run prepare` once after cloning is what installs them.
+```bash
+gh api --method POST repos/OWNER/REPO/rulesets --input .github/ruleset.json
+gh api repos/OWNER/REPO/rules/branches/master   # or main — whatever your default branch is
+```
+
+The order matters, and this one costs least: enable Actions, open one pull request and let every check report its name at least once, then post the ruleset. A required check that has never reported is Pending forever, so posting it first blocks every pull request with no error message anywhere — which is why the pull request comes first. The file targets `~DEFAULT_BRANCH` rather than a branch name, so it survives a rename; the check names inside it are the ones these workflows actually produce, so if you rename a CI job, update this file in the same commit.
+
+Two things that are NOT settings and are easy to miss. `.npmrc` disables lifecycle scripts on purpose, so `npm install` alone leaves you with no git hooks — `npm run prepare` once after cloning is what installs them. And the workflows trigger on `main` and `master` both, so renaming your default branch to either does not silently stop CI; any other name has to be added to the `branches:` filters, or nothing runs and every required check stays Pending.
 
 ## 📝 Additional Notes
 
