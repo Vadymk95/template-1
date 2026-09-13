@@ -81,7 +81,7 @@
         "@commitlint/config-conventional": "^21.2.0",
         "@eslint/js": "^10.0.1",
         "@playwright/test": "^1.62.1",
-        "@size-limit/preset-app": "^13.0.3",
+        "@size-limit/file": "^13.0.3",
         "@stryker-mutator/core": "^10.0.0",
         "@stryker-mutator/vitest-runner": "^10.0.0",
         "@tailwindcss/vite": "^4.3.3",
@@ -138,10 +138,6 @@
         },
         "js-yaml": ">=4.3.1 <5",
         "undici": ">=7.29.0 <8",
-        "@puppeteer/browsers": ">=3.0.2 <4",
-        "estimo": {
-            "nanoid": ">=5.1.16 <6"
-        },
         "postcss": {
             "nanoid": ">=3.3.18 <4"
         }
