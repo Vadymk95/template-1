@@ -38,7 +38,14 @@ export default defineConfig([
         'test-results/**',
         'playwright-report/**',
         'blob-report/**',
-        'playwright/.cache/**'
+        'playwright/.cache/**',
+        // An agent worktree created under the repository root is a full SECOND CHECKOUT, and every
+        // ignore above is root-anchored, so its copies walk straight past them. Same class as the
+        // `.stryker-tmp` line - the gate must never lint a copy of the repo - and measured with a
+        // probe file on 2026-09-13: without this line eslint linted the copy as if it were ours.
+        // The rule stays that agent worktrees belong OUTSIDE the repository; this line is what
+        // makes the gate independent of anyone remembering it.
+        '.claude/worktrees'
     ]),
     // ─── oxlint — disable ESLint rules that oxlint already covers ────────────
     // Contract: oxlint owns JS/ES basics (no-console, eqeqeq, prefer-const, no-unused-vars,
