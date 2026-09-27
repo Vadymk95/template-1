@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.2.3](https://github.com/Vadymk95/template-1/compare/v3.2.2...v3.2.3) (2026-09-27)
+
+
+### Maintenance
+
+* **deps:** bump the development-dependencies group with 9 updates ([#74](https://github.com/Vadymk95/template-1/issues/74)) ([0ca8a23](https://github.com/Vadymk95/template-1/commit/0ca8a23e759a1c1710b363b81ebd51a2cac27a83))
+* **deps:** bump the production-dependencies group with 6 updates ([#73](https://github.com/Vadymk95/template-1/issues/73)) ([97b5bdb](https://github.com/Vadymk95/template-1/commit/97b5bdbcd3dc4e89b27bb469a7d3a3921534a6b3))
+
+
+### CI
+
+* **deps:** bump googleapis/release-please-action in the actions group ([#72](https://github.com/Vadymk95/template-1/issues/72)) ([8cfc2da](https://github.com/Vadymk95/template-1/commit/8cfc2daa06e6f8faec345a1352c2984167d6ad12))
+
 ## [3.2.2](https://github.com/Vadymk95/template-1/compare/v3.2.1...v3.2.2) (2026-09-13)
 
 
