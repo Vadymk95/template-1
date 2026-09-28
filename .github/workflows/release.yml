@@ -16,8 +16,10 @@ name: Release
 # Measured 2026-09-13: every run on the release branch came back `conclusion: action_required`.
 # Two ways out. Click "Approve and run" on the runs in the Actions tab (or
 # `gh api --method POST repos/OWNER/REPO/actions/runs/<id>/approve`) — one click per release, nothing is
-# weakened. Or add a fine-grained PAT as the RELEASE_PLEASE_TOKEN secret and pass it as `token:` below,
-# which removes the click for good. Do NOT reach for an admin bypass merge instead: bypass is not
+# weakened. Or add a fine-grained PAT (this repository only: Contents, Issues and Pull requests read and
+# write) as the RELEASE_PLEASE_TOKEN secret, which removes the click for good: `token:` below already
+# prefers it and falls back to this workflow's own token while the secret is absent.
+# Do NOT reach for an admin bypass merge instead: bypass is not
 # selective, it skips the status checks, the pull-request rule and the force-push rule together.
 on:
     push:
@@ -39,5 +41,6 @@ jobs:
         steps:
             - uses: googleapis/release-please-action@v5
               with:
+                  token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
                   config-file: release-please-config.json
                   manifest-file: .release-please-manifest.json
