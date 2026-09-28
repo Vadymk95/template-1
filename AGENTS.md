@@ -192,6 +192,17 @@ scripts take the next free port. Only the push gate clears its own port.
   points at (read on demand; nothing beyond `AGENTS.md` is `@`-imported); Cursor reads `AGENTS.md` plus
   every `alwaysApply: true` rule; Copilot reads `.github/copilot-instructions.md`. `AGENTS.md` is the only
   file all of them read, which is why the law lives here and everything else is a pointer.
+- **What an agent may not do.** `.claude/settings.json` holds the agent-side limits; they bind Claude Code
+  only (Cursor, Copilot and Codex do not read that file). Denied in every permission mode, bypass
+  included: reading .env files other than the example, editing `.claude/settings.json` itself, a force
+  push (a `+branch` refspec too), `--no-verify` or `-n` on a commit, `--no-verify` on a push,
+  `git reset --hard`, `git clean -f`. Asked before every edit of the gate files, the documented edits
+  included (the phase flip, a raised mutation threshold): `.husky/`, `.github/workflows/`,
+  `.github/ruleset.json`, `scripts/gate-tiers.json`, `stryker.config.json`, `.npmrc`. A rule matches the
+  command or path as an agent usually writes it and is not a security boundary: `sh -c`, a full binary
+  path, a `git -C` or `git -c` prefix, a bundled flag such as `-uf`, or a command that reads a file
+  without naming it (`grep -r`) walks past it. The boundary is the required CI check on the default
+  branch. To change a guarded file, edit it yourself or change the rule in a reviewed commit.
 
 ### Before code - spec and plan
 
