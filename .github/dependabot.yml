@@ -12,11 +12,12 @@ updates:
       cooldown:
           default-days: 7
           semver-major-days: 14
+      # One weekly PR for every minor and patch update, production and development alike: two groups
+      # both rewrite package-lock.json, so the second one conflicted after the first merged (2026-09-27).
+      # A major update still arrives as its own PR, where it gets its own look.
       groups:
-          production-dependencies:
-              dependency-type: production
-          development-dependencies:
-              dependency-type: development
+          minor-and-patch:
+              update-types: ['minor', 'patch']
       # Every entry here mirrors a version hold in .cursor/brain/DECISIONS.md. An
       # ignore that outlives its reason is worse than none: it silently withholds
       # security patches. Check the reason before adding or keeping one.
