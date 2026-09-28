@@ -51,12 +51,13 @@ reports
 # .claude/commands/ holds the repo's own agent commands and is tracked for the
 # same reason. The directory itself has to be re-included first: the global
 # ignore lists `.claude/`, and git will not descend into an ignored directory to
-# see a negation inside it. Machine-local settings stay untracked.
+# see a negation inside it. `.claude/settings.json` is tracked too: it carries the agent limits every
+# clone shares (AGENTS.md § Lanes). Machine-local settings stay untracked in settings.local.json.
 !.claude/
 !.claude/commands/
 !.claude/commands/**
+!.claude/settings.json
 .claude/settings.local.json
-.claude/settings.json
 .claude/worktrees/
 
 # The gate's cost baseline, calibrated from THIS machine's own runs. Never committed, for the same

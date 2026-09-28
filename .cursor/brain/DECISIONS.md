@@ -1,5 +1,36 @@
 # Architectural Decisions
 
+## [2026-09] Agent limits in a committed `.claude/settings.json`; one Dependabot group; release token wired
+
+**Decision**: `.claude/settings.json` is tracked and denies, in every permission mode: reading .env files
+other than the example, editing itself, force pushes, `--no-verify`, `git reset --hard`, `git clean -f`; it
+asks before edits of the gate files. The rule text lives in `AGENTS.md` § Lanes. Reopened on 2026-09-28 by
+the owner's decision: the 2026-09-12 review had deferred it until an agent was seen editing a listed file,
+and two public guides now name a deny list as the baseline of a professional agent setup.
+
+**What it is not**: a security boundary. Per the Claude Code permissions docs, a Bash rule matches the
+command as written, and `sh -c`, a full binary path or a `git -C` / `git -c` prefix walks past it; Read and
+Edit denies cover the built-in file tools and the file commands Claude Code recognises in Bash (`cat`,
+`head`, `tail`, `sed`, `tee`), not a script that opens the file itself nor `grep -r` run over the folder.
+The boundary stays the required CI check. Cursor and Codex do not read the file.
+
+**Review, 2026-09-28** (two adversarial passes before merge): a force push through a `+branch` refspec and
+through a bundled `-fu` got past the first rules, both reproduced in a scratch repo, so `git push -f*`,
+`git push *+*` and `git commit -n*` replaced the space-anchored forms. `-uf` and a trailing `-n` still get
+through; more wildcards would start catching commit messages, so they stay documented, not chased. A claim
+that deny rules lapse in `bypassPermissions` was checked and rejected: the permission-modes docs say deny
+rules block in every mode, bypass included.
+
+**Dependabot**: the production and development groups both rewrote `package-lock.json`, so the second PR
+conflicted once the first merged (2026-09-27). One `minor-and-patch` group now carries every non-major
+update; a major still opens its own PR.
+
+**Release token**: `release.yml` passes `secrets.RELEASE_PLEASE_TOKEN || github.token`. With the secret
+absent nothing changes (release PR runs wait in `action_required` for one approval); with a fine-grained
+PAT in it, release PRs get CI like any other PR.
+
+---
+
 ## [2026-09] `extract-zip` closed by one override: `@puppeteer/browsers`, not `puppeteer-core`
 
 **Closed 2026-09-13**: `@size-limit/preset-app` was replaced by `@size-limit/file`. The running-time plugin (`@size-limit/time` → `estimo` → `puppeteer-core`) measured nothing any budget used and cost 15–19 s per CI run (6.5 s → 0.7 s locally, sizes identical). `estimo` and `puppeteer-core` left the tree, and the `@puppeteer/browsers` and `estimo` overrides went with them.
