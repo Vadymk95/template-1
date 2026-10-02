@@ -1,5 +1,20 @@
 # Architectural Decisions
 
+## [2026-10] Playwright `maxFailures: 10` on the gate run and in CI
+
+**Decision**: `playwright.config.ts` caps `maxFailures` at 10 when `usePreview` is true (CI or
+`PLAYWRIGHT_USE_PREVIEW=1`); the desk run against the dev server stays uncapped. Each config also
+writes to its own `outputDir` (`test-results/e2e`, `test-results/dev`) so `--last-failed` never
+reads the wrong suite's record.
+
+**Why**: measured in a sibling product forked from this template over 30 days — 22 of 60 pushes
+went red, and a red push ran up to 21 minutes against ~5 for a green one because every failing
+test waited out its own timeout with no cap. The cap value comes from one measured break of a
+shared invariant in that product (630 tests, six workers): uncapped, the run took 7.5 min and
+reported 55 failures; capped at 10 it stopped at 21 s; capped at 5 it stopped at 15 s — 5 s less,
+at the cost of reporting half as many of the failing neighbours. 10 is the value that measurement
+settled on.
+
 ## [2026-09] Agent limits in a committed `.claude/settings.json`; one Dependabot group; release token wired
 
 **Decision**: `.claude/settings.json` is tracked and denies, in every permission mode: reading .env files

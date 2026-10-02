@@ -149,6 +149,17 @@ acceptance does not re-run the gate, the push does. Parallel lanes never run hea
 shared caches): heavy work serialises at the push. Individual scripts (`typecheck`, `lint`, `test`, `fix`)
 are drill-downs on a specific failure; none of them is a moment.
 
+**A red push costs one fix, not another round of the whole gate.** Where the repo has a browser suite, it
+stops after a capped number of failures on the gate run and in CI (`maxFailures`) instead of running every
+remaining test into its timeouts. After a red push, whoever pushes fixes the cause, rebuilds only when the
+failing stage runs against a build, re-runs only the tests that failed until they pass, then pushes again;
+the push still runs the whole gate and reaches whatever the cap stopped short of. Name the failed spec files
+from the red output: Playwright's `--last-failed` also re-runs every test a capped run never reached, which
+is most of the suite, so it fits only a red that finished under the cap (Jest's `--onlyFailures` has no such
+catch). That re-run is a drill-down on a known failure, so it is the one sanctioned hand-run of a build or of
+browser tests, and it never replaces the push. Each browser config writes to its own output folder, so the
+last-failed record always belongs to the suite that failed.
+
 **What earns a browser test.** The browser suite is counted in INVARIANTS, not in screens. A new route
 or a new component earns a browser test only when it brings an invariant the existing specs do not
 already measure: a different layout shell, an engine-dependent behaviour, the first instance of a flow

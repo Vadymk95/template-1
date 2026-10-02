@@ -17,6 +17,11 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 
 export default defineConfig({
     testDir: 'e2e',
+    // Own output folder: Playwright writes `.last-run.json` into `outputDir`, and this config and
+    // `playwright.dev.config.ts` both run inside the same push chain. A shared default folder lets
+    // the second suite overwrite the first's last-failed record, so `--last-failed` would then
+    // select the wrong tests, or none.
+    outputDir: 'test-results/e2e',
     /*
      * `dev/**` belongs to `playwright.dev.config.ts` and needs the DEV server. Collecting it here runs
      * it against `vite preview`, where the dev-only fixture route 404s — and a spec that finds no
@@ -33,6 +38,11 @@ export default defineConfig({
     // Runner sizing is CI's concern, not preview's: a two-core runner pins one
     // worker; the local gate runs at the machine's core-count default.
     ...(process.env.CI ? { workers: 1 } : {}),
+    // A red run must not cost a green run's wall clock: without a cap, every failure waits out its
+    // own timeout, and CI's retries pay for each failure three times over. 10 is the measured
+    // value — see DECISIONS.md [2026-10] for the numbers. The desk run against the dev server
+    // (`usePreview` false) stays uncapped — it is not what a push or CI pays for.
+    maxFailures: usePreview ? 10 : undefined,
     reporter: [['html', { open: 'never' }], ['list']],
     timeout: 60_000,
     expect: {
