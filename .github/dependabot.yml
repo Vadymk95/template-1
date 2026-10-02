@@ -16,6 +16,9 @@ updates:
       # both rewrite package-lock.json, so the second one conflicted after the first merged (2026-09-27).
       # A major update still arrives as its own PR, where it gets its own look.
       groups:
+          # size-limit and @size-limit/* peer each other exactly; a split major update fails ERESOLVE.
+          size-limit:
+              patterns: ['size-limit', '@size-limit/*']
           minor-and-patch:
               update-types: ['minor', 'patch']
       # Every entry here mirrors a version hold in .cursor/brain/DECISIONS.md. An
