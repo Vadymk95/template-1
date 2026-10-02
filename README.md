@@ -98,7 +98,7 @@ After cloning, these are the exact files / symbols to edit to make the template 
 - **Prettier 3** — code formatting
 - **Husky + lint-staged** — git hooks for quality gates
 - **Commitlint** — conventional commits enforcement
-- **Vitest 5** — unit testing with Testing Library
+- **Vitest 4.1** — unit testing with Testing Library (held back from 5.x; see `AGENTS.md` § Version holds)
 - **Playwright 1.63** — E2E tests; browsers installed on demand by `scripts/ensure-playwright.mjs`
 
 ## 🛠 Project Structure

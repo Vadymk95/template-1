@@ -14,7 +14,7 @@ Production-ready React 19 + Vite 8 (Rolldown) + TypeScript 6.0 SPA template — 
 
 ## Stack
 
-React 19 · TypeScript 6.0 strict · Vite 8 (Rolldown) · Tailwind **v4** · shadcn/ui · Zustand 5 · TanStack Query 5 · React Router 7 · i18next · Vitest 5 · Playwright
+React 19 · TypeScript 6.0 strict · Vite 8 (Rolldown) · Tailwind **v4** · shadcn/ui · Zustand 5 · TanStack Query 5 · React Router 7 · i18next · Vitest 4.1 (held back, see Version holds) · Playwright
 
 ## Critical rules
 
@@ -258,6 +258,10 @@ The gate is **zero-warnings**: `eslint --max-warnings 0`, `oxlint --deny-warning
 - **TypeScript stays `~6.0.x`** — `typescript-eslint` peer is `<6.1.0`. TS 7 exists; do not bump until the peer widens.
 - **`oxlint` tilde-tracks `eslint-plugin-oxlint`** — lockstep releases; the plugin pins `~<its version>`.
 - **`@types/node` stays 24.x** — types match `engines.node >= 24`, not the newest Node.
+- **vitest and `@vitest/coverage-v8` stay `^4.1.11` in this repo** — under vitest 5.0.2 the weekly
+  mutation gate scored 9.59 (cold run) against the `thresholds.break` floor of 40; on 4.1.11 it scores
+  43.49. `dependabot.yml` ignores `vitest >=5` and `@vitest/coverage-v8 >=5`. Lift trigger and the
+  numbers: `DECISIONS.md` § "[2026-10] vitest 5 hold".
 
 ## Machine-agnostic configs
 
