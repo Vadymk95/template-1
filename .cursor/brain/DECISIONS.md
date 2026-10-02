@@ -1,5 +1,17 @@
 # Architectural Decisions
 
+## [2026-10] `brace-expansion` floor raised past three new high advisories (2026-10-02)
+
+**Decision**: root override `"brace-expansion": ">=5.0.9 <6"` raised to `">=5.0.12 <6"`, same entry,
+same cap — not a second line. The 5.0.9 floor had aged into three new high advisories published after
+it was written: `GHSA-q2hr-2g5m-vwhr` (quadratic-time `{a},b}` expansion, fixed 5.0.12),
+`GHSA-qhr7-859c-m2p7` (unbounded recursion on nested brace groups, fixed 5.0.11), `GHSA-6j4f-fj2g-mc7p`
+(unbounded recursion in `parseCommaParts`, fixed 5.0.10). 5.0.12 clears all three in one floor.
+`npm audit --audit-level=high` and `audit:gate` both report zero high/critical afterward (2 moderate,
+pre-existing `qs`/`fast-uri`, untouched). Exactly the aging class the 2026-08-09 sweep below predicted
+for an uncapped floor — this one already carried a cap, so raising it was a one-line edit rather than a
+new allowance.
+
 ## [2026-10] Playwright `maxFailures: 10` on the gate run and in CI
 
 **Decision**: `playwright.config.ts` caps `maxFailures` at 10 when `usePreview` is true (CI or
