@@ -1,5 +1,31 @@
 # Changelog
 
+## [3.3.0](https://github.com/Vadymk95/template-1/compare/v3.2.3...v3.3.0) (2026-10-02)
+
+
+### Features
+
+* **agents:** committed limits deny force pushes, skipped hooks and env reads in every mode ([96e3abb](https://github.com/Vadymk95/template-1/commit/96e3abb48eb2085156814fa6afc049b3342253a2))
+
+
+### Bug fixes
+
+* **deps:** raise the brace-expansion floor past three new high advisories ([8b982b1](https://github.com/Vadymk95/template-1/commit/8b982b1abfa9198a709096c4ac8cfe3a3b4ff891))
+* **test:** hold vitest at 4.1 until the Stryker runner kills mutants under vitest 5 ([e332981](https://github.com/Vadymk95/template-1/commit/e332981b4941ee4a851b57dc01a0af558d293881))
+
+
+### Maintenance
+
+* **deps:** bump the minor-and-patch group with 14 updates ([#83](https://github.com/Vadymk95/template-1/issues/83)) ([b97a6d7](https://github.com/Vadymk95/template-1/commit/b97a6d717ae3f34c51fbca214f6fa5ace63fc2ac))
+* **deps:** size-limit and @size-limit/file 14 together, and one Dependabot group for them ([#86](https://github.com/Vadymk95/template-1/issues/86)) ([f66e98f](https://github.com/Vadymk95/template-1/commit/f66e98fc99436fe5d07ec7cf307b9477712051ae))
+* **gate:** cap e2e failures on the gate run and keep one last-run record per suite ([fd5c8ab](https://github.com/Vadymk95/template-1/commit/fd5c8abc7e6d8855f64ea58b1cf6b93760a0a08f))
+
+
+### CI
+
+* **deps:** one weekly Dependabot PR for minor and patch, so the lock file stops conflicting ([5144da3](https://github.com/Vadymk95/template-1/commit/5144da3add3fbb36303ae2bf3a0d205ff711e4cd))
+* **release:** release-please prefers a RELEASE_PLEASE_TOKEN secret when one is set ([c61a1f2](https://github.com/Vadymk95/template-1/commit/c61a1f259071b165fc7aecd035522ae0c88942b3))
+
 ## [3.2.3](https://github.com/Vadymk95/template-1/compare/v3.2.2...v3.2.3) (2026-09-27)
 
 
