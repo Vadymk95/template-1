@@ -1,5 +1,40 @@
 # Architectural Decisions
 
+## [2026-10] vitest 5 hold (2026-10-02)
+
+**Decision**: `vitest` and `@vitest/coverage-v8` held back to `^4.1.11` in THIS repo. The weekly
+`mutation.yml` job (cold, no incremental cache — `actions/checkout` + `npm ci` every run) went red on
+2026-09-14, 09-21 and 09-28. A cold local re-run on the unchanged tree (vitest 5.0.2,
+`@stryker-mutator/vitest-runner` 10.0.0) confirmed it: **mutation score 9.59** (60 killed, 7 timed out,
+464 survived, 168 in code no test covers, 2.67 tests per mutant on average) against
+`thresholds.break: 40` in `stryker.config.json` — files with full unit coverage scored mutants as
+undetected, the runner's per-test coverage data effectively not reaching most mutants. Holding vitest at
+4.1.11 and re-running cold on the same tree scored **43.49** (304 killed, 0 timed out, 227 survived, the
+same 168 no-coverage, 4.33 tests per mutant) — above the floor, with the no-coverage count unchanged,
+showing the fix is in the runner pairing, not in test coverage. `npm run test:coverage`
+passes unchanged under 4.1.11 (333/333 tests, thresholds met) — the 2026-09-06 move to vitest 5 needed no
+vitest-5-only adaptation here (unlike the probe/`coverage.exclude` fixes in the sibling `template-next-seo`
+Next.js template), so nothing else moved.
+
+**Why not the same root cause as the sibling Next.js template.** `template-next-seo` measured
+`Ran 0.00 tests per mutant` under vitest 5 — the runner selected no test for any mutant at all. This repo's
+vitest-5 run selected SOME tests (2.67 per mutant average, 60 genuinely killed), so the regression here is
+partial, not total; the net effect is the same (gate red, below floor) and the fix is the same (hold at
+4.1.11), but "the runner returns zero coverage" does not generalise to every template on this version pair.
+
+**An earlier same-day local measurement reported 38.48 for both vitest 5 and 4.1.11 — wrong, not a second
+data point.** `stryker.config.json`'s `incremental: true` reused `reports/stryker-incremental.json` (a
+local, gitignored file) across both runs, so the second run mostly replayed the first run's cached
+per-mutant results instead of re-testing under the new runner. The CI job never has this file (fresh
+checkout, `reports/` gitignored), so it measures cold every time; a trustworthy local comparison has to
+delete `reports/` (and `.stryker-tmp/`) before each run, matching what CI does. The two numbers above are
+both cold.
+
+**Lift trigger**: a `@stryker-mutator/vitest-runner` release dated after 2026-08-14 (latest as of
+2026-10-02, per `npm view @stryker-mutator/vitest-runner time`) that passes a one-file probe
+(`stryker run --mutate <a covered file>` under `vitest@5` scoring near its 4.1.11 baseline, not near zero)
+— take vitest 5 when it kills mutants again, in the same commit that drops the `dependabot.yml` ignore.
+
 ## [2026-10] `brace-expansion` floor raised past three new high advisories (2026-10-02)
 
 **Decision**: root override `"brace-expansion": ">=5.0.9 <6"` raised to `">=5.0.12 <6"`, same entry,
