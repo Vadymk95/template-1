@@ -54,6 +54,21 @@ The push gate's preflight takes `--kill-port` (SIGTERM, re-probe, refuse if it w
   `verify`; CI runs it as its own `dev-smoke` job, mandatory on every PR. Run `verify:full` locally
   before a PR that touched a shared UI primitive, the layout shell, or `src/index.css`.
 
+## After a red push: re-run only what failed
+
+Both Playwright configs cap failures (`maxFailures`) on the gate run and in CI, and each writes
+`.last-run.json` to its own `outputDir` — see `AGENTS.md` § the gate and `DECISIONS.md` [2026-10].
+The re-run after a fix, production-mode suite (`npm run build` first in both cases):
+
+- **The red stopped at the cap**: `PLAYWRIGHT_USE_PREVIEW=1 npx playwright test <failed spec files from the red output>`
+- **The red finished under the cap**: `PLAYWRIGHT_USE_PREVIEW=1 npx playwright test --last-failed`
+
+Name the files rather than reaching for `--last-failed` by default: after a capped stop,
+`.last-run.json` also lists every test the run never reached, so `--last-failed` re-runs most of
+the suite instead of only what failed.
+
+- **Dev smoke**: `npx playwright test --config playwright.dev.config.ts --last-failed`
+
 `npm run bench:verify` runs the same steps with per-step timings when the gate feels slow.
 
 `npm run test:mutation` (StrykerJS) sits outside every rung on purpose: it rides the weekly

@@ -25,6 +25,9 @@ const crossBrowser = isCrossBrowserEnabled(process.env);
 
 export default defineConfig({
     testDir: 'e2e/dev',
+    // Own output folder, same reason as playwright.config.ts: a shared default would let this
+    // suite's `.last-run.json` overwrite (or be overwritten by) the gate config's.
+    outputDir: 'test-results/dev',
     // `*.test.ts` under `e2e/` is a pure Vitest sibling of a support module, not a browser spec.
     testIgnore: ['**/*.test.ts'],
     fullyParallel: false,
