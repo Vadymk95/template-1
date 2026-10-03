@@ -64,6 +64,42 @@
             "description": "mechanical doc drift: paths, scripts, sentinels, versions, command table, dead docs; the push budget vs traced pushes of the same phase (report only)"
         }
     },
+    "ci": {
+        "_description": "Data for scripts/docs-check.mjs § ciSteps/rulesetContexts. allowedRunSteps lists every `run:` step in a PR-triggered workflow that legitimately runs outside `verify` (install/tooling steps, and the cross-browser/dev-smoke lanes AGENTS.md § the gate documents as CI-only), each with the reason it is not a check that belongs in the gate. rulesetContextAllowlist is for a required status check produced by something other than this repo's own workflows (a third-party GitHub App) — empty today.",
+        "allowedRunSteps": [
+            {
+                "run": "npm install -g npm@^11.14.0",
+                "reason": "pins the npm version the lock file needs; not a check"
+            },
+            { "run": "npm ci --ignore-scripts", "reason": "installs dependencies; not a check" },
+            {
+                "run": "node scripts/ensure-playwright.mjs",
+                "reason": "installs the Playwright browsers the gate needs; not a check"
+            },
+            {
+                "run": "npx --no-install playwright install-deps",
+                "reason": "installs OS-level browser dependencies; not a check"
+            },
+            {
+                "run": "npm run build",
+                "reason": "the cross-browser job's own build for the geometry spec on Firefox/WebKit; not a check"
+            },
+            {
+                "run": "node scripts/check-cross-browser-selection.mjs",
+                "reason": "fails loud on a testMatch that silently selects zero tests; not a lint/type/unit check"
+            },
+            { "run": "npm run verify:ci", "reason": "the gate itself" },
+            {
+                "run": "npm run smoke:dev",
+                "reason": "the dev-smoke/content-stress lane, deliberately CI-only per AGENTS.md § the gate"
+            },
+            {
+                "run": "npm run test:e2e:prod",
+                "reason": "the cross-browser lane, deliberately CI-only per AGENTS.md § the gate"
+            }
+        ],
+        "rulesetContextAllowlist": []
+    },
     "docs": {
         "_description": "Data for scripts/docs-check.mjs. sentinels = verbatim fragments of the tier law that may live only in AGENTS.md; versions = doc names -> package names compared with package-lock.json (node -> .nvmrc).",
         "sentinels": [

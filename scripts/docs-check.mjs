@@ -24,6 +24,10 @@
  *   versions   "Vitest 5" / "React 19.3" in a doc matches the installed version (package-lock.json)
  *   table      every non-internal package.json script is documented in AGENTS.md or README.md
  *   dead       every doc file has an inbound reference (platform-discovered files exempt)
+ *   ciSteps    every `run:` step in a PR-triggered workflow is declared in gate-tiers.json §
+ *              ci.allowedRunSteps (a check running only in CI, not in `verify`), with a reason
+ *   rulesetContexts  every required status check in .github/ruleset.json is produced by a workflow
+ *              job (its `name:` or id, plus matrix values) or listed in ci.rulesetContextAllowlist
  *   budget     (report only) the push budget vs the p90 of traced pushes IN THE SAME PHASE; a
  *              missing log or too few rows prints a loud skip, never a silent pass
  *   revisit    (--weekly only) "revisit / re-check / trigger" lines whose latest date is past
@@ -257,6 +261,235 @@ export const checkDeadDocs = ({ docs, extraText = '' }) => {
         }
     }
     return findings;
+};
+
+/** True when a workflow's `on:` trigger includes `pull_request:` (checked before its `jobs:` key). */
+export const isPullRequestTriggered = (text) => {
+    const jobsAt = text.search(/^jobs:/m);
+    const head = jobsAt === -1 ? text : text.slice(0, jobsAt);
+    return /^\s*pull_request:/m.test(head);
+};
+
+const RUN_LINE = /^(\s*)run:\s*(.+?)\s*$/;
+/** A block-scalar header: `run: |`, `run: >`, with an optional chomping/indent indicator. */
+const BLOCK_SCALAR = /^[|>][+-]?\d*$/;
+const unquote = (value) => value.replace(/^(['"])(.*)\1$/, '$2');
+/** The text before a `${{ ... }}` expression, or the whole string when it has none. */
+const staticPrefix = (value) => value.split('${{')[0];
+
+/**
+ * Every `run:` step in a workflow, with its OWN 1-based line number. A single-line step is one
+ * entry; a block scalar (`run: |`/`run: >`) is read line by line — everything indented deeper
+ * than the `run:` key itself, stopping at the first blank-trimmed line that is not, or at EOF —
+ * because a check added inside a multi-line step is exactly as capable of bypassing the gate as
+ * one added as its own step, and a block scalar is the more common way to write a multi-line one.
+ */
+export const extractRunSteps = (text) => {
+    const lines = text.split('\n');
+    const steps = [];
+    for (let index = 0; index < lines.length; index++) {
+        const match = RUN_LINE.exec(lines[index]);
+        if (!match) continue;
+        const [, indent, value] = match;
+        const command = unquote(value);
+        if (!BLOCK_SCALAR.test(command)) {
+            steps.push({ command, line: index + 1 });
+            continue;
+        }
+        let cursor = index + 1;
+        while (cursor < lines.length) {
+            const line = lines[cursor];
+            if (line.trim() === '') {
+                cursor++;
+                continue;
+            }
+            if (line.length - line.trimStart().length <= indent.length) break;
+            steps.push({ command: line.trim(), line: cursor + 1 });
+            cursor++;
+        }
+        index = cursor - 1;
+    }
+    return steps;
+};
+
+/**
+ * F1 — "the gate lied" (2026-07-28, fb36cde): a check that runs only in CI stops a green `verify`
+ * from predicting a green pipeline. Every `run:` step (single-line or inside a block scalar) in a
+ * PR-triggered workflow must be declared in gate-tiers.json § ci.allowedRunSteps (install/tooling
+ * steps, and the CI-only lanes the tier law names on purpose), each with a reason; anything else
+ * is a check that bypassed the gate.
+ */
+export const checkCiRunSteps = ({ workflows, allowedRunSteps }) => {
+    const findings = [];
+    const allowed = new Set(
+        allowedRunSteps.map((entry) => (typeof entry === 'string' ? entry : entry.run))
+    );
+    for (const [file, text] of workflows) {
+        if (!isPullRequestTriggered(text)) continue;
+        for (const { command, line } of extractRunSteps(text)) {
+            if (allowed.has(command)) continue;
+            findings.push(
+                `${file}:${line}: CI runs "${command}" outside the gate. Put it into verify, or list it in scripts/gate-tiers.json ci.allowedRunSteps with a reason.`
+            );
+        }
+    }
+    return findings;
+};
+
+/**
+ * A workflow job's required-status-check context: its `name:` (falling back to the job id) plus
+ * " (<matrix values>)" for a matrix job — GitHub's own naming convention. Indentation-based on
+ * purpose, dependency-free like the rest of this file: inline `key: [a, b]` and block-list
+ * (`key:` then `- value` lines) matrices are both read. Two shapes are deliberately NOT resolved,
+ * because GitHub renders them only at runtime: a matrix `include:`/`exclude:` key (the exact
+ * combination set depends on how it merges with the rest of the matrix) and a job `name:`
+ * carrying a `${{ }}` expression. Both land in `undecidable` instead of `contexts`, with the
+ * static part of the name as `base` — the caller exempts any ruleset context that starts with
+ * it, rather than only the part that can be rendered without running the workflow.
+ */
+export const deriveWorkflowContexts = (text) => {
+    const lines = text.split('\n');
+    const jobsIndex = lines.findIndex((line) => /^jobs:\s*$/.test(line));
+    if (jobsIndex === -1) return { contexts: [], undecidable: [] };
+
+    let cursor = jobsIndex + 1;
+    while (cursor < lines.length && lines[cursor].trim() === '') cursor++;
+    const firstJob = /^(\s+)[A-Za-z0-9_-]+:\s*$/.exec(lines[cursor] ?? '');
+    if (!firstJob) return { contexts: [], undecidable: [] };
+    const jobIndent = firstJob[1].length;
+    const fieldDepth = jobIndent + 4;
+    const matrixKeyDepth = jobIndent + 12;
+    const matrixValueDepth = jobIndent + 16;
+    const jobIdPattern = new RegExp(`^ {${String(jobIndent)}}([A-Za-z0-9_-]+):\\s*$`);
+
+    const contexts = [];
+    const undecidable = [];
+    let job = null;
+    let matrixKey = null;
+
+    const flush = () => {
+        if (!job) return;
+        const rawBase = job.name ?? job.id;
+        const base = staticPrefix(rawBase);
+        if (job.dynamicMatrix || base !== rawBase) {
+            undecidable.push({
+                line: job.line,
+                id: job.id,
+                base,
+                reason: base !== rawBase ? 'job name uses an expression' : 'matrix include/exclude'
+            });
+            return;
+        }
+        const axes = Object.values(job.matrix);
+        if (axes.length === 0) {
+            contexts.push(base);
+            return;
+        }
+        const combos = axes.reduce(
+            (acc, values) => acc.flatMap((prefix) => values.map((value) => [...prefix, value])),
+            [[]]
+        );
+        contexts.push(...combos.map((combo) => `${base} (${combo.join(', ')})`));
+    };
+
+    for (let i = cursor; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim() === '') continue;
+        const indent = line.length - line.trimStart().length;
+        if (indent < jobIndent) break;
+
+        const jobId = jobIdPattern.exec(line);
+        if (jobId) {
+            flush();
+            job = { id: jobId[1], name: null, matrix: {}, dynamicMatrix: false, line: i + 1 };
+            matrixKey = null;
+            continue;
+        }
+        if (!job) continue;
+        const content = line.slice(indent);
+
+        if (indent === fieldDepth) {
+            const nameField = /^name:\s*(.+?)\s*$/.exec(content);
+            if (nameField) job.name = unquote(nameField[1]);
+        } else if (indent === matrixKeyDepth) {
+            const inline = /^([A-Za-z0-9_-]+):\s*\[(.+)\]\s*$/.exec(content);
+            const blockHead = /^([A-Za-z0-9_-]+):\s*$/.exec(content);
+            const key = (inline ?? blockHead)?.[1];
+            if (key === 'include' || key === 'exclude') {
+                job.dynamicMatrix = true;
+                matrixKey = null;
+            } else if (inline) {
+                job.matrix[key] = inline[2].split(',').map((value) => unquote(value.trim()));
+                matrixKey = null;
+            } else if (blockHead) {
+                matrixKey = key;
+                job.matrix[key] = [];
+            } else {
+                matrixKey = null;
+            }
+            continue;
+        } else if (indent === matrixValueDepth && matrixKey) {
+            const item = /^-\s+(.+?)\s*$/.exec(content);
+            if (item) {
+                job.matrix[matrixKey].push(unquote(item[1]));
+                continue;
+            }
+        }
+        if (indent <= matrixKeyDepth) matrixKey = null;
+    }
+    flush();
+
+    return { contexts, undecidable };
+};
+
+/**
+ * F2 — a required status check no workflow produces is Pending forever (6e47f3d, #70: a fork that
+ * deletes the CodeQL job, or renames any CI job, gets every pull request blocked with no error).
+ * Every `required_status_checks[].context` in .github/ruleset.json must equal a context a workflow
+ * job actually produces, or be named in gate-tiers.json § ci.rulesetContextAllowlist with a reason
+ * (a check produced by an external app, not this repo's own workflows).
+ *
+ * A job whose exact context GitHub only renders at runtime (an `include:`/`exclude:` matrix, a
+ * `${{ }}` job name) is reported once, loudly, in `notes` — never added to `findings`, because
+ * neither a red nor a green here would be grounded in anything this script actually read. Every
+ * OTHER context still has to resolve exactly; only the ones that start with that job's own static
+ * base name are exempted from the strict comparison.
+ */
+export const checkRulesetContexts = ({ rulesetText, workflows, allowlist = [] }) => {
+    if (!rulesetText) return { findings: [], notes: [] };
+    const ruleset = JSON.parse(rulesetText);
+    const derived = workflows.map(([file, text]) => [file, deriveWorkflowContexts(text)]);
+    const produced = new Set(derived.flatMap(([, { contexts }]) => contexts));
+    const undecidable = derived.flatMap(([file, { undecidable: jobs }]) =>
+        jobs.map((job) => ({ ...job, file }))
+    );
+    const allowed = new Set(
+        allowlist.map((entry) => (typeof entry === 'string' ? entry : entry.context))
+    );
+    const statusCheckRule = (ruleset.rules ?? []).find(
+        (rule) => rule.type === 'required_status_checks'
+    );
+    const contexts = (statusCheckRule?.parameters?.required_status_checks ?? []).map(
+        (entry) => entry.context
+    );
+    const lines = rulesetText.split('\n');
+
+    const notes = undecidable.map(
+        ({ file, line, id, reason }) =>
+            `docs:check: cannot derive the status-check names of ${file}:${line} job ${id} (${reason}) — ruleset contexts for it are not verified`
+    );
+
+    const findings = [];
+    for (const context of contexts) {
+        if (produced.has(context) || allowed.has(context)) continue;
+        if (undecidable.some((job) => context.startsWith(job.base))) continue;
+        const lineIndex = lines.findIndex((line) => line.includes(`"context": "${context}"`));
+        const line = lineIndex === -1 ? 1 : lineIndex + 1;
+        findings.push(
+            `.github/ruleset.json:${String(line)}: required context "${context}" is produced by no workflow job. Rename the job back, or list the context in scripts/gate-tiers.json ci.rulesetContextAllowlist with a reason.`
+        );
+    }
+    return { findings, notes };
 };
 
 /** Test files (`*.test.*`, `*.spec.*`) outside dependencies and build output. */
@@ -562,6 +795,15 @@ export const run = ({ root, weekly, today }) => {
         .filter(([file]) => file === 'AGENTS.md' || file === 'README.md')
         .map(([, text]) => text)
         .join('\n');
+    const workflowFiles = tracked.filter(
+        (file) => file.startsWith('.github/workflows/') && file.endsWith('.yml')
+    );
+    const workflows = workflowFiles.map((file) => [
+        file,
+        readFileSync(path.join(root, file), 'utf8')
+    ]);
+    const rulesetPath = path.join(root, '.github/ruleset.json');
+    const rulesetText = existsSync(rulesetPath) ? readFileSync(rulesetPath, 'utf8') : null;
     const workflowText = tracked
         .filter(
             (file) =>
@@ -571,6 +813,13 @@ export const run = ({ root, weekly, today }) => {
         )
         .map((file) => readFileSync(path.join(root, file), 'utf8'))
         .join('\n');
+    const ciConfig = isRecord(tiers.ci) ? tiers.ci : {};
+    const rulesetCheck = checkRulesetContexts({
+        rulesetText,
+        workflows,
+        allowlist: ciConfig.rulesetContextAllowlist ?? []
+    });
+    const notes = [...rulesetCheck.notes];
 
     const findings = [
         ...checkPathsAndScripts({ docs, root, scripts, topDirs }),
@@ -585,7 +834,9 @@ export const run = ({ root, weekly, today }) => {
             scripts,
             internalScripts: [...DEFAULT_INTERNAL_SCRIPTS, ...(docsConfig.internalScripts ?? [])]
         }),
-        ...checkDeadDocs({ docs, extraText: workflowText })
+        ...checkDeadDocs({ docs, extraText: workflowText }),
+        ...checkCiRunSteps({ workflows, allowedRunSteps: ciConfig.allowedRunSteps ?? [] }),
+        ...rulesetCheck.findings
     ];
     const tests = listTestFiles(root).map((file) => [
         file,
@@ -642,7 +893,7 @@ export const run = ({ root, weekly, today }) => {
         );
     }
 
-    return { findings, budget };
+    return { findings, budget, notes };
 };
 
 const main = () => {
@@ -651,10 +902,11 @@ const main = () => {
     const root = rootFlag === -1 ? process.cwd() : path.resolve(argv[rootFlag + 1]);
     const weekly = argv.includes('--weekly');
     const today = new Date().toISOString().slice(0, 10);
-    const { findings, budget } = run({ root, weekly, today });
+    const { findings, budget, notes } = run({ root, weekly, today });
 
     console.log(`docs:check${weekly ? ' (weekly)' : ''}`);
     console.log(`  ${budget.message}`);
+    for (const note of notes) console.log(`  ${note}`);
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {
         console.log(

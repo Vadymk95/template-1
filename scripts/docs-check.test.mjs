@@ -2,17 +2,22 @@ import { describe, expect, it } from 'vitest';
 
 import {
     budgetReport,
+    checkCiRunSteps,
     checkCommandTable,
     checkDeadDocs,
     checkQuarantine,
     checkPathsAndScripts,
     checkRevisitDates,
+    checkRulesetContexts,
     checkSuiteBudgets,
     checkSentinels,
     checkVersions,
     classifyToken,
     compareVersion,
+    deriveWorkflowContexts,
+    extractRunSteps,
     extractTokens,
+    isPullRequestTriggered,
     listTestFiles,
     parseTraceRows,
     pathExists,
@@ -378,6 +383,373 @@ describe('listTestFiles', () => {
         const files = listTestFiles(process.cwd());
         expect(files).toContain('scripts/docs-check.test.mjs');
         expect(files.some((file) => file.includes('node_modules'))).toBe(false);
+    });
+});
+
+describe('isPullRequestTriggered', () => {
+    it('reads the on: block before jobs:, not a step that merely mentions pull_request', () => {
+        const prWorkflow =
+            'name: CI\non:\n    pull_request:\n        branches: [main]\njobs:\n    build:\n';
+        const scheduleOnly =
+            'name: Docs\non:\n    schedule:\n        - cron: "0 6 * * 2"\njobs:\n    docs:\n        steps:\n            - run: echo pull_request\n';
+        expect(isPullRequestTriggered(prWorkflow)).toBe(true);
+        expect(isPullRequestTriggered(scheduleOnly)).toBe(false);
+    });
+});
+
+describe('extractRunSteps', () => {
+    it('collects a single-line run: step with its own line number', () => {
+        // Real workflow shape: `run:` sits on its own line under a `- name:` step, never on the
+        // dash line itself.
+        const text =
+            'jobs:\n    build:\n        steps:\n            - name: Install\n              run: npm ci\n';
+        expect(extractRunSteps(text)).toEqual([{ command: 'npm ci', line: 5 }]);
+    });
+
+    // R1: a block scalar used to be skipped outright, which let a check added as a multi-line
+    // step bypass F1 with docs:check green — the audit's exact sabotage shape.
+    it('reads every non-empty line inside a run: | block scalar, each with its own line number', () => {
+        const text = [
+            'jobs:',
+            '    build:',
+            '        steps:',
+            '            - name: Multi',
+            '              run: |',
+            '                  npm ci --ignore-scripts',
+            '',
+            '                  npm run lint:extra'
+        ].join('\n');
+        expect(extractRunSteps(text)).toEqual([
+            { command: 'npm ci --ignore-scripts', line: 6 },
+            { command: 'npm run lint:extra', line: 8 }
+        ]);
+    });
+
+    it('stops a block at the first line indented back to the run: key or less', () => {
+        const text = [
+            'jobs:',
+            '    build:',
+            '        steps:',
+            '            - name: Multi',
+            '              run: |',
+            '                  npm ci',
+            '            - name: Next',
+            '              run: npm run build'
+        ].join('\n');
+        expect(extractRunSteps(text)).toEqual([
+            { command: 'npm ci', line: 6 },
+            { command: 'npm run build', line: 8 }
+        ]);
+    });
+});
+
+describe('checkCiRunSteps', () => {
+    const workflow = [
+        'name: CI',
+        'on:',
+        '    pull_request:',
+        '        branches: [main]',
+        'jobs:',
+        '    build:',
+        '        steps:',
+        '            - name: Install',
+        '              run: npm ci --ignore-scripts',
+        '            - name: Extra lint sweep',
+        '              run: npm run lint:extra'
+    ].join('\n');
+
+    it('flags a run step outside the allowlist, in the F1 finding style, and accepts an allowed one', () => {
+        const findings = checkCiRunSteps({
+            workflows: [['.github/workflows/ci.yml', workflow]],
+            allowedRunSteps: [{ run: 'npm ci --ignore-scripts', reason: 'install, not a check' }]
+        });
+        expect(findings).toEqual([
+            '.github/workflows/ci.yml:11: CI runs "npm run lint:extra" outside the gate. Put it into verify, or list it in scripts/gate-tiers.json ci.allowedRunSteps with a reason.'
+        ]);
+    });
+
+    it('ignores a workflow that does not trigger on pull_request', () => {
+        const scheduleOnly = workflow.replace('pull_request:', 'schedule:');
+        expect(
+            checkCiRunSteps({
+                workflows: [['.github/workflows/docs.yml', scheduleOnly]],
+                allowedRunSteps: []
+            })
+        ).toEqual([]);
+    });
+
+    // R1: the audit's sabotage replayed as a block step — one allowed line, one unknown one — must
+    // flag exactly the unknown line, at its own position inside the block.
+    it('checks each line inside a run: | block, flagging only the unknown command', () => {
+        const blockWorkflow = [
+            'name: CI',
+            'on:',
+            '    pull_request:',
+            '        branches: [main]',
+            'jobs:',
+            '    build:',
+            '        steps:',
+            '            - name: Multi',
+            '              run: |',
+            '                  npm ci --ignore-scripts',
+            '                  npm run lint:extra'
+        ].join('\n');
+        const findings = checkCiRunSteps({
+            workflows: [['.github/workflows/ci.yml', blockWorkflow]],
+            allowedRunSteps: [{ run: 'npm ci --ignore-scripts', reason: 'install, not a check' }]
+        });
+        expect(findings).toEqual([
+            '.github/workflows/ci.yml:11: CI runs "npm run lint:extra" outside the gate. Put it into verify, or list it in scripts/gate-tiers.json ci.allowedRunSteps with a reason.'
+        ]);
+    });
+});
+
+describe('deriveWorkflowContexts', () => {
+    it('derives a matrix job context from its id and a named job context with no matrix', () => {
+        const workflow = [
+            'name: CI',
+            'jobs:',
+            '    validate:',
+            '        runs-on: ubuntu-latest',
+            '        strategy:',
+            '            matrix:',
+            '                node-version: [24.x]',
+            '        steps:',
+            '            - run: npm ci',
+            '    gitleaks:',
+            '        name: Secret scan (gitleaks)',
+            '        runs-on: ubuntu-latest'
+        ].join('\n');
+        expect(deriveWorkflowContexts(workflow).contexts).toEqual([
+            'validate (24.x)',
+            'Secret scan (gitleaks)'
+        ]);
+    });
+
+    it('returns nothing for a workflow with no jobs: key', () => {
+        expect(deriveWorkflowContexts('name: CI\non:\n    push:\n')).toEqual({
+            contexts: [],
+            undecidable: []
+        });
+    });
+
+    // R2(a): a fork that writes its matrix as a block list, not inline, must derive the same
+    // contexts — the inline shape was the only one read before.
+    it('gives identical contexts for an inline matrix and the equivalent block-list matrix', () => {
+        const inlineMatrix = [
+            'name: CI',
+            'jobs:',
+            '    validate:',
+            '        runs-on: ubuntu-latest',
+            '        strategy:',
+            '            matrix:',
+            '                node-version: [24.x, 22.x]',
+            '        steps:',
+            '            - run: npm ci'
+        ].join('\n');
+        const blockMatrix = [
+            'name: CI',
+            'jobs:',
+            '    validate:',
+            '        runs-on: ubuntu-latest',
+            '        strategy:',
+            '            matrix:',
+            '                node-version:',
+            '                    - 24.x',
+            '                    - 22.x',
+            '        steps:',
+            '            - run: npm ci'
+        ].join('\n');
+        expect(deriveWorkflowContexts(inlineMatrix).contexts).toEqual([
+            'validate (24.x)',
+            'validate (22.x)'
+        ]);
+        expect(deriveWorkflowContexts(blockMatrix).contexts).toEqual(
+            deriveWorkflowContexts(inlineMatrix).contexts
+        );
+    });
+
+    // R2: an `include:`/`exclude:` matrix renders its real combination set only at runtime, so the
+    // job is undecidable rather than silently wrong.
+    it('marks a job with an include/exclude matrix as undecidable, naming its static base', () => {
+        const workflow = [
+            'name: CI',
+            'jobs:',
+            '    build:',
+            '        name: Build',
+            '        runs-on: ubuntu-latest',
+            '        strategy:',
+            '            matrix:',
+            '                os: [ubuntu-latest]',
+            '                include:',
+            '                    - os: ubuntu-latest',
+            '                      extra: true',
+            '        steps:',
+            '            - run: npm run build'
+        ].join('\n');
+        const result = deriveWorkflowContexts(workflow);
+        expect(result.contexts).toEqual([]);
+        expect(result.undecidable).toEqual([
+            { line: 3, id: 'build', base: 'Build', reason: 'matrix include/exclude' }
+        ]);
+    });
+
+    // R2: a job name that interpolates a matrix value is rendered only at runtime too.
+    it('marks a job whose name: carries an expression as undecidable, keeping the static prefix', () => {
+        const workflow = [
+            'name: CI',
+            'jobs:',
+            '    build:',
+            '        name: Build (${{ matrix.os }})',
+            '        runs-on: ubuntu-latest',
+            '        strategy:',
+            '            matrix:',
+            '                os: [ubuntu-latest]',
+            '        steps:',
+            '            - run: npm run build'
+        ].join('\n');
+        const result = deriveWorkflowContexts(workflow);
+        expect(result.contexts).toEqual([]);
+        expect(result.undecidable).toEqual([
+            { line: 3, id: 'build', base: 'Build (', reason: 'job name uses an expression' }
+        ]);
+    });
+});
+
+describe('checkRulesetContexts', () => {
+    const workflow = [
+        'name: CI',
+        'jobs:',
+        '    cross-browser:',
+        '        runs-on: ubuntu-latest',
+        '        steps:',
+        '            - run: npm run build'
+    ].join('\n');
+    const ruleset = (context) =>
+        JSON.stringify(
+            {
+                rules: [
+                    {
+                        type: 'required_status_checks',
+                        parameters: { required_status_checks: [{ context }] }
+                    }
+                ]
+            },
+            null,
+            4
+        );
+
+    it('passes when the ruleset context matches a workflow job', () => {
+        const result = checkRulesetContexts({
+            rulesetText: ruleset('cross-browser'),
+            workflows: [['.github/workflows/ci.yml', workflow]]
+        });
+        expect(result.findings).toEqual([]);
+        expect(result.notes).toEqual([]);
+    });
+
+    // R2(c): an ordinary renamed job must still fail — the exemption below is scoped to
+    // undecidable jobs only, never a blanket loosening.
+    it('fails when the job behind a required context is renamed', () => {
+        const renamed = workflow.replace('cross-browser:', 'cross-browser-v2:');
+        const result = checkRulesetContexts({
+            rulesetText: ruleset('cross-browser'),
+            workflows: [['.github/workflows/ci.yml', renamed]]
+        });
+        expect(result.findings).toHaveLength(1);
+        expect(result.findings[0]).toContain(
+            'required context "cross-browser" is produced by no workflow job'
+        );
+    });
+
+    it('accepts a context produced by an external app via the allowlist', () => {
+        const result = checkRulesetContexts({
+            rulesetText: ruleset('license/cla'),
+            workflows: [['.github/workflows/ci.yml', workflow]],
+            allowlist: [{ context: 'license/cla', reason: 'external app, not our workflow' }]
+        });
+        expect(result.findings).toEqual([]);
+    });
+
+    it('returns no findings when the repo carries no ruleset file', () => {
+        expect(checkRulesetContexts({ rulesetText: null, workflows: [] })).toEqual({
+            findings: [],
+            notes: []
+        });
+    });
+});
+
+// R2(b): a job GitHub can only resolve at runtime (include/exclude, an expression name) must
+// never cause a false red, and must say so once, loudly, without failing the check.
+describe('checkRulesetContexts: jobs that cannot be derived statically', () => {
+    const includeMatrixWorkflow = [
+        'name: CI',
+        'jobs:',
+        '    build:',
+        '        name: Build',
+        '        runs-on: ubuntu-latest',
+        '        strategy:',
+        '            matrix:',
+        '                os: [ubuntu-latest]',
+        '                include:',
+        '                    - os: ubuntu-latest',
+        '                      extra: true',
+        '        steps:',
+        '            - run: npm run build'
+    ].join('\n');
+    const ruleset = (context) =>
+        JSON.stringify(
+            {
+                rules: [
+                    {
+                        type: 'required_status_checks',
+                        parameters: { required_status_checks: [{ context }] }
+                    }
+                ]
+            },
+            null,
+            4
+        );
+
+    it('skips the strict comparison and prints the loud non-failing line for an include/exclude matrix', () => {
+        const result = checkRulesetContexts({
+            rulesetText: ruleset('Build (ubuntu-latest)'),
+            workflows: [['.github/workflows/ci.yml', includeMatrixWorkflow]]
+        });
+        expect(result.findings).toEqual([]);
+        expect(result.notes).toEqual([
+            'docs:check: cannot derive the status-check names of .github/workflows/ci.yml:3 job build (matrix include/exclude) — ruleset contexts for it are not verified'
+        ]);
+    });
+
+    it('still flags a context unrelated to the undecidable job', () => {
+        const result = checkRulesetContexts({
+            rulesetText: ruleset('Secret scan (gitleaks)'),
+            workflows: [['.github/workflows/ci.yml', includeMatrixWorkflow]]
+        });
+        expect(result.findings).toHaveLength(1);
+        expect(result.findings[0]).toContain('required context "Secret scan (gitleaks)"');
+    });
+
+    it('marks a job whose name: carries an expression as undecidable too', () => {
+        const workflow = [
+            'name: CI',
+            'jobs:',
+            '    build:',
+            '        name: Build (${{ matrix.os }})',
+            '        runs-on: ubuntu-latest',
+            '        strategy:',
+            '            matrix:',
+            '                os: [ubuntu-latest]',
+            '        steps:',
+            '            - run: npm run build'
+        ].join('\n');
+        const result = checkRulesetContexts({
+            rulesetText: ruleset('Build (ubuntu-latest)'),
+            workflows: [['.github/workflows/ci.yml', workflow]]
+        });
+        expect(result.findings).toEqual([]);
+        expect(result.notes[0]).toContain('job name uses an expression');
     });
 });
 

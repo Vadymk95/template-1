@@ -54,6 +54,15 @@ for (const width of VIEWPORT_WIDTHS) {
             await page.goto(route.path, { waitUntil: 'load' });
             await expect(page.getByRole('main')).toBeVisible();
 
+            if (route.name === ROUTES_UNDER_TEST[0].name) {
+                // Guards against a layout shift between a scrolling route and a short one: without a
+                // reserved gutter, the scrollbar itself changes the content box width per route.
+                const scrollbarGutter = await page.evaluate(
+                    () => getComputedStyle(document.documentElement).scrollbarGutter
+                );
+                expect(scrollbarGutter, 'html must keep a stable scrollbar gutter').toBe('stable');
+            }
+
             const violationCountBefore = violations.length;
 
             const documentWidths = await page.evaluate(measureDocument);
