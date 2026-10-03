@@ -30,7 +30,7 @@ checkout, `reports/` gitignored), so it measures cold every time; a trustworthy 
 delete `reports/` (and `.stryker-tmp/`) before each run, matching what CI does. The two numbers above are
 both cold.
 
-**Lift trigger**: a `@stryker-mutator/vitest-runner` release dated after 2026-08-14 (latest as of
+**Lift trigger** (next check 2026-11-02): a `@stryker-mutator/vitest-runner` release dated after 2026-08-14 (latest as of
 2026-10-02, per `npm view @stryker-mutator/vitest-runner time`) that passes a one-file probe
 (`stryker run --mutate <a covered file>` under `vitest@5` scoring near its 4.1.11 baseline, not near zero)
 — take vitest 5 when it kills mutants again, in the same commit that drops the `dependabot.yml` ignore.
