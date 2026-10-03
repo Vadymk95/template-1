@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.3.1](https://github.com/Vadymk95/template-1/compare/v3.3.0...v3.3.1) (2026-10-03)
+
+
+### Bug fixes
+
+* **gate:** close audit holes - CI steps, ruleset, size, boundary, safeFetch, shim ([#89](https://github.com/Vadymk95/template-1/issues/89)) ([cb92490](https://github.com/Vadymk95/template-1/commit/cb92490397b79fc5140f79d219a350af8c2de9b8))
+* **gate:** enable no-empty and run docs:check when the checker or scripts change ([#90](https://github.com/Vadymk95/template-1/issues/90)) ([ce22788](https://github.com/Vadymk95/template-1/commit/ce227880c1295bc0185a864ced3f45f02c5b171d))
+
+
+### Documentation
+
+* **decisions:** date the next check of the vitest hold lift trigger ([#87](https://github.com/Vadymk95/template-1/issues/87)) ([036ed57](https://github.com/Vadymk95/template-1/commit/036ed57c8d97a1968849014fa13070376b17e28b))
+
 ## [3.3.0](https://github.com/Vadymk95/template-1/compare/v3.2.3...v3.3.0) (2026-10-02)
 
 
