@@ -1,5 +1,28 @@
 # Architectural Decisions
 
+## [2026-10] delta audit fixes
+
+A second audit round found two silent gaps that the sibling templates (`template-spa-pwa`,
+`template-next-seo`, `template-rn`) also had, and this repo closed the same way.
+
+**`no-empty` was not enabled anywhere** — ESLint's `no-empty` is not in this repo's rule set, so a
+`catch {}` passed every check silently. Added `'no-empty': ['error', { allowEmptyCatch: false }]`
+to `eslint.config.js` next to `no-console`. Proven: a probe file with an empty `catch {}` turns
+`error` red (`Empty block statement`); no existing code in this repo had one to fix.
+
+**The pre-commit `docs:check` trigger (`.husky/pre-commit`) missed the checker's own files.** The
+`grep -qE` gate that decides whether a staged commit runs `docs:check` matched doc/rule/workflow
+paths but not `scripts/docs-check.*` or `package.json`, so a broken checker or a renamed npm
+script could commit clean and surface only on the weekly CI run. Added
+`|^scripts/docs-check\.|^package\.json$` to the regex. Proven: `scripts/docs-check.mjs` does not
+match the old pattern (exit 1) and does match the new one (exit 0); same for `package.json`.
+
+**Not applicable here, checked and confirmed:** the sibling delta audit also covers a cross-origin
+token-leak guard (`isSafeForAuth`) and a persist-hydration gate with a `partialize` token
+exclusion in `template-spa-pwa`'s `client.ts` / `userStore.ts` / `ProtectedRoute.tsx`. This repo's
+equivalent files have neither mechanism (no origin/protocol guard in `client.ts`, no
+`_hasHydrated` flag or `partialize` option in `userStore.ts`), so there is nothing to port.
+
 ## [2026-10] guard audit fixes
 
 An audit sabotaged 73 guards in this repo and 53 caught the injected defect. These close the holes

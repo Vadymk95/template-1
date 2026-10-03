@@ -36,7 +36,7 @@ npm run typecheck || repo_gate_status=1
 # Docs class: the mechanical drift check (paths, scripts, sentinels, versions, command table,
 # dead docs) runs only when the staged set touches docs, rules, commands, brain files or the
 # tier data — seconds, deterministic. The tier law it protects: AGENTS.md § the gate.
-if git diff --cached --name-only | grep -qE '\.(md|mdc)$|^\.cursor/|^\.github/|^scripts/gate-tiers\.json$'; then
+if git diff --cached --name-only | grep -qE '\.(md|mdc)$|^\.cursor/|^\.github/|^scripts/gate-tiers\.json$|^scripts/docs-check\.|^package\.json$'; then
     npm run docs:check || repo_gate_status=1
 fi
 

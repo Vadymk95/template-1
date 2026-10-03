@@ -133,6 +133,11 @@ export default defineConfig([
             // Use src/lib/logger.ts instead. console.* left in code = prod noise.
             'no-console': 'error',
 
+            // ─── Empty catch ─────────────────────────────────────────────────
+            // A swallowed error ships silently. Every catch needs real handling or a
+            // comment stating why doing nothing is the deliberate disposition.
+            'no-empty': ['error', { allowEmptyCatch: false }],
+
             // ─── Magic numbers — extract to a constants file (exempt below) ───
             // Cheap models scatter literals; force named constants. Universal
             // units (60 s/min, 1000 ms/s, 100 %) and trivial (-1,0,1,2) ignored.
