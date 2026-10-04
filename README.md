@@ -499,6 +499,7 @@ This template does not ship automatic CSP nonce injection. If your production en
 - **Deployment:** `vercel.json` or `netlify.toml` for security headers
 - **CSS-in-JS:** Emotion or Styled-Components for advanced runtime styling (Tailwind covers the majority of cases)
 - **File-based Routing:** TanStack Router for 100+ routes or micro-frontend architectures
+- **Wiring a real product** (first real API, auth, monitoring, analytics, flags, languages, deployment hardening; each with a config and a guard): [`.cursor/brain/EXTENSIONS.md`](.cursor/brain/EXTENSIONS.md)
 - **Beyond the template** (auth providers, error monitoring, analytics, feature flags, data tables, deployment): [`.cursor/docs/enterprise-upgrade.md`](.cursor/docs/enterprise-upgrade.md)
 
 ## 🧹 Removed in v3.1.0 — Restore If Needed

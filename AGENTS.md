@@ -4,7 +4,7 @@ Production-ready React 19 + Vite 8 (Rolldown) + TypeScript 6.0 SPA template — 
 
 ## Start here
 
-1. Read `.cursor/brain/PROJECT_CONTEXT.md` before any task. Architecture map: `.cursor/brain/MAP.md`. Danger zones: `.cursor/brain/SKELETONS.md`. What to run per change: `.cursor/brain/VERIFICATION.md`. Template seeds (do NOT remove as "dead code"): `.cursor/brain/TEMPLATE_SEEDS.md`.
+1. Read `.cursor/brain/PROJECT_CONTEXT.md` before any task. Architecture map: `.cursor/brain/MAP.md`. Danger zones: `.cursor/brain/SKELETONS.md`. What to run per change: `.cursor/brain/VERIFICATION.md`. Template seeds (do NOT remove as "dead code"): `.cursor/brain/TEMPLATE_SEEDS.md`. Wiring recipes for a real backend, auth, monitoring, analytics, flags, languages and hosting: `.cursor/brain/EXTENSIONS.md`.
 2. `.cursor/rules/*.mdc` are **binding for the files they cover** — read the rules relevant to the area you touch before the first edit.
 
 ## Source of truth (tiebreaker)

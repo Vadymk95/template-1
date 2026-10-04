@@ -2,6 +2,8 @@
 
 > When this template becomes a real business product, this is what you need to add.
 > Each section includes: why you need it, the best option for 2025–2026, and what to replace/remove.
+>
+> Wiring recipes with config and guards (real API, auth, monitoring, analytics, flags, i18n, deployment): [`../brain/EXTENSIONS.md`](../brain/EXTENSIONS.md)
 
 ---
 

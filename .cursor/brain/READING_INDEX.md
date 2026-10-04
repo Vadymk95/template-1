@@ -52,7 +52,15 @@ Why it exists: `AGENTS.md` § Entering this repo cheaply.
   an allowance is the last resort and needs an expiry.
 - `scripts/audit-allowlist.json` — the current allowances and their reasons.
 
-## 7. Wondering whether the work is still needed
+## 7. About to wire a real backend, auth, monitoring, analytics, flags, more languages or a host
+
+- `.cursor/brain/EXTENSIONS.md` — WINS for the wiring recipes: trigger, install command, where it
+  plugs in, config with reasons, the guard to add.
+- `SECURITY_REQUIREMENTS.md` and `AGENTS.md` — WIN on policy and the gate: EXTENSIONS.md links to them
+  and never overrides them.
+- `.cursor/brain/TEMPLATE_SEEDS.md` — graduating a seed comes first; EXTENSIONS.md starts after it.
+
+## 8. Wondering whether the work is still needed
 
 Before reading anything else: `git log --oneline -15`, then grep for the thing the task names. On the
 sibling project two of five dispatched lanes returned "already done" after ~430k tokens between them,
