@@ -1,5 +1,26 @@
 # Architectural Decisions
 
+## [2026-10] Every GitHub Action is SHA-pinned; workflow tokens start read-only
+
+**Decision**: every `uses:` in `.github/workflows/*.yml` is a full 40-hex commit SHA with the version as a
+trailing comment (`uses: actions/checkout@<sha> # v7.0.1`), since 2026-10-04. This replaces the earlier
+split where only gitleaks was SHA-pinned and the official `actions/*` stayed on floating `@vN` tags.
+
+**Why**: GitHub's immutable releases lock only a release's own tag, and only when the publisher opts in. At
+the time of the change `actions/setup-node` v7.0.0 was published immutable, while `actions/checkout`
+v7.0.1 and `googleapis/release-please-action` v5.0.0 were not, so a floating `@vN` tag stays movable and
+the official-action exemption protected nothing. Each pin is the SAME version the workflows ran before:
+no upgrade rode along.
+
+**How it stays fresh**: `.github/dependabot.yml` keeps its `github-actions` ecosystem, which updates a SHA
+pin and its version comment together. A new action is added pinned the same way, never as `@vN`.
+
+**Token permissions**: `release.yml` declares `permissions: contents: read` at the workflow level and gives
+the `release-please` job its own `contents`, `issues` and `pull-requests` write scopes; `security.yml`
+declares `permissions: contents: read` at the top, and its jobs keep their own scopes. The effective
+permissions of every job are unchanged; the point is that a job added later starts read-only (the
+OpenSSF Scorecard Token-Permissions check reads the workflow level).
+
 ## [2026-10] delta audit fixes
 
 A second audit round found two silent gaps that the sibling templates (`template-spa-pwa`,

@@ -19,6 +19,7 @@ describe('ErrorBoundary', () => {
 
     afterEach(() => {
         consoleErrorSpy.mockRestore();
+        vi.unstubAllEnvs();
     });
 
     it('renders fallback UI when child throws', () => {
@@ -33,6 +34,29 @@ describe('ErrorBoundary', () => {
         expect(screen.getByText(/we encountered an unexpected error/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /reload page/i })).toBeInTheDocument();
+    });
+
+    it('shows no error message, stack trace or details in a production build', () => {
+        vi.stubEnv('DEV', false);
+
+        const Leaky = () => {
+            const error = new Error('Boom');
+            error.stack = 'Error: Boom\n    at secretFrame (internal/path.ts:1:1)';
+            throw error;
+        };
+
+        const { container } = renderWithProviders(
+            <ErrorBoundary>
+                <Leaky />
+            </ErrorBoundary>
+        );
+
+        const alert = screen.getByRole('alert');
+
+        expect(alert).not.toHaveTextContent(/boom/i);
+        expect(alert).not.toHaveTextContent('secretFrame');
+        expect(screen.queryByText(/error details/i)).not.toBeInTheDocument();
+        expect(container.querySelector('details, pre')).toBeNull();
     });
 
     it('calls window.location.reload when "Reload page" is clicked', async () => {

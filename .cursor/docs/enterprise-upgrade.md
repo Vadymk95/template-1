@@ -219,7 +219,7 @@ Current CI covers: the full `verify:ci` chain (audit gate, oxlint + ESLint, form
 #    run inside `verify`; nothing to add here
 
 # 2. Lighthouse CI — catch performance regressions
-- uses: treosh/lighthouse-ci-action@v10
+- uses: treosh/lighthouse-ci-action@03becbfc543944dd6e7534f7ff768abb8a296826 # v10.1.0
   with:
     uploadArtifacts: true
 

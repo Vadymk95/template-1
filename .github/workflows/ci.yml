@@ -27,10 +27,10 @@ jobs:
                 node-version: [24.x]
 
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: Use Node.js ${{ matrix.node-version }}
-              uses: actions/setup-node@v7
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: ${{ matrix.node-version }}
                   cache: 'npm'
@@ -55,7 +55,7 @@ jobs:
             # cache and scripts/ensure-playwright.mjs (inside the gate) reinstalls
             # the builds that version actually needs.
             - name: Cache Playwright browsers
-              uses: actions/cache@v6
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: ~/.cache/ms-playwright
                   key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -69,7 +69,7 @@ jobs:
               run: npm run verify:ci
 
             - name: Upload coverage report
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               if: always()
               with:
                   name: coverage-report
@@ -77,7 +77,7 @@ jobs:
                   retention-days: 14
 
             - name: Upload Playwright report on failure
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               if: failure()
               with:
                   name: playwright-report
@@ -95,10 +95,10 @@ jobs:
             HUSKY: '0'
 
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: Use Node.js 24.x
-              uses: actions/setup-node@v7
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 24.x
                   cache: 'npm'
@@ -110,7 +110,7 @@ jobs:
               run: npm ci --ignore-scripts
 
             - name: Cache Playwright browsers
-              uses: actions/cache@v6
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: ~/.cache/ms-playwright
                   key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -122,7 +122,7 @@ jobs:
               run: npm run smoke:dev
 
             - name: Upload Playwright report on failure
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               if: failure()
               with:
                   name: playwright-report-dev
@@ -143,10 +143,10 @@ jobs:
             PLAYWRIGHT_BROWSERS: 'chromium,firefox,webkit'
 
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: Use Node.js 24.x
-              uses: actions/setup-node@v7
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
               with:
                   node-version: 24.x
                   cache: 'npm'
@@ -158,7 +158,7 @@ jobs:
               run: npm ci --ignore-scripts
 
             - name: Cache Playwright browsers
-              uses: actions/cache@v6
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: ~/.cache/ms-playwright
                   key: playwright-xbrowser-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -189,7 +189,7 @@ jobs:
               run: npm run smoke:dev
 
             - name: Upload Playwright report on failure
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               if: failure()
               with:
                   name: playwright-report-cross-browser
