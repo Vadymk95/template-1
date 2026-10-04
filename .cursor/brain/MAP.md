@@ -27,6 +27,8 @@
 
 > All files prefixed `_` under `src/lib/api/` are **template seeds** — kept as canonical pattern references, not wired into the app. See [`TEMPLATE_SEEDS.md`](./TEMPLATE_SEEDS.md) before deleting any.
 
+> Wiring a real backend, auth, monitoring, analytics, flags, more languages or a host: recipes with config and guards are in [`EXTENSIONS.md`](./EXTENSIONS.md).
+
 ## Adding a shadcn Component
 
 Use the shadcn CLI; primitives land under `src/components/ui/`. `components.json` targets Tailwind v4 (no separate JS theme file).
