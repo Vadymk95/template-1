@@ -110,6 +110,7 @@ To update after MSW upgrade: `npx msw init public/`.
 | `e2e/support/measure.ts` | The in-page measurement, one definition shared by both geometry specs. Serialised into the page by Playwright, so it references nothing from module scope. |
 | `e2e/support/control-targets.ts` | The two kit sizes accepted below the 44px touch floor, each with a reason and an exit condition. A ratchet, not an amnesty. |
 | `e2e/support/cross-browser.ts` | Which specs run on every engine, and the `CROSS_BROWSER` switch. |
+| `e2e/support/a11y.ts` | The axe-core scan called at the end of the home, login and not-found specs: fails on serious or critical violations, `target-size` enabled. |
 | `e2e/dev/content-stress.spec.ts` | Measures every primitive × content state × 5 widths against the invariants. Dev server only. |
 | `e2e/layout-geometry.spec.ts` | The same invariants over the real routes with real content — the assembled page, not the primitive. |
 | `e2e/forced-colors.spec.ts` | Proves a focus indicator survives `forced-colors: active`, where the ring is suppressed. |

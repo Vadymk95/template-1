@@ -284,20 +284,27 @@ checks and loudly skips build, size and e2e until the first deploy; phase 1 runs
 (content-variance fixture on a dev server) and the `cross-browser` job (Firefox + WebKit on the geometry
 specs). One `verify:ci` step on purpose — see the gate rule above.
 
-**`security.yml`** — on push, PR and a weekly cron: gitleaks over the full history and CodeQL
-`security-extended`. Findings land in the repo's Security tab. Exclusions live in
-`.github/codeql/codeql-config.yml` with their reason written down, rather than being dismissed in the UI
-where the reason is lost.
+**`security.yml`** — on push, PR and a weekly cron: gitleaks over the full history, CodeQL
+`security-extended`, and zizmor over the workflow files themselves (unpinned actions, a checkout that leaves
+its token in `.git`, injectable expressions). CodeQL findings land in the repo's Security tab; zizmor reports as
+job annotations and fails the job at Medium severity or above. All three of its jobs are required checks in
+`.github/ruleset.json`. Exclusions live in `.github/codeql/codeql-config.yml` and `.github/zizmor.yml` with
+their reason written down, rather than being dismissed in the UI where the reason is lost. Run zizmor locally
+with `uvx zizmor@1.30.1 .github/workflows`: the version is the one the job pins and it reads the same
+`.github/zizmor.yml`, so it reproduces the gate online or offline. zizmor audits only this repository's
+workflow files; its online audits also ask the GitHub API about the actions those files reference, with the
+job's read-only token.
 
 Every action in every workflow is pinned to a full commit SHA, with its version as a trailing comment:
 a `@vN` tag is a movable pointer and has been retargeted in supply-chain attacks. Dependabot's
 `github-actions` ecosystem updates the SHA and its comment together. Workflow tokens default to
-`contents: read`; a job that needs more declares it itself.
+`contents: read`; a job that needs more declares it itself, and every checkout that does not push sets
+`persist-credentials: false`.
 
 ### Where the security workflow works
 
-`gitleaks` runs anywhere — it executes the scanner itself and fails the job on a finding, independent of
-any GitHub feature or plan. The action only asks for a `GITLEAKS_LICENSE` when the repository is owned by
+`gitleaks` and `zizmor` run anywhere — each executes its scanner itself and fails the job on a finding,
+independent of any GitHub feature or plan. The action only asks for a `GITLEAKS_LICENSE` when the repository is owned by
 an **organisation**; a personal account needs nothing.
 
 `codeql` needs GitHub **code scanning**, which is free on **public** repositories and a paid add-on on
@@ -557,4 +564,4 @@ Two things that are NOT settings and are easy to miss. `.npmrc` disables lifecyc
 
 - **Meta Tags:** add description and robots meta tags in `index.html`
 - **Language:** `lang` attribute in `index.html` is updated dynamically by i18next
-- **Accessibility:** `eslint-plugin-jsx-a11y` enforces A11y rules during linting
+- **Accessibility:** `eslint-plugin-jsx-a11y` enforces A11y rules during linting, and the home, login and not-found specs run an axe-core scan on the rendered page (`e2e/support/a11y.ts`): a serious or critical violation fails the spec, and the WCAG 2.2 `target-size` rule is switched on

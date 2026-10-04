@@ -1,0 +1,15 @@
+# zizmor configuration for .github/workflows. The `zizmor` job in security.yml passes this file, and the local
+# command in the README (`uvx zizmor@1.30.1 .github/workflows`) discovers it, so both give the same verdict.
+# Every entry is one rule with its reason; there is no blanket ignore.
+rules:
+    artipacked:
+        remap:
+            # Online, zizmor grades a checkout that leaves its token in .git as Low for actions/checkout v6
+            # and later (offline it is Medium), which `min-severity: medium` would let through. The remap
+            # keeps it at the gate whichever way zizmor runs.
+            severity: medium
+    adhoc-packages:
+        ignore:
+            # npm is upgraded on purpose: the Node 24 runner's bundled npm fails on cross-platform
+            # optional binaries. The range `^11.14.0` is the pin, kept narrow so npm@latest cannot jump a major.
+            - ci.yml

@@ -35,6 +35,9 @@ export default defineConfig({
     // Retries belong to the remote runner only: a retry on the local gate turns a
     // flake into a green line, and the flake survives to bite elsewhere.
     retries: process.env.CI ? 2 : 0,
+    // A retry keeps a flake from blocking a merge but must not hide it: in CI a test that fails and then
+    // passes on retry still fails the run, so it is fixed or quarantined rather than passing quietly.
+    failOnFlakyTests: Boolean(process.env.CI),
     // Runner sizing is CI's concern, not preview's: a two-core runner pins one
     // worker; the local gate runs at the machine's core-count default.
     ...(process.env.CI ? { workers: 1 } : {}),
