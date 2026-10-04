@@ -33,6 +33,8 @@ export default defineConfig({
     fullyParallel: false,
     forbidOnly: isCI,
     retries: isCI ? 2 : 0,
+    // Same rule as playwright.config.ts: a pass on retry is still a red run in CI.
+    failOnFlakyTests: isCI,
     reporter: [['html', { open: 'never' }], ['list']],
     timeout: 60_000,
     expect: {

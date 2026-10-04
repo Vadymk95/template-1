@@ -32,7 +32,8 @@
                     { "context": "Secret scan (gitleaks)" },
                     { "context": "cross-browser" },
                     { "context": "dev-smoke" },
-                    { "context": "CodeQL (JavaScript / TypeScript) (javascript-typescript)" }
+                    { "context": "CodeQL (JavaScript / TypeScript) (javascript-typescript)" },
+                    { "context": "Workflow audit (zizmor)" }
                 ]
             }
         }

@@ -6,6 +6,9 @@
 // config must write `.last-run.json` to two different folders, or the second suite in the push
 // chain overwrites the first's last-failed record and `--last-failed` selects the wrong tests.
 //
+// It also guards the retry policy: in CI a test that passes only on a retry must still fail the run
+// (`failOnFlakyTests`), or the retries turn a flake into a green run nobody ever sees.
+//
 // Both configs read `process.env` at import time, so each case needs a fresh module instance:
 // `vi.resetModules()` plus a re-import, not a single cached import reused across cases with the
 // env mutated around it. `@vitest-environment node` avoids the default jsdom environment: under
@@ -69,5 +72,23 @@ describe('playwright configs outputDir', () => {
         expect(gateConfig.outputDir).toBeTruthy();
         expect(devConfig.outputDir).toBeTruthy();
         expect(gateConfig.outputDir).not.toBe(devConfig.outputDir);
+    });
+});
+
+describe.each([
+    ['playwright.config.ts', importGateConfig],
+    ['playwright.dev.config.ts', importDevConfig]
+])('%s retry policy', (_name, importConfig) => {
+    it('retries in CI and fails the run when a test only passes on a retry', async () => {
+        process.env.CI = 'true';
+        const config = await importConfig();
+        expect(config.retries).toBeGreaterThan(0);
+        expect(config.failOnFlakyTests).toBe(true);
+    });
+
+    it('does not retry on the desk run, so a flake there is simply a failure', async () => {
+        const config = await importConfig();
+        expect(config.retries).toBe(0);
+        expect(config.failOnFlakyTests).toBe(false);
     });
 });

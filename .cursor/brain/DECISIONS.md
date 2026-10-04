@@ -1,5 +1,71 @@
 # Architectural Decisions
 
+## [2026-10] zizmor audits the workflow files; this closes the 2026-07-17 watch item
+
+**Decision**: the `zizmor` job in `security.yml` ("Workflow audit (zizmor)") runs on every pull request,
+every push to the default branch and the weekly cron, and fails at Medium severity or above. It is one step:
+`zizmorcore/zizmor-action` v0.6.4, SHA-pinned like every other action, with `version: 1.30.1`,
+`inputs: .github/workflows` and `config: .github/zizmor.yml`. The action runs zizmor from a container image
+pinned by digest; `version` is the pin, Dependabot moves the action's SHA, and a newer zizmor is a deliberate
+edit of `version`. The watch item opened 2026-07-17 named one trigger, "workflows grow beyond ~2 files per
+repo"; there are five workflow files now, so it has fired and the item is closed.
+
+**One pass, and a remap so it reads the same everywhere.** The action audits online by default (it verifies
+that every pinned SHA belongs to its repository and version comment, and flags actions with a published
+advisory), and online zizmor grades a checkout that leaves its token in `.git` (`artipacked`) one level lower
+than offline. Measured with zizmor 1.30.1 on a throwaway copy of the tree before the fix (7 such checkouts):
+online, 7 Low findings (and no Medium, so the Medium gate exited 0); offline, 7 Medium (exit 13). A single
+removed `persist-credentials: false` behaved the same: exit 0 online, 13 offline. The answer is
+`rules.artipacked.remap.severity: medium` in `.github/zizmor.yml`: with it the same removal exits 13 online and
+offline. The job and the local command (`uvx zizmor@1.30.1 .github/workflows`, which discovers the same file)
+therefore give one verdict, and the job needs no second, offline pass.
+
+**What it found, fixed at the source**: 7 `artipacked` findings, one per checkout that never pushes, now
+`persist-credentials: false` in `ci.yml`, `docs.yml`, `mutation.yml` and `security.yml` (the zizmor job's own
+checkout sets it too). 3 `adhoc-packages` findings remain, for the `npm install -g npm@^11.14.0` steps in
+`ci.yml`; they are a deliberate exception in `.github/zizmor.yml` (one rule, one whole file, with the reason),
+not a blanket ignore. A run with no severity filter and no config reports exactly those 3 and nothing else.
+
+**Required check.** The job's context, `Workflow audit (zizmor)`, is in `required_status_checks` of
+`.github/ruleset.json` (`docs:check` verifies that a workflow job produces it), so a pull request that adds an
+unpinned action or a credential-persisting checkout cannot merge. The file is the written-down ruleset; the
+live one in the repository settings changes when the owner re-posts it (README § "What your fork does not
+inherit"). As with every required check, it must have reported once before the ruleset is posted; the job
+runs on every pull request, so the first one does that.
+
+## [2026-10] A test that passes only on retry fails the CI run
+
+**Decision**: `failOnFlakyTests` is on whenever `CI` is set, in `playwright.config.ts` and
+`playwright.dev.config.ts` (the two configs CI uses). CI keeps `retries: 2`; locally there are no retries.
+
+**Why**: a retry exists so one flake cannot block a merge, but with the default a test that fails and then
+passes is reported as "1 flaky" and the run is green, so the flake is never fixed and never counted.
+Measured: with `CI=1` and the option forced off, a test failing once exited 0 and printed "1 flaky"; with the
+option on the same run exited 1. Measured here: 0 of 23 completed `ci.yml` runs carry a "flaky" line, so
+the change costs nothing today and turns the first flake into a visible red instead of a silent green.
+
+**Rule it adds**: a red caused by this is fixed, or quarantined with a date (`docs:check` tracks
+quarantines); a retry count is never raised to make it pass.
+
+`scripts/check-playwright-gate-config.test.mjs` pins both configs (retries and `failOnFlakyTests` on in CI,
+both off on the desk run); it failed 4 of 8 cases against the previous configs and passes 8 of 8 now.
+
+## [2026-10] axe-core scans the rendered pages inside the existing specs
+
+**Decision**: `e2e/support/a11y.ts` runs an axe-core scan (`@axe-core/playwright`, `^4.12.1`) at the end of
+the home, login and not-found specs, after each page's own heading is visible. A `serious` or `critical`
+violation fails the spec and prints the rule id and the selectors. `target-size` (WCAG 2.2 SC 2.5.8) is
+switched on because axe ships it disabled. No `test()` was added, so the browser suite did not grow.
+
+**Why**: `eslint-plugin-jsx-a11y` reads JSX; it cannot see a missing accessible name, a contrast failure or
+an undersized target that only exists in the rendered page.
+
+**Proved in both directions** (dev server, `e2e:one`): an `<img>` without `alt` on the home page failed the
+smoke spec with `image-alt` (critical) and exit 1; two 10 px buttons failed it with `target-size` (serious)
+and exit 1; with the `target-size` override removed from the helper the same two buttons passed, so the
+override is what makes the rule fire. The clean pages pass (exit 0). `minor` and `moderate` findings stay
+advisory on purpose.
+
 ## [2026-10] Every GitHub Action is SHA-pinned; workflow tokens start read-only
 
 **Decision**: every `uses:` in `.github/workflows/*.yml` is a full 40-hex commit SHA with the version as a

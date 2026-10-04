@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { expectNoSevereA11yViolations } from './support/a11y';
+
 test.describe('Smoke', () => {
     test('home loads with app title', async ({ page }) => {
         await page.goto('/');
@@ -12,5 +14,6 @@ test.describe('Smoke', () => {
         await expect(
             page.getByRole('heading', { level: 1, name: /gate already wired/i })
         ).toBeVisible();
+        await expectNoSevereA11yViolations(page);
     });
 });
