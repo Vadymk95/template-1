@@ -26,6 +26,8 @@
 import type { QueryFunction } from '@tanstack/react-query';
 import type { z } from 'zod';
 
+import { ApiError } from './client';
+
 /**
  * Thrown when an HTTP response parses as JSON but does NOT match the expected
  * Zod schema. Exposes the offending `url` and the raw `z.core.$ZodIssue[]` so
@@ -46,7 +48,7 @@ export class SchemaValidationError extends Error {
 /**
  * Fetches `url` and validates the JSON response against `schema`.
  *
- * - Throws `Error` on HTTP non-2xx (`HTTP <status>: <statusText>`).
+ * - Throws `ApiError` on HTTP non-2xx (`HTTP <status>: <statusText>`, `status` set).
  * - Throws `SchemaValidationError` if the response body fails `schema.safeParse`.
  * - Forwards `init.signal` to `fetch` so callers can cancel in-flight requests.
  *
@@ -61,7 +63,11 @@ export const safeFetch = async <T>(
     const response = await fetch(url, init);
 
     if (!response.ok) {
-        throw new Error(`HTTP ${response.status.toString()}: ${response.statusText}`);
+        // ApiError, not a bare Error: the default retry policy reads `status` to skip 4xx.
+        throw new ApiError(
+            response.status,
+            `HTTP ${response.status.toString()}: ${response.statusText}`
+        );
     }
 
     const raw: unknown = await response.json();

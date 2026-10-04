@@ -1,3 +1,7 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -5,6 +9,7 @@ import {
     checkCiRunSteps,
     checkCommandTable,
     checkDeadDocs,
+    checkMemoryImports,
     checkQuarantine,
     checkPathsAndScripts,
     checkRevisitDates,
@@ -791,5 +796,64 @@ describe('checkSuiteBudgets', () => {
         });
         expect(findings).toHaveLength(1);
         expect(findings[0]).toContain('test(s)');
+    });
+});
+
+describe('checkMemoryImports', () => {
+    /** Scans a temp repo: `text` is the whole CLAUDE.md or AGENTS.md, `files` are the real files. */
+    const scan = (text, { file = 'AGENTS.md', files = ['x.md'] } = {}) => {
+        const root = mkdtempSync(path.join(tmpdir(), 'memory-imports-'));
+        try {
+            for (const name of ['AGENTS.md', ...files]) {
+                mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+                writeFileSync(path.join(root, name), '');
+            }
+            writeFileSync(path.join(root, file), text);
+            return checkMemoryImports(root);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    };
+
+    // [text, the flagged target or null for clean, options: file, files, line]
+    const cases = [
+        ['Detail: @x.md', 'x.md'],
+        ['**@x.md**', 'x.md'],
+        ['**see @x.md**', 'x.md'],
+        ['[@x.md](u)', 'x.md'],
+        ['[see @x.md](u)', 'x.md'],
+        ['_@x.md_', 'x.md'],
+        ['~~@x.md~~', 'x.md'],
+        ['>@x.md', 'x.md'],
+        ['**bold**@x.md', 'x.md'],
+        ['<b>x</b>@x.md', 'x.md'],
+        ['- item @x.md', 'x.md'],
+        ['- read `@x.md`', 'x.md'],
+        ['@~/notes.md', '~/notes.md'],
+        ['see @./x.md#part.', './x.md'],
+        ['# Doc\n```\n@x.md\n```\nDetail: @x.md', 'x.md', { line: 5 }],
+        ['`x.md`', null],
+        ['```md\nDetail: @x.md\n```', null],
+        ['~~~\n@x.md\n~~~', null],
+        ['me@example.com', null],
+        ['built on @testing-library/react-native and @scope/pkg', null],
+        ['the `@/*` alias and @/i18n/request-locale', null],
+        ['typescript-eslint@8.65.0', null],
+        ['the `@`-imported file', null],
+        ['@x.md', null, { files: [] }],
+        ['@sub', null, { files: ['sub/y.md'] }],
+        ['@AGENTS.md', null, { file: 'CLAUDE.md' }],
+        ['@AGENTS.md', 'AGENTS.md']
+    ];
+
+    it.each(cases)('%j', (text, target, options) => {
+        const findings = scan(text, options);
+        if (target === null) expect(findings).toEqual([]);
+        else {
+            expect(findings).toHaveLength(1);
+            expect(findings[0]).toBe(
+                `AGENTS.md:${options?.line ?? 1}: "@${target}" is a Claude Code memory import; write the pointer as a path in backticks without "@"`
+            );
+        }
     });
 });

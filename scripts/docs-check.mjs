@@ -17,6 +17,8 @@
  *              script families must exist in package.json
  *   sentinels  the tier-law sentinel sentences (gate-tiers.json → docs.sentinels) appear only in
  *              AGENTS.md — a copy elsewhere is a restatement, which is how rules go stale in place
+ *   memoryImports  CLAUDE.md and AGENTS.md hold no `@path` that Claude Code would import into every
+ *              session (a `~/` path, or one naming an existing file), except `@AGENTS.md` in CLAUDE.md
  *   suites     the browser suite has not outgrown the ceiling in gate-tiers.json, and that
  *              ceiling is not more than twice the measurement
  *   tests      no focused test (`.only`) lands; an unconditional `.skip`/`.fixme` carries
@@ -187,6 +189,62 @@ export const checkSentinels = ({ docs, sentinels, home = 'AGENTS.md' }) => {
                         `${file}:${index + 1}: restates the tier law ("${sentinel}") — point at ${home} § the gate instead`
                     );
                 }
+            }
+        });
+    }
+    return findings;
+};
+
+/* Claude Code expands an `@path` in CLAUDE.md or AGENTS.md into every session, recursively
+   (code.claude.com/docs/en/memory § Import additional files). Its scanner changes between releases,
+   so this rule does not copy it: it over-approximates on purpose, and a false flag costs one `@`
+   removed from a doc line. Every `@` followed by a non-space run, outside fenced blocks, is a
+   candidate (inline code spans count: Claude Code also scans raw list-item text). The run loses a
+   `#fragment`, escaped spaces are unescaped, and it is cut where link text closes (`]`) and trimmed
+   of Markdown and punctuation edges; a leading `.` or `~` is kept, they open `@.cursor/...` and
+   `@~/...`. It is flagged when it starts with `~/` (no committed agent file imports from a home
+   folder) or names an existing regular file, absolute or relative to the repo root. The pointer
+   convention is a backticked path without `@`; the one allowed import is `@AGENTS.md` in CLAUDE.md. */
+const MEMORY_FILES = ['CLAUDE.md', 'AGENTS.md'];
+const FENCE = /^\s*(`{3,}(?=[^`]*$)|~{3,})/;
+const AT_RUN = /@(?=((?:\\ |\S)+))/g;
+const LEADING_EDGE = /^[*_[\]()<>"'`,;:!?]+/;
+const TRAILING_EDGE = /[*_~[\]()<>"'`.,;:!?]+$/;
+
+/** The lines with fenced code blocks emptied, so line numbers stay. */
+const outsideFences = (text) => {
+    let open = '';
+    return text.split('\n').map((line) => {
+        const fence = FENCE.exec(line)?.[1] ?? '';
+        if (open) {
+            if (fence[0] === open[0] && fence.length >= open.length) open = '';
+            return '';
+        }
+        open = fence;
+        return fence ? '' : line;
+    });
+};
+
+export const checkMemoryImports = (root) => {
+    const findings = [];
+    for (const file of MEMORY_FILES) {
+        if (!existsSync(path.join(root, file))) continue;
+        outsideFences(readFileSync(path.join(root, file), 'utf8')).forEach((line, index) => {
+            for (const [, run] of line.matchAll(AT_RUN)) {
+                const target = run
+                    .split('#')[0]
+                    .replaceAll('\\ ', ' ')
+                    .split(']')[0]
+                    .replace(LEADING_EDGE, '')
+                    .replace(TRAILING_EDGE, '');
+                const resolved = path.resolve(root, target);
+                const imported =
+                    target.startsWith('~/') ||
+                    (existsSync(resolved) && statSync(resolved).isFile());
+                if (!imported || (file === 'CLAUDE.md' && target === 'AGENTS.md')) continue;
+                findings.push(
+                    `${file}:${index + 1}: "@${target}" is a Claude Code memory import; write the pointer as a path in backticks without "@"`
+                );
             }
         });
     }
@@ -824,6 +882,7 @@ export const run = ({ root, weekly, today }) => {
     const findings = [
         ...checkPathsAndScripts({ docs, root, scripts, topDirs }),
         ...checkSentinels({ docs, sentinels: docsConfig.sentinels ?? [] }),
+        ...checkMemoryImports(root),
         ...checkVersions({
             docs,
             versions: docsConfig.versions ?? {},
@@ -910,7 +969,7 @@ const main = () => {
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {
         console.log(
-            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, quarantines, suite ceilings'
+            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, quarantines, suite ceilings, agent-memory imports'
         );
         process.exit(0);
     }
