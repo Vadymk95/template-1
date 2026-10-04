@@ -284,10 +284,15 @@ checks and loudly skips build, size and e2e until the first deploy; phase 1 runs
 (content-variance fixture on a dev server) and the `cross-browser` job (Firefox + WebKit on the geometry
 specs). One `verify:ci` step on purpose — see the gate rule above.
 
-**`security.yml`** — on push, PR and a weekly cron: gitleaks over the full history (SHA-pinned action;
-tags are mutable and have been retargeted in supply-chain attacks) and CodeQL `security-extended`.
-Findings land in the repo's Security tab. Exclusions live in `.github/codeql/codeql-config.yml` with
-their reason written down, rather than being dismissed in the UI where the reason is lost.
+**`security.yml`** — on push, PR and a weekly cron: gitleaks over the full history and CodeQL
+`security-extended`. Findings land in the repo's Security tab. Exclusions live in
+`.github/codeql/codeql-config.yml` with their reason written down, rather than being dismissed in the UI
+where the reason is lost.
+
+Every action in every workflow is pinned to a full commit SHA, with its version as a trailing comment:
+a `@vN` tag is a movable pointer and has been retargeted in supply-chain attacks. Dependabot's
+`github-actions` ecosystem updates the SHA and its comment together. Workflow tokens default to
+`contents: read`; a job that needs more declares it itself.
 
 ### Where the security workflow works
 
@@ -453,7 +458,7 @@ If none of the above applies, remove `vite-plugin-compression` from `vite.config
 
 ## 🔒 Security & Production
 
-Security headers (CSP, X-Frame-Options, etc.) must be configured on your production server/CDN. See [`SECURITY_REQUIREMENTS.md`](./SECURITY_REQUIREMENTS.md) for the complete deployment checklist.
+Security headers (CSP, X-Frame-Options, etc.) must be configured on your production server/CDN. See [`SECURITY_REQUIREMENTS.md`](./SECURITY_REQUIREMENTS.md) for the complete deployment checklist. To report a vulnerability in the template itself, follow [`SECURITY.md`](./SECURITY.md).
 
 **⚠️ IMPORTANT:** `'unsafe-inline'` in CSP is NOT acceptable for production. Use CSP nonces or hashes.
 

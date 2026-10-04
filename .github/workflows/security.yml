@@ -25,6 +25,9 @@ on:
         # Sunday 06:00 UTC — weekly catch-up scan picks up CVEs published mid-week.
         - cron: '0 6 * * 0'
 
+permissions:
+    contents: read
+
 # Avoid duplicate runs when a branch push triggers a PR.
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,7 +42,7 @@ jobs:
             contents: read
         steps:
             - name: Checkout (full history)
-              uses: actions/checkout@v7
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   # gitleaks needs commit history to scan past commits, not just HEAD.
                   fetch-depth: 0
@@ -68,10 +71,10 @@ jobs:
                 language: [javascript-typescript]
         steps:
             - name: Checkout
-              uses: actions/checkout@v7
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: Initialize CodeQL
-              uses: github/codeql-action/init@v4
+              uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
               with:
                   languages: ${{ matrix.language }}
                   # Adds the security-extended pack — broader coverage at the cost of run time.
@@ -81,6 +84,6 @@ jobs:
                   config-file: ./.github/codeql/codeql-config.yml
 
             - name: Perform analysis
-              uses: github/codeql-action/analyze@v4
+              uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
               with:
                   category: '/language:${{ matrix.language }}'
