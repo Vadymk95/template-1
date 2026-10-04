@@ -61,7 +61,7 @@
         },
         "docs:check": {
             "class": "docs",
-            "description": "mechanical doc drift: paths, scripts, sentinels, versions, command table, dead docs; the push budget vs traced pushes of the same phase (report only)"
+            "description": "mechanical doc drift: paths, scripts, sentinels, versions, command table, dead docs, agent-memory imports; the push budget vs traced pushes of the same phase (report only)"
         }
     },
     "ci": {

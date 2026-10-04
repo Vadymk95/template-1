@@ -4,6 +4,9 @@ import { devtools, persist } from 'zustand/middleware';
 import { DEVTOOLS_NAMES, STORAGE_KEYS, USER_STORE_ACTIONS } from '@/store/keys';
 import { createSelectors } from '@/store/utils/createSelectors';
 
+// DEMO store: it keeps a mock bearer token in persisted state (localStorage) and `apiClient` sends it
+// as `Authorization`. A real product keeps the session token in an HttpOnly cookie the app never reads
+// (SECURITY_REQUIREMENTS.md); the migration is `.cursor/brain/EXTENSIONS.md` Phase 2.
 interface UserState {
     isLoggedIn: boolean;
     username: string | null;

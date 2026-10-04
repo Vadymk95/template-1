@@ -162,8 +162,8 @@ router with a throwing child route and asserts the fallback (`role="alert"`) ren
 `<ErrorBoundary>` removed from `App.tsx` (the throw escapes render, uncaught); green restored.
 
 **F6 — `safeFetch` contract test.** `src/lib/api/safeFetch.test.ts` covers: valid data returns
-parsed; a schema mismatch throws `SchemaValidationError`; a non-2xx response throws a plain
-`Error` carrying the status; `safeFetchQueryFn` re-throws `AbortError` unchanged. Red when the
+parsed; a schema mismatch throws `SchemaValidationError`; a non-2xx response throws an
+`ApiError` carrying the status (so the default retry skips a 4xx); `safeFetchQueryFn` re-throws `AbortError` unchanged. Red when the
 schema-mismatch throw was replaced with `return raw` (only that one case failed); green restored.
 
 **F7 — dead `cross-fetch` shim removed.** `npm ls cross-fetch` is empty, and

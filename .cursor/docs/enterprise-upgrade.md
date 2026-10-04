@@ -62,11 +62,7 @@ Sentry.init({
 });
 ```
 
-**Wire up logger** (`src/lib/logger.ts` is already implemented):
-```ts
-// In the IS_PROD branch of logger.ts, replace console.error with:
-// Sentry.captureMessage(message, { level, extra: context });
-```
+**Wire up logger** (`src/lib/logger.ts` is already implemented): do not forward the logger's message string to Sentry. Register one sink that forwards the caller's original `Error` through `Sentry.captureException`, as in [`EXTENSIONS.md`](../brain/EXTENSIONS.md) § 3.1.
 
 **Wire up ErrorBoundary** (`src/components/common/ErrorBoundary/index.tsx`):
 ```tsx
@@ -79,7 +75,7 @@ componentDidCatch(error: Error, info: ErrorInfo) {
 
 **Add to env.ts:**
 ```ts
-VITE_SENTRY_DSN: z.string().url().optional()
+VITE_SENTRY_DSN: z.url().optional()
 ```
 
 **Alternatives:** Datadog RUM (if already paying for Datadog), LogRocket (session replay focus).
@@ -99,11 +95,9 @@ VITE_SENTRY_DSN: z.string().url().optional()
 | **Supabase Auth** | If using Supabase DB | Integrated with Supabase ecosystem. |
 | **AWS Cognito** | Enterprise/AWS shops | More complex, cheaper at scale. |
 
-**Recommendation for new SaaS:** Clerk. Time to auth = ~1 hour. Free tier is generous.
+**Recommendation for new SaaS:** Clerk. Time to auth, tier limits and pricing were not verified here.
 
-```bash
-npm install @clerk/react
-```
+Install the SDK from the vendor's current quickstart: the package name and API are not verified here. Then apply [`EXTENSIONS.md`](../brain/EXTENSIONS.md) Phase 2 (2.2 to 2.5) unchanged: the app does not hold the token.
 
 Replace the mock logic in `src/lib/api/auth.ts` with the real provider SDK.
 
@@ -156,8 +150,10 @@ npm install @growthbook/growthbook-react
 **PostHog** is the best default for new products — analytics + feature flags + session replay in one tool.
 
 ```bash
-npm install posthog-js posthog-js/react
+npm install --save posthog-js @posthog/react
 ```
+
+Wiring, init options and CSP origins: [`EXTENSIONS.md`](../brain/EXTENSIONS.md) § 4.1.
 
 **Important:** Load analytics AFTER hydration to avoid blocking LCP:
 ```ts
@@ -186,7 +182,7 @@ Works with TanStack Query out of the box (already in the template). Headless —
 | Option | Notes |
 |--------|-------|
 | **date-fns** | Lightweight, tree-shakeable, functional API. Recommended. |
-| **Temporal API** | Native browser API, no install needed. Not yet baseline as of 2026. |
+| **Temporal API** | Native browser API, no install needed. Browser support was not verified here: check its Baseline status on MDN against this repo's `baseline-widely-available` build target before using it. |
 | **dayjs** | Smaller than moment, plugin-based. OK second choice. |
 | **moment.js** | Avoid — huge bundle, no longer maintained. |
 
@@ -253,13 +249,14 @@ Current CI covers: the full `verify:ci` chain (audit gate, oxlint + ESLint, form
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; ..." }
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
       ]
     }
   ]
 }
 ```
+
+**Content-Security-Policy** is not in this example on purpose: a policy is built from the built `dist/index.html` and a Report-Only run, not copied. See [`EXTENSIONS.md`](../brain/EXTENSIONS.md) § 6.4 and `SECURITY_REQUIREMENTS.md`.
 
 **Dependency scanning:**
 - GitHub Dependabot is already configured ✅
@@ -314,7 +311,7 @@ These are fully implemented — no action needed:
 ## What NOT to Add (Common Mistakes)
 
 - **Redux** — already have Zustand with DevTools ✅
-- **Axios** — native fetch is sufficient with the current `apiClient.ts`. Axios adds ~13kb.
+- **Axios** — native fetch is sufficient with the current `apiClient.ts`, so a second HTTP client adds a dependency for no gain.
 - **Moment.js** — use date-fns instead
 - **`React.memo` everywhere** — premature optimization. Profile first.
 - **CSS-in-JS (styled-components, emotion)** — Tailwind v4 covers everything, CSS-in-JS adds runtime cost
