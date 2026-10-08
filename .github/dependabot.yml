@@ -25,7 +25,8 @@ updates:
       # ignore that outlives its reason is worse than none: it silently withholds
       # security patches. Check the reason before adding or keeping one.
       #
-      # typescript: `typescript-eslint@8` peers `>=4.8.4 <6.1.0`. A bump to 7.x
+      # typescript: `typescript-eslint@8` peers `>=4.8.4 <6.1.0` (re-checked 2026-10-07 on 8.71.1,
+      # with TypeScript latest at 7.0.2). A bump to 7.x
       # makes BOTH `npm install` and `npm ci` fail with ERESOLVE — the whole tree
       # stops resolving, not just linting. A sibling template had that bump merged
       # and reach master; this guard is why it cannot happen here.
@@ -35,18 +36,28 @@ updates:
       # `overrides` currently map to `$eslint`.
       #
       # @types/node: aligned with `engines.node >=24` (Node 24 LTS), not the newest
-      # type defs. Re-evaluate when `engines.node` bumps.
+      # type defs. Re-evaluate when `engines.node` bumps (2026-10-07: 24.19.1 is the newest 24.x,
+      # latest is 26.6.4).
       #
       # vitest / @vitest/coverage-v8: under vitest 5.0.2 the weekly mutation gate went
       # red (2026-09-14, 09-21, 09-28), scoring 9.59 on a cold run; on 4.1.11 it scores
       # 43.49, clearing the `thresholds.break` floor of 40. Lift together with a
       # `@stryker-mutator/vitest-runner` release dated after 2026-08-14 that passes the
       # one-file probe in .cursor/brain/DECISIONS.md § "[2026-10] vitest 5 hold".
+      # Re-checked 2026-10-07: vitest 5.0.3, runner still 10.0.0 (2026-08-14); the probe scored
+      # 5.88 on vitest 5.0.3 against 88.24 on 4.1.11, so the hold stands.
+      #
+      # msw: 3.x removes the `msw/core/http` export that `@vitest/mocker` (4.1.11 and 5.0.3) imports
+      # in vitest browser mode, and the mocker peers `msw ^2.4.9` (checked 2026-10-07). Lift when a
+      # vitest release widens that peer to include 3; migration notes in .cursor/brain/DECISIONS.md
+      # § "[2026-10] Dependency refresh".
       ignore:
           - dependency-name: vitest
             versions: ['>=5']
           - dependency-name: '@vitest/coverage-v8'
             versions: ['>=5']
+          - dependency-name: msw
+            versions: ['>=3']
           - dependency-name: typescript
             versions: ['>=6.1']
           - dependency-name: eslint

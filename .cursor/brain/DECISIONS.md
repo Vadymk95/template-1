@@ -1,5 +1,61 @@
 # Architectural Decisions
 
+## [2026-10] Dependency refresh (2026-10-07): `msw` stays 2.x, every hold re-checked
+
+**Hold: `msw` stays `^2.15.0`; 3.0.2 exists and is not compatible.** `@vitest/mocker` (4.1.11 and the latest,
+5.0.3) peers `msw ^2.4.9`, and its browser entry (`dist/browser.js`) imports `msw/core/http`, an export `msw` 3
+removed (its `exports` map has no `./core/*`). npm accepts `msw` 3 only through an override of the mocker's
+peer, which would hide a real break in vitest browser mode, so no override is added. `dependabot.yml` ignores
+`msw >=3`. Lift it when a vitest release widens the mocker's `msw` peer to include 3. The migration then needs:
+handlers imported from `msw/http`; `onUnhandledRequest` renamed `onUnhandledFrame`; `public/mockServiceWorker.js`
+regenerated with `npx msw init public/ --no-save`; and a pause of the MSW server in the two test files that probe
+real sockets (`scripts/run-on-free-port.test.mjs`, `scripts/check-gate-env.test.mjs`), because `msw` 3
+intercepts raw `net.connect`: while `server.listen()` is active every connect reports success, so a probe sees
+a free port as taken.
+
+**Two new lint rules fired on unchanged code.** `oxlint` 1.86 turned `react/purity` on: the footer year is
+now read once at module load (`CURRENT_YEAR`) instead of calling `Date` during render. `typescript-eslint`
+8.71 added `no-unsafe-enum-assignment` to `strictTypeChecked`; it reports a false positive on the computed
+key in `src/store/utils/createSelectors.ts` (upstream typescript-eslint#12966, still open on 8.71.1), so that
+one file carries a scoped, commented override in `eslint.config.js`. Remove it when the upstream issue is fixed.
+
+**The `eslint-plugin-import` override is gone.** The package is not in the tree (`npm ls eslint-plugin-import`
+prints nothing, and it was absent on master), so its `$eslint` override mapped nothing and was deleted.
+
+**Holds re-checked 2026-10-07, all stand.**
+
+- `typescript` stays `~6.0.x`: `typescript-eslint` 8.71.1 still peers `>=4.8.4 <6.1.0`; TypeScript latest is 7.0.2.
+- `eslint` stays on 10.x with the `$eslint` overrides: `eslint-plugin-react` 7.37.5 peers up to `^9.7` and
+  `eslint-plugin-jsx-a11y` 6.10.2 up to `^9`; both are the latest releases of those plugins.
+- `@types/node` stays 24.x: 24.19.1 is the newest 24.x; latest is 26.6.4, above `engines.node >=24`.
+- `vitest` and `@vitest/coverage-v8` stay 4.1.11: see the probe numbers in § "[2026-10] vitest 5 hold".
+- `qs` stays 6.15.1 under `typed-rest-client` 2.3.1, which pins it exactly and arrives through
+  `@stryker-mutator/core` 10.0.0 (latest, depends on `typed-rest-client ~2.3.0`; `typed-rest-client` 3.1.1 and later
+  (`qs ^6.16.0`) carry the fix): two moderate advisories on a dev-only chain, below the `audit:gate` threshold.
+  Lift with a Stryker release that moves `typed-rest-client`.
+
+**Installed under the one-off `--min-release-age=0` operator override (2026-10-07).** `.npmrc` keeps
+`min-release-age=3`; a plain `npm ci` installs the resulting lockfile. Each version below was younger than 3
+days when taken; publish date and npm provenance (`npm view <pkg>@<v> dist.attestations`):
+
+- `@radix-ui/react-slot` 1.4.0, 2026-10-05, provenance
+- `@vitejs/plugin-react` 6.1.2, 2026-10-05, provenance
+- `eslint-plugin-better-tailwindcss` 4.9.0, 2026-10-05, no provenance
+- `eslint-plugin-oxlint` 1.87.0, 2026-10-05, provenance
+- `oxlint` 1.87.0 with its `@oxlint/binding-*` platform packages 1.87.0, 2026-10-05, provenance
+- `react-i18next` 17.0.16, 2026-10-06, no provenance
+- `typescript-eslint` 8.71.1 with its `@typescript-eslint/*` packages 8.71.1, 2026-10-05, provenance
+- `vite` 8.3.3, 2026-10-06, provenance
+- `web-vitals` 6.2.3, 2026-10-05, no provenance
+- Transitives moved by `npm update --min-release-age=0`, 2026-10-05, provenance: `@conventional-changelog/git-client`
+  3.2.0, `@napi-rs/wasm-runtime` 1.2.5, `@oxc-project/types` 0.153.0, `conventional-changelog-conventionalcommits`
+  10.4.1, `conventional-commits-parser` 7.1.3, `nanoid` 3.3.20, `postcss` 8.5.29. Same date, no provenance:
+  `@bramus/specificity` 2.4.3, `acorn` 8.19.0.
+- Transitives, 2026-10-07, provenance: `@babel/core`, `helper-compilation-targets`,
+  `helper-create-class-features-plugin`, `helpers`, `parser`, `preset-typescript`, `traverse` 8.0.7 and
+  `@babel/helpers`, `runtime`, `traverse` 7.29.10; `rolldown` 1.2.13 with its `@rolldown/binding-*` platform
+  packages 1.2.13; `caniuse-lite` 1.0.30001815; `electron-to-chromium` 1.5.450.
+
 ## [2026-10] zizmor audits the workflow files; this closes the 2026-07-17 watch item
 
 **Decision**: the `zizmor` job in `security.yml` ("Workflow audit (zizmor)") runs on every pull request,
@@ -7,8 +63,8 @@ every push to the default branch and the weekly cron, and fails at Medium severi
 `zizmorcore/zizmor-action` v0.6.4, SHA-pinned like every other action, with `version: 1.30.1`,
 `inputs: .github/workflows` and `config: .github/zizmor.yml`. The action runs zizmor from a container image
 pinned by digest; `version` is the pin, Dependabot moves the action's SHA, and a newer zizmor is a deliberate
-edit of `version`. The watch item opened 2026-07-17 named one trigger, "workflows grow beyond ~2 files per
-repo"; there are five workflow files now, so it has fired and the item is closed.
+edit of `version`. The watch item opened 2026-07-17 named one condition (checked 2026-10-08: met), "workflows
+grow beyond ~2 files per repo"; there are five workflow files in `.github/workflows`, so the item is closed.
 
 **One pass, and a remap so it reads the same everywhere.** The action audits online by default (it verifies
 that every pinned SHA belongs to its repository and version comment, and flags actions with a published
@@ -208,6 +264,13 @@ both cold.
 (`stryker run --mutate <a covered file>` under `vitest@5` scoring near its 4.1.11 baseline, not near zero)
 — take vitest 5 when it kills mutants again, in the same commit that drops the `dependabot.yml` ignore.
 
+**Re-checked 2026-10-07, hold stands.** Latest `vitest` is 5.0.3 and `@stryker-mutator/vitest-runner` is
+still 10.0.0 (2026-08-14), so the condition above has not been met. The one-file probe, run cold (no `reports/`,
+no `.stryker-tmp/`) in a throwaway copy of this tree with `msw` 2.15.0, `stryker run --mutate src/lib/api/safeFetch.ts`:
+vitest 4.1.11 scored **88.24** (15 killed, 2 survived, 1.35 to 2.12 tests per mutant over three cold runs);
+vitest 5.0.3 scored **5.88** (1 killed, 16 survived, 0.41 tests per mutant), below the `thresholds.break` floor of 40.
+Next check 2026-11-02.
+
 ## [2026-10] `brace-expansion` floor raised past three new high advisories (2026-10-02)
 
 **Decision**: root override `"brace-expansion": ">=5.0.9 <6"` raised to `">=5.0.12 <6"`, same entry,
@@ -349,7 +412,8 @@ out of the pre-push hook — but out of `verify` only together with the workflow
 `eslint` peer below 10 — `eslint-plugin-react` at `^9.7`, `eslint-plugin-jsx-a11y` at `^9`, and
 `eslint-plugin-import` at `^9`, which arrives transitively — so each gets an `overrides` entry mapping
 its peer to `$eslint`. `npm install` and `npm ci` both succeed with **no `--legacy-peer-deps`**; the
-blanket flag was rejected as a permanent posture in a repo with a hardened `.npmrc`.
+blanket flag was rejected as a permanent posture in a repo with a hardened `.npmrc`. Update 2026-10-07:
+`eslint-plugin-import` is not in the tree any more, so its override is gone and two plugins remain.
 
 **`settings.react.version` is `'19.2'`, never `'detect'`.** `eslint-plugin-react` resolves `'detect'`
 through `detectReactVersion` → `resolveBasedir`, which calls the `context.getFilename()` API that

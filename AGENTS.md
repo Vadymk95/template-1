@@ -254,13 +254,15 @@ The gate is **zero-warnings**: `eslint --max-warnings 0`, `oxlint --deny-warning
 
 ## Version holds (do not "fix" by bumping)
 
-- **ESLint is 10.x** — the 9.x hold was lifted ahead of the 2026-08-06 end of life. Three plugins still cap their `eslint` peer below 10 (`eslint-plugin-react` at `^9.7`, `eslint-plugin-jsx-a11y` at `^9`, and `eslint-plugin-import` transitively), so each has an `overrides` entry mapping that peer to `$eslint`. Do not remove them, and do not reach for `--legacy-peer-deps`. **`settings.react.version` must stay a literal, never `'detect'`** — see `DECISIONS.md`.
-- **TypeScript stays `~6.0.x`** — `typescript-eslint` peer is `<6.1.0`. TS 7 exists; do not bump until the peer widens.
+- **ESLint is 10.x** — the 9.x hold was lifted ahead of the 2026-08-06 end of life. Two plugins still cap their `eslint` peer below 10 (`eslint-plugin-react` at `^9.7` and `eslint-plugin-jsx-a11y` at `^9`), so each has an `overrides` entry mapping that peer to `$eslint`. Do not remove them, and do not reach for `--legacy-peer-deps`. **`settings.react.version` must stay a literal, never `'detect'`** — see `DECISIONS.md`.
+- **TypeScript stays `~6.0.x`** — `typescript-eslint` peer is `<6.1.0` (re-checked 2026-10-07 on 8.71.1). TS 7 exists; do not bump until the peer widens.
 - **`oxlint` tilde-tracks `eslint-plugin-oxlint`** — lockstep releases; the plugin pins `~<its version>`.
-- **`@types/node` stays 24.x** — types match `engines.node >= 24`, not the newest Node.
+- **`@types/node` stays 24.x** — types match `engines.node >= 24`, not the newest Node (2026-10-07: 24.19.1 is the newest 24.x).
+- **`msw` stays 2.x (`^2.15.0`)** — `msw` 3 removed the `msw/core/http` export that `@vitest/mocker` (4.1.11 and 5.0.3) imports in vitest browser mode, and the mocker peers `msw ^2.4.9`. `dependabot.yml` ignores `msw >=3`; do not paper over it with an `overrides` entry. Lift when a vitest release widens that peer to include 3; the migration notes are in `DECISIONS.md` § "[2026-10] Dependency refresh".
 - **vitest and `@vitest/coverage-v8` stay `^4.1.11` in this repo** — under vitest 5.0.2 the weekly
   mutation gate scored 9.59 (cold run) against the `thresholds.break` floor of 40; on 4.1.11 it scores
-  43.49. `dependabot.yml` ignores `vitest >=5` and `@vitest/coverage-v8 >=5`. Lift trigger and the
+  43.49. Re-probed 2026-10-07 on vitest 5.0.3: the one-file probe scored 5.88 against 88.24 on 4.1.11 (msw 2.15.0).
+  `dependabot.yml` ignores `vitest >=5` and `@vitest/coverage-v8 >=5`. Lift trigger and the
   numbers: `DECISIONS.md` § "[2026-10] vitest 5 hold".
 
 ## Machine-agnostic configs

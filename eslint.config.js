@@ -92,7 +92,7 @@ export default defineConfig([
         settings: {
             // NOT 'detect' — see the trailing settings block at the end of this
             // file for why that crashes under ESLint 10.
-            react: { version: '19.2' },
+            react: { version: '19.3' },
             // resolver-next is the new API for eslint-plugin-import-x.
             // The legacy 'import-x/resolver' interface throws "node with invalid interface"
             // at runtime. createTypeScriptImportResolver wraps eslint-import-resolver-typescript
@@ -355,6 +355,18 @@ export default defineConfig([
             '@typescript-eslint/explicit-function-return-type': 'off'
         }
     },
+    // ─── createSelectors — computed key over a generic `keyof` ───────────────
+    // typescript-eslint 8.71.0 added `no-unsafe-enum-assignment` to strictTypeChecked and it
+    // reports every computed property write whose key is a generic `keyof` ("does not have a
+    // shared enum type with the expected enum ."), in code with no enum anywhere. Open upstream
+    // as typescript-eslint#12966; delete this block when that issue is closed and the rule
+    // passes on this file.
+    {
+        files: ['src/store/utils/createSelectors.ts'],
+        rules: {
+            '@typescript-eslint/no-unsafe-enum-assignment': 'off'
+        }
+    },
     // Vite plugins load before Vite resolves `@/`; they may import `../src/**` explicitly.
     {
         files: ['vite-plugins/**/*.ts'],
@@ -505,9 +517,9 @@ export default defineConfig([
      * that path entirely (`lib/util/version.js`).
      * This block deliberately has NO `files` key, so it applies to every linted file
      * and cannot be undone by a shared config that sets 'detect' for its own
-     * patterns. Keep it in step with the `react` major/minor in package.json.
+     * patterns. Keep it in step with the installed `react` major/minor (package-lock.json).
      */
     {
-        settings: { react: { version: '19.2' } }
+        settings: { react: { version: '19.3' } }
     }
 ]);

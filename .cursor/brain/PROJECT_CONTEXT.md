@@ -6,22 +6,22 @@ Production-ready React SPA template. Copy, rename, start building. Includes all 
 
 ## Tech Stack
 
-| Layer        | Choice                            | Version                   |
-| ------------ | --------------------------------- | ------------------------- |
-| UI           | React                             | 19                        |
-| Language     | TypeScript                        | 6.0 strict                |
-| Bundler      | Vite + Rolldown (official `vite`) | 8                         |
-| Styling      | Tailwind CSS                      | **v4** (CSS-based config) |
-| Components   | shadcn/ui (new-york)              | latest                    |
-| Global State | Zustand + devtools                | 5                         |
-| Server State | TanStack Query                    | 5                         |
-| Routing      | React Router                      | 7                         |
-| Forms        | react-hook-form + zod             | 7 / 4                     |
-| i18n         | i18next + react-i18next           | 26 / 17                   |
-| Testing      | Vitest + Testing Library          | 5                         |
-| Linting      | ESLint 10 flat + Oxlint (staged)  | 10 / 1.x                  |
-| Formatting   | Prettier                          | 3                         |
-| Git hooks    | Husky + commitlint + lint-staged  | 9 / 21                    |
+| Layer        | Choice                            | Version                                   |
+| ------------ | --------------------------------- | ----------------------------------------- |
+| UI           | React                             | 19                                        |
+| Language     | TypeScript                        | 6.0 strict                                |
+| Bundler      | Vite + Rolldown (official `vite`) | 8                                         |
+| Styling      | Tailwind CSS                      | **v4** (CSS-based config)                 |
+| Components   | shadcn/ui (new-york)              | latest                                    |
+| Global State | Zustand + devtools                | 5                                         |
+| Server State | TanStack Query                    | 5                                         |
+| Routing      | React Router                      | 7                                         |
+| Forms        | react-hook-form + zod             | 7 / 4                                     |
+| i18n         | i18next + react-i18next           | 26 / 17                                   |
+| Testing      | Vitest + Testing Library          | 4.1 (held, see AGENTS.md § Version holds) |
+| Linting      | ESLint 10 flat + Oxlint (staged)  | 10 / 1.x                                  |
+| Formatting   | Prettier                          | 3                                         |
+| Git hooks    | Husky + commitlint + lint-staged  | 9 / 21                                    |
 
 ## Architecture
 

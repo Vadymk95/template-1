@@ -3,7 +3,7 @@ import { resolve } from 'path';
 
 import type { Plugin } from 'vite';
 
-import { I18N_HMR_EVENT, LOCALES_DIR } from '../src/lib/i18n/constants';
+import { I18N_HMR_EVENT, LOCALES_DIR } from '../src/lib/i18n/constants.ts';
 
 /**
  * i18n HMR Plugin
