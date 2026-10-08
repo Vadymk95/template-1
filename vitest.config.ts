@@ -2,7 +2,7 @@
 import { mergeConfig } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-import viteConfigFn from './vite.config';
+import viteConfigFn from './vite.config.ts';
 
 const viteConfig =
     typeof viteConfigFn === 'function'

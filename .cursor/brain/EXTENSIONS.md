@@ -6,7 +6,7 @@ It points and never restates. Seeds and the graduation contract live in [`TEMPLA
 
 ## How to read a recipe
 
-**Targets** (read from `package.json`, 2026-10-04): React 19, Vite 8 (Rolldown), TanStack Query 5, React Router 7 (imports come from `react-router-dom`), Zod 4, Zustand 5, i18next 26 with react-i18next 17, MSW 2. A recipe that needs a newer major than these says so.
+**Targets** (read from `package.json`, 2026-10-07): React 19, Vite 8 (Rolldown), TanStack Query 5, React Router 7 (imports come from `react-router-dom`), Zod 4, Zustand 5, i18next 26 with react-i18next 17, MSW 2. A recipe that needs a newer major than these says so.
 
 **Labels.** Facts carry a source key (`[tq]`, `[sentry]`, ...) resolved in the Sources section at the end, all checked against current docs on 2026-10-04. A default with no vendor behind it is marked _(opinion)_. A conclusion drawn from a verified fact plus this repo's code is marked _(inference)_. Anything not checked is marked _(unverified)_: treat it as a lead, not a recipe.
 

@@ -3,8 +3,8 @@
  *
  * Why it exists:
  *   Canonical reference for surfacing build-time metadata (`__APP_VERSION__`
- *   injected by Vite from `package.json`) alongside the current year computed
- *   at render. `.cursor/brain/TEMPLATE_SEEDS.md` points here as the metadata
+ *   injected by Vite from `package.json`) alongside the current year read
+ *   once at module load. `.cursor/brain/TEMPLATE_SEEDS.md` points here as the metadata
  *   surface; emptying it back to `<footer />` loses both the version badge and
  *   the "where do I read __APP_VERSION__" onboarding hint.
  *
@@ -21,14 +21,16 @@
 import type { FunctionComponent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+// Read once at module load: calling `Date` inside the component is an impure render.
+const CURRENT_YEAR = new Date().getFullYear();
+
 export const Footer: FunctionComponent = () => {
     const { t } = useTranslation('common');
-    const year = new Date().getFullYear();
 
     return (
         <footer className="border-t bg-card">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 p-4 text-xs text-muted-foreground">
-                <span>{t('footer.copyright', { year, appName: t('appName') })}</span>
+                <span>{t('footer.copyright', { year: CURRENT_YEAR, appName: t('appName') })}</span>
                 <span className="font-mono">
                     {t('footer.version', { version: __APP_VERSION__ })}
                 </span>
