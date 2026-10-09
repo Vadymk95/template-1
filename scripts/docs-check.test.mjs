@@ -206,6 +206,23 @@ describe('normalizeHeading', () => {
         expect(normalizeHeading('Version holds (do not "fix" by bumping)')).toBe('version holds');
         expect(normalizeHeading('[link text](./x.md) — note')).toBe('link text - note');
     });
+
+    it('strips an inline HTML tag and keeps the words around it', () => {
+        expect(normalizeHeading('The <code>tier</code> law')).toBe('the tier law');
+        expect(normalizeHeading('<b>Bold</b> heading:')).toBe('bold heading');
+    });
+
+    it('leaves no angle bracket behind for nested or unclosed tags', () => {
+        for (const raw of [
+            'A <<b>b> B',
+            '<<script>script>x',
+            '<scr<script>ipt>x',
+            'A <b B',
+            'x <!-- y'
+        ]) {
+            expect(normalizeHeading(raw)).not.toMatch(/[<>]/);
+        }
+    });
 });
 
 describe('checkSectionPointers', () => {

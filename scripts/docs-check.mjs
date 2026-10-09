@@ -359,6 +359,8 @@ const flatten = (raw) =>
     raw
         .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
         .replace(/<[^>]*>/g, '')
+        // One pass over nested or unclosed tags can leave a `<`: no angle bracket survives.
+        .replace(/[<>]/g, '')
         .replace(/[`*~]/g, '')
         .replace(/(?<![A-Za-z0-9])_|_(?![A-Za-z0-9])/g, '')
         .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '')
