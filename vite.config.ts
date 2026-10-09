@@ -4,13 +4,24 @@ import * as path from 'path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
-import { defineConfig, type Plugin, type PluginOption } from 'vite';
+import { defineConfig, loadEnv, type Plugin, type PluginOption } from 'vite';
 import compression from 'vite-plugin-compression';
 import { webfontDownload } from 'vite-plugin-webfont-dl';
 
 import pkg from './package.json' with { type: 'json' };
 import { htmlOptimize } from './vite-plugins/html-optimize.ts';
 import { i18nHmr } from './vite-plugins/i18n-hmr.ts';
+import { securityHeaders } from './vite-plugins/security-headers.ts';
+
+// The fallback `src/lib/api/client.ts` uses when VITE_API_URL is unset. The CSP must allow the origin
+// the app really calls; if the two ever disagree, the production-mode e2e run fails on the blocked
+// request (the home page calls the API), so this copy cannot drift silently.
+const DEFAULT_API_URL = 'http://localhost:3001/api';
+
+const resolveApiUrl = (mode: string): string => {
+    const { VITE_API_URL: apiUrl = DEFAULT_API_URL } = loadEnv(mode, import.meta.dirname, 'VITE_');
+    return apiUrl;
+};
 
 // Remove MSW service worker from production dist — it's a dev-only artifact.
 // public/mockServiceWorker.js is committed so MSW works in dev, but must not ship.
@@ -25,7 +36,7 @@ const removeMswPlugin = (): Plugin => ({
     }
 });
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
     server: {
         port: 3000,
         cors: true
@@ -46,13 +57,20 @@ export default defineConfig(({ command }) => ({
         // Hot reload for i18n translation files in development
         i18nHmr(),
         removeMswPlugin(),
+        // Default CSP and security headers: `vite preview` sends them, the build emits dist/_headers.
+        // The API origin joins connect-src (SECURITY_REQUIREMENTS.md).
+        securityHeaders({
+            apiUrl: resolveApiUrl(mode)
+        }),
         compression({
             algorithm: 'brotliCompress',
             ext: '.br',
             deleteOriginFile: false
         }),
-        // Downloads fonts from @import in CSS and bundles them locally (0 external requests)
-        webfontDownload(),
+        // Downloads fonts from @import in CSS and bundles them locally (0 external requests).
+        // Emitted as a blocking <link>: the plugin's default inline <style> is blocked by style-src 'self',
+        // and its async media="print" swap uses an inline onload handler that script-src 'self' blocks.
+        webfontDownload([], { injectAsStyleTag: false, async: false }),
         // Bundle analyzer: only runs when ANALYZE=true env variable is set
         // Usage: ANALYZE=true npm run build
         ...((process.env.ANALYZE === 'true'

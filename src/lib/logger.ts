@@ -31,10 +31,10 @@ const log = (level: LogLevel, message: string, context?: LogContext): void => {
         // Wire up in src/lib/sentry.ts when ready (see .cursor/docs/enterprise-upgrade.md)
         const entry = JSON.stringify({ level, message, context, ts });
         if (level === 'error') {
-            // eslint-disable-next-line no-console
+            // eslint-disable-next-line no-console -- the logger is the one sanctioned console sink; prod emits one structured JSON line
             console.error(entry);
         } else {
-            // eslint-disable-next-line no-console
+            // eslint-disable-next-line no-console -- the logger is the one sanctioned console sink; prod emits one structured JSON line
             console.warn(entry);
         }
         return;
@@ -45,10 +45,10 @@ const log = (level: LogLevel, message: string, context?: LogContext): void => {
     const reset = 'color: inherit; font-weight: normal';
 
     if (context !== undefined) {
-        // eslint-disable-next-line no-console
+        // eslint-disable-next-line no-console -- the logger is the one sanctioned console sink; dev output is styled per level
         console[level](prefix, LEVEL_STYLE[level], reset, message, context);
     } else {
-        // eslint-disable-next-line no-console
+        // eslint-disable-next-line no-console -- the logger is the one sanctioned console sink; dev output is styled per level
         console[level](prefix, LEVEL_STYLE[level], reset, message);
     }
 };

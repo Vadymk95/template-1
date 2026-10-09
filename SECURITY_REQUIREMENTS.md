@@ -1,37 +1,73 @@
 # Security Requirements · Production Deployment Checklist
 
-This document contains **mandatory security configurations** that must be implemented before deploying to production. These requirements apply regardless of your hosting platform (AWS, Vercel, Netlify, self-hosted, etc.).
+This document contains **mandatory security configurations** that must be in place before deploying to production. The template ships a working default for the response headers; this file says what it is, how to adapt it, and how to carry it to your host.
 
-> **⚠️ CRITICAL:** Security headers and CSP nonce injection are **not optional** for production environments. This checklist must be completed before going live.
+> **⚠️ CRITICAL:** Security headers and a Content-Security-Policy are **not optional** for production environments. This checklist must be completed before going live.
 
-## 📜 Required HTTP Headers
+## 📜 What ships
 
-Configure these headers on your CDN or server:
+One module, `vite-plugins/security-headers.ts`, is the single source of truth for the response headers. Everything else reads it, so the copies cannot drift:
 
-| Header                        | Purpose                             | Example Value                                          |
-| ----------------------------- | ----------------------------------- | ------------------------------------------------------ |
-| **Strict-Transport-Security** | Protection against MITM attacks     | `max-age=31536000; includeSubDomains; preload`         |
-| **X-Frame-Options**           | Clickjacking protection             | `DENY`                                                 |
-| **X-Content-Type-Options**    | MIME-type sniffing protection       | `nosniff`                                              |
-| **Referrer-Policy**           | Controls referrer info in requests  | `strict-origin-when-cross-origin`                      |
-| **Permissions-Policy**        | Restrict browser feature access     | `camera=(), microphone=(), geolocation=()`             |
-| **Content-Security-Policy**   | XSS and injection attack prevention | See [CSP Nonce Injection](#-csp-nonce-injection) below |
+| Consumer                   | What it does                                                                                                                                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vite build`               | Emits `dist/_headers`, the file Netlify and Cloudflare Pages read from the publish directory                                                                                                    |
+| `vite preview`             | Sends the same headers on every response, so the production-mode e2e suite runs under the policy                                                                                                |
+| `e2e/support/test.ts`      | The `test` every spec that runs against the built app imports: it fails the test on a Content-Security-Policy violation, from the console or the `securitypolicyviolation` event (every engine) |
+| `security-headers.test.ts` | Pins the header set and the CSP directives: removing a header or loosening a directive turns it red                                                                                             |
+| `e2e/smoke.spec.ts`        | Asserts the preview response carries every header                                                                                                                                               |
+
+`vite dev` is left out on purpose: HMR needs an inline preamble script and a websocket, and the dev-only MSW worker (`src/mocks/`, never part of `dist`) runs there, so the production policy needs no hole for either.
+
+| Header                         | Shipped value                              | Purpose                                                   |
+| ------------------------------ | ------------------------------------------ | --------------------------------------------------------- |
+| **Content-Security-Policy**    | See [The CSP](#the-csp)                    | XSS and injection prevention, framing (`frame-ancestors`) |
+| **Strict-Transport-Security**  | `max-age=31536000; includeSubDomains`      | Protection against MITM attacks                           |
+| **X-Content-Type-Options**     | `nosniff`                                  | MIME-type sniffing protection                             |
+| **Referrer-Policy**            | `strict-origin-when-cross-origin`          | Controls referrer info in requests                        |
+| **Permissions-Policy**         | `camera=(), microphone=(), geolocation=()` | Restrict browser feature access                           |
+| **X-Frame-Options**            | `DENY`                                     | Clickjacking protection for browsers without CSP level 2  |
+| **Cross-Origin-Opener-Policy** | `same-origin`                              | Isolates the browsing context from cross-origin openers   |
 
 > **Note on `X-XSS-Protection`:** This header is **deprecated** and should not be set. It was removed from modern browsers (Chrome 78+) and can introduce vulnerabilities in legacy browsers. CSP is the correct defense against XSS.
 
-### Implementation Examples
+### The CSP
 
-**Nginx:**
+Deny by default (`default-src 'none'`), then allow exactly what the app loads: its own origin for scripts, styles, fonts and requests (locale JSON included), `data:` images, and the API origin in `connect-src`. `base-uri` and `form-action` are `'self'`; `frame-ancestors 'none'` only works in the header (a `<meta>` element ignores it, per [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/frame-ancestors)), which is why the policy is delivered as a header and not as a `<meta>` tag.
+
+There is no `'unsafe-inline'` and no `'unsafe-eval'`. `index.html` has no inline script (`public/theme-boot.js` is external), and the web fonts are emitted as a blocking `<link rel="stylesheet">` (`vite.config.ts`, `webfontDownload` with `injectAsStyleTag: false, async: false`) because the plugin's default is an inline `<style>` (blocked by `style-src 'self'`) and its async mode swaps `media="print"` with an inline onload handler (blocked by `script-src 'self'`). React `style` props are fine: they are written through `element.style`, which CSP does not block.
+
+Zod runs with its JIT off (`z.config({ jitless: true })` in `src/env.ts`), so no `'unsafe-eval'` is needed: zod's default probes for `eval` with `new Function`, which this policy blocks, and browsers report the caught attempt as a violation. A schema built before `src/env.ts` loads would bring the probe back, and the e2e CSP guard would name it.
+
+## 🛠 Adapt it
+
+- **Your API origin.** `connect-src` takes the origin of `VITE_API_URL` (the value the build runs with). A path such as `/api` needs nothing, `'self'` covers it. When `VITE_API_URL` is unset the build uses the same fallback as `src/lib/api/client.ts` (`http://localhost:3001/api`), so a production build **must** set `VITE_API_URL`, or the shipped header names a localhost origin.
+- **Another origin** (analytics, error monitoring, an image CDN): add it to the matching directive in `buildCsp` in `vite-plugins/security-headers.ts` and update `security-headers.test.ts` in the same change. Keep the origin list in the PR description. Roll a stricter or new policy out as `Content-Security-Policy-Report-Only` first (`.cursor/brain/EXTENSIONS.md` § 6.4).
+- **Never `'unsafe-inline'` for scripts.** A library that injects `<style>` tags at runtime fails `style-src 'self'`: the e2e CSP guard names the violation. Prefer a build-time stylesheet; if you must allow it, use a nonce or hash delivered by your host, not `'unsafe-inline'`. This template injects no nonce: a nonce needs per-response HTML rewriting at the edge (Edge Middleware, a Cloudflare Worker with `HTMLRewriter`), which is platform-specific.
+- **`Cross-Origin-Opener-Policy: same-origin`** breaks `window.open` popups that must talk back to the opener (some OAuth flows). Relax it to `same-origin-allow-popups` in the module if the product needs one.
+- **HSTS `preload`** is not set: joining the browsers' preload list is a separate decision that is hard to undo. Add it only after you commit every subdomain to HTTPS.
+- **A new browser spec** that runs against the built app imports `test` and `expect` from `./support/test`, not from `@playwright/test`, so it inherits the CSP guard. Specs under `e2e/dev/` run against `vite dev`, which sends no CSP, and keep the plain import.
+
+## 🚀 Carry it to your host
+
+The headers are only real where your host sends them. Check the response of a **deep link** (for example `/some/route`), not only `/`: a rewrite to `index.html` is where a host's header rule most often does not apply.
+
+**Netlify and Cloudflare Pages:** nothing to write. `dist/_headers` is already in the publish directory. Both docs place the file there ([Netlify](https://docs.netlify.com/manage/routing/headers/), [Cloudflare Pages](https://developers.cloudflare.com/pages/configuration/headers/)); Cloudflare allows up to 100 rules and 2,000 characters per line, and applies the file to static assets only, not to Pages Functions responses. Netlify applies custom headers only to files it serves from its own store, not to proxied content or functions, and its docs do not say whether a `/*` rule covers an SPA-rewritten path, so read the headers of a deep link on the deployed site.
+
+**Nginx:** copy the values from `dist/_headers` (the CSP line already contains your API origin):
 
 ```nginx
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-add_header X-Frame-Options "DENY" always;
+add_header Content-Security-Policy "<value from dist/_headers>" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 add_header X-Content-Type-Options "nosniff" always;
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+add_header X-Frame-Options "DENY" always;
+add_header Cross-Origin-Opener-Policy "same-origin" always;
 ```
 
-**Vercel (`vercel.json`):**
+`always` adds the header on error responses too. `add_header` is inherited from the previous level only if the current level defines none ([nginx docs](https://nginx.org/en/docs/http/ngx_http_headers_module.html)), so a `location` with its own `add_header` (a cache header, for instance) drops all of these: repeat them there or include them from one shared file.
+
+**Vercel (`vercel.json`):** one `headers` entry per header under `source: "/(.*)"`, the values copied from `dist/_headers`:
 
 ```json
 {
@@ -39,102 +75,26 @@ add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
         {
             "source": "/(.*)",
             "headers": [
+                { "key": "Content-Security-Policy", "value": "<value from dist/_headers>" },
                 {
                     "key": "Strict-Transport-Security",
-                    "value": "max-age=31536000; includeSubDomains; preload"
+                    "value": "max-age=31536000; includeSubDomains"
                 },
-                {
-                    "key": "X-Frame-Options",
-                    "value": "DENY"
-                },
-                {
-                    "key": "X-Content-Type-Options",
-                    "value": "nosniff"
-                },
-                {
-                    "key": "Referrer-Policy",
-                    "value": "strict-origin-when-cross-origin"
-                },
+                { "key": "X-Content-Type-Options", "value": "nosniff" },
+                { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
                 {
                     "key": "Permissions-Policy",
                     "value": "camera=(), microphone=(), geolocation=()"
-                }
+                },
+                { "key": "X-Frame-Options", "value": "DENY" },
+                { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" }
             ]
         }
     ]
 }
 ```
 
-**Netlify (`netlify.toml`):**
-
-```toml
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-```
-
-## 🔐 CSP Nonce Injection
-
-**CRITICAL REQUIREMENT:** Content Security Policy (CSP) must use cryptographic nonces or another strict strategy instead of `'unsafe-inline'`. This template does not inject nonce values automatically — your delivery pipeline must implement that behavior if you choose a nonce-based CSP.
-
-### What is a CSP Nonce?
-
-A CSP nonce is a random, one-time-use token that allows inline scripts/styles to execute only if they have the matching nonce attribute. This prevents XSS attacks while allowing legitimate inline code.
-
-### Template Preparation
-
-If you adopt a nonce-based CSP, you must add the nonce attributes and matching CSP header as part of your own hosting or build pipeline.
-
-### CI/CD Implementation Requirements
-
-This template is **not prewired** with CSP nonce automation. There is no built-in `postbuild` hook, a `scripts/<inject-nonce>.js` of your own, or nonce placeholder in `index.html`. Choose the approach based on your hosting platform and implement it in your delivery pipeline.
-
-#### Option 1: Static Hosting (Build-time Nonce)
-
-**For:** Netlify, AWS S3, Firebase Hosting, Vercel Static, GitHub Pages
-
-For static hosting, add nonce generation and HTML/header injection in your own build or deployment step:
-
-1. Generate a cryptographically secure nonce
-2. Inject the nonce into the served HTML or build artifact
-3. Set the same nonce in the CSP header on your CDN/server
-
-#### Option 2: Edge/Dynamic Hosting (Request-time Nonce) — Maximum Security
-
-**For:** Vercel Edge Functions, Cloudflare Workers, AWS Lambda@Edge
-
-For per-request nonce generation (unique nonce per user request), implement edge middleware or HTML rewriting on your platform:
-
-- **Vercel:** Use Edge Middleware (see Vercel documentation)
-- **Cloudflare:** Use HTMLRewriter in Workers (see Cloudflare documentation)
-
-**Note:** Edge nonce injection requires HTML response rewriting, which is platform-specific. Refer to your hosting platform's documentation for implementation details.
-
-### CSP Configuration Template
-
-```html
-<meta
-    http-equiv="Content-Security-Policy"
-    content="
-    default-src 'self';
-    script-src 'self' 'nonce-{{ CSP_NONCE }}';
-    style-src 'self' 'nonce-{{ CSP_NONCE }}';
-    img-src 'self' data: https:;
-    font-src 'self' data:;
-    connect-src 'self' https://your-api-domain.com;
-    frame-ancestors 'none';
-  "
-/>
-```
-
-**Note:** Adjust `connect-src`, `img-src`, etc. based on your application's needs (API endpoints, CDN domains, analytics).
-
-**`frame-ancestors` does nothing in a `<meta>` element**: browsers ignore it there ([MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/frame-ancestors) says the directive "is not supported in the `<meta>` element"), so the template above does not stop framing. Send it in the `Content-Security-Policy` response header (`frame-ancestors 'none'`), together with `X-Frame-Options: DENY` for older browsers, from your host's header config (`.cursor/brain/EXTENSIONS.md` § 6.4).
+Cache headers and the SPA rewrite for the same file: `.cursor/brain/EXTENSIONS.md` § 6.1 and § 6.2.
 
 ## 🔑 Session, tokens and money
 
@@ -147,16 +107,12 @@ For per-request nonce generation (unique nonce per user request), implement edge
 
 Before deploying to production, verify:
 
-- [ ] All required HTTP headers are configured on CDN/server
+- [ ] `VITE_API_URL` is set for the production build, and `connect-src` in `dist/_headers` names that origin and nothing local
+- [ ] Every header in the table above is sent by your host (`dist/_headers` on Netlify / Cloudflare Pages, or the nginx / Vercel recipe), checked on a deep link of the deployed site
 - [ ] `X-XSS-Protection` is **NOT set** (deprecated, potentially harmful)
-- [ ] **CSP nonce injection:** Implement nonce generation in your hosting or build pipeline
-- [ ] **Verify nonce injection:** Check that the delivered HTML and CSP header use the same nonce value
-- [ ] **CDN configuration:** Configure your CDN/server to emit the matching CSP header
-- [ ] **CSP header:** Set `Content-Security-Policy` header with the generated nonce value
-- [ ] **Nonce matching:** Ensure nonce in CSP header matches nonce in script/style tags
-- [ ] HSTS header is configured with appropriate `max-age`
-- [ ] All external domains in CSP `connect-src` are whitelisted
-- [ ] `Permissions-Policy` restricts unused browser APIs
+- [ ] Every external domain you added to the CSP is listed in the PR description
+- [ ] No `'unsafe-inline'` or `'unsafe-eval'` in the delivered `Content-Security-Policy`
+- [ ] The browser console of the deployed site shows no CSP violation
 - [ ] Security headers are tested (use [Security Headers Scanner](https://securityheaders.com/))
 - [ ] No token in `localStorage` / `sessionStorage` (grep the production bundle for both; the shipped demo `userStore` fails this until Phase 2 replaces it)
 - [ ] No price arithmetic in `src/` (money arrives computed from the server)

@@ -421,7 +421,7 @@ Sources: [i18next] [i18n-http].
 
 ## Phase 6 — deployment hardening
 
-Trigger: before the first public deploy. No host config is tracked in this repo, so everything here is new text you write at deploy time. The policy is `SECURITY_REQUIREMENTS.md`; this phase adds only what that file does not say. Only Vercel's syntax was checked [vercel]; other hosts _(unverified)_ follow the Nginx example already in `SECURITY_REQUIREMENTS.md`.
+Trigger: before the first public deploy. No host config is tracked in this repo, so the cache and rewrite rules here are new text you write at deploy time; the security headers are the exception, they ship as `dist/_headers` from `vite-plugins/security-headers.ts`. The policy is `SECURITY_REQUIREMENTS.md`; this phase adds only what that file does not say. Only Vercel's syntax was checked [vercel]; other hosts _(unverified)_ follow the Nginx example already in `SECURITY_REQUIREMENTS.md`.
 
 ### 6.1 Cache headers
 
@@ -450,7 +450,7 @@ Trigger: before the first public deploy. No host config is tracked in this repo,
 }
 ```
 
-The `headers` array, the SPA rewrite and the negative-lookahead source are documented forms, and real files take precedence over rewrites [vercel]. Append the `/(.*)` security-header block from `SECURITY_REQUIREMENTS.md` § Implementation Examples to `headers`; it is not repeated here. The rewrite skips `/assets/`: with the catch-all `/(.*)` instead, a missing hashed chunk would answer with `index.html` and status 200 under the year-long `immutable` header above, so a cache could keep HTML at a script URL (_inference_ from the precedence rule). Excluded, a missing chunk is a plain 404, which the next point handles.
+The `headers` array, the SPA rewrite and the negative-lookahead source are documented forms, and real files take precedence over rewrites [vercel]. Add the `/(.*)` security-header block from `SECURITY_REQUIREMENTS.md` § Carry it to your host to `headers`; it is not repeated here. The rewrite skips `/assets/`: with the catch-all `/(.*)` instead, a missing hashed chunk would answer with `index.html` and status 200 under the year-long `immutable` header above, so a cache could keep HTML at a script URL (_inference_ from the precedence rule). Excluded, a missing chunk is a plain 404, which the next point handles.
 
 ### 6.3 Stale chunks after a deploy
 
@@ -458,11 +458,11 @@ Pages are lazy by default (`SKELETONS.md`), so a tab opened before a deploy can 
 
 ### 6.4 Content-Security-Policy
 
-- Deliver it as a header. `frame-ancestors` is not supported in a `<meta>` element, and neither is Report-Only [mdn-csp]. The `<meta>` template in `SECURITY_REQUIREMENTS.md` includes `frame-ancestors`, so that directive is ignored there.
+- Deliver it as a header. `frame-ancestors` is not supported in a `<meta>` element, and neither is Report-Only [mdn-csp]. The shipped policy is a header (`vite-plugins/security-headers.ts`), so its `frame-ancestors 'none'` takes effect.
 - Roll out as `Content-Security-Policy-Report-Only` with `report-to` and a `Reporting-Endpoints` header, plus `report-uri` until `report-to` is broadly supported, read the violations, then enforce [mdn-csp].
-- The source `index.html` has no inline script or style (`public/theme-boot.js` is external), but decide `script-src` and `style-src` from the BUILT `dist/index.html` and from a Report-Only run, not from the source _(measurement, not an assumption)_. React `style` props do not need `'unsafe-inline'`: CSP blocks a `style` attribute set as markup or through `setAttribute`, not properties set on `element.style` [mdn-csp-style], and the installed React DOM client writes style props through `element.style` (`setProperty`), checked in `node_modules`. A library that injects `<style>` tags at runtime is a different case: check the report.
-- Every integration adds an origin to `connect-src`: the API (unless same-origin), the monitoring ingest or tunnel, the analytics host. Keep the list in the PR description next to the header change.
-- A nonce needs per-response HTML rewriting at the edge; the template does not inject one and `SECURITY_REQUIREMENTS.md` § "CSP Nonce Injection" owns the options. Vite's `html.cspNonce` is only a placeholder value [vite-build].
+- The source `index.html` has no inline script or style (`public/theme-boot.js` is external), but decide `script-src` and `style-src` from the BUILT `dist/index.html` and from a Report-Only run, not from the source _(measurement, not an assumption)_. The shipped policy was settled that way: the first production-mode e2e run under `style-src 'self'` failed on an inline `<style>` the font plugin injects, which the source never showed, so fonts are emitted as a `<link>` (`vite.config.ts`). After adding a library, the e2e CSP guard (`e2e/support/test.ts`) names a new violation. React `style` props do not need `'unsafe-inline'`: CSP blocks a `style` attribute set as markup or through `setAttribute`, not properties set on `element.style` [mdn-csp-style], and the installed React DOM client writes style props through `element.style` (`setProperty`), checked in `node_modules`. A library that injects `<style>` tags at runtime is a different case: check the report.
+- Every integration adds an origin to `connect-src`: the API (unless same-origin; the shipped policy already takes the origin of `VITE_API_URL`), the monitoring ingest or tunnel, the analytics host (add those in `buildCsp`). Keep the list in the PR description next to the header change.
+- A nonce needs per-response HTML rewriting at the edge; the template does not inject one and `SECURITY_REQUIREMENTS.md` § "Adapt it" owns the options. Vite's `html.cspNonce` is only a placeholder value [vite-build].
 
 ### 6.5 Proxying an API
 

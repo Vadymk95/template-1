@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support/test';
 
 /**
  * Proves there is still a visible focus indicator when the operating system forces its own colours

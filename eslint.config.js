@@ -1,3 +1,4 @@
+import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 import js from '@eslint/js';
 import queryPlugin from '@tanstack/eslint-plugin-query';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
@@ -268,6 +269,20 @@ export default defineConfig([
             // structural strings do not flood. Intentional English-only surfaces
             // turn it off in their own block below.
             'i18next/no-literal-string': ['warn', { mode: 'jsx-text-only' }]
+        }
+    },
+    // ─── A suppression must carry its reason ─────────────────────────────────
+    // Measured gap: `// eslint-disable-next-line <rule>` with no reason passed the whole gate, so a
+    // violation could be silenced with nothing recorded about why. `require-description` makes the
+    // `-- reason` part mandatory and `no-unlimited-disable` bans the blanket form that names no rule.
+    // An UNUSED directive needs no rule here: ESLint's own `reportUnusedDisableDirectives` defaults
+    // to `warn`, and the gate runs with `--max-warnings 0`. No `files` key: it applies to every
+    // linted file, scripts and config included.
+    {
+        plugins: { '@eslint-community/eslint-comments': eslintComments },
+        rules: {
+            '@eslint-community/eslint-comments/require-description': 'error',
+            '@eslint-community/eslint-comments/no-unlimited-disable': 'error'
         }
     },
     // ─── Intentional English-only surfaces ───────────────────────────────────

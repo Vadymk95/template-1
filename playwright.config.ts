@@ -65,7 +65,22 @@ export default defineConfig({
             ? [
                   {
                       name: 'firefox',
-                      use: { ...devices['Desktop Firefox'] },
+                      use: {
+                          ...devices['Desktop Firefox'],
+                          /*
+                           * Firefox swaps the content process on a navigation into a page served with
+                           * `Cross-Origin-Opener-Policy: same-origin`, and Playwright's Firefox driver
+                           * intermittently loses that navigation under load: `page.goto` never resolves
+                           * although every request finished. The header stays SENT (Chromium and WebKit
+                           * enforce it, and the smoke spec asserts it); only this test browser stops
+                           * swapping processes. DECISIONS.md has the measured numbers.
+                           */
+                          launchOptions: {
+                              firefoxUserPrefs: {
+                                  'browser.tabs.remote.useCrossOriginOpenerPolicy': false
+                              }
+                          }
+                      },
                       testMatch: LAYOUT_SPEC_PATTERN
                   },
                   {

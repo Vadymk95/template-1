@@ -237,26 +237,7 @@ Current CI covers: the full `verify:ci` chain (audit gate, oxlint + ESLint, form
 
 ## 12. Security Hardening
 
-**HTTP Security Headers** — add via hosting provider (Vercel `vercel.json`, Netlify `netlify.toml`):
-
-```json
-{
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
-      ]
-    }
-  ]
-}
-```
-
-**Content-Security-Policy** is not in this example on purpose: a policy is built from the built `dist/index.html` and a Report-Only run, not copied. See [`EXTENSIONS.md`](../brain/EXTENSIONS.md) § 6.4 and `SECURITY_REQUIREMENTS.md`.
+**HTTP Security Headers and CSP** — the template ships default security headers (`vite-plugins/security-headers.ts` → `dist/_headers`, also sent by `vite preview`); host recipes, how to adapt the CSP and why HSTS has no preload: [`SECURITY_REQUIREMENTS.md`](../../SECURITY_REQUIREMENTS.md).
 
 **Dependency scanning:**
 - GitHub Dependabot is already configured ✅

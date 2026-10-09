@@ -80,6 +80,7 @@
         "@axe-core/playwright": "^4.12.1",
         "@commitlint/cli": "^21.2.3",
         "@commitlint/config-conventional": "^21.2.0",
+        "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
         "@eslint/js": "^10.0.1",
         "@playwright/test": "^1.62.1",
         "@size-limit/file": "^14.1.0",

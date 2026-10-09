@@ -47,8 +47,7 @@ export const useI18nReload = (): void => {
                 await i18n.reloadResources(resolvedLng, loadedNamespaces);
                 await i18n.changeLanguage(i18n.language);
             } catch (error) {
-                // Dev-only HMR hook — console is intentional here
-                // eslint-disable-next-line no-console
+                // eslint-disable-next-line no-console -- dev-only HMR hook; console is intentional here
                 console.error(I18N_ERROR_MESSAGE, error);
             }
         };
