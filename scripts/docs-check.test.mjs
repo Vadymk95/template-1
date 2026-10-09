@@ -212,6 +212,11 @@ describe('normalizeHeading', () => {
         expect(normalizeHeading('<b>Bold</b> heading:')).toBe('bold heading');
     });
 
+    it('strips a tag that removing an inner tag completes', () => {
+        expect(normalizeHeading('A <<b>b> B')).toBe('a b');
+        expect(normalizeHeading('<scr<script>ipt>x')).toBe('x');
+    });
+
     it('leaves no angle bracket behind for nested or unclosed tags', () => {
         for (const raw of [
             'A <<b>b> B',

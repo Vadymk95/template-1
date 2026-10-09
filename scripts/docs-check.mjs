@@ -354,12 +354,21 @@ const CONNECTOR_END = /(?:\band|\bor|&|,|\/)\s*$/i;
 /** The character after a matched name: not the middle of a word or of a number such as 4.1a. */
 const NAME_END = /^(?![A-Za-z0-9]|\.[A-Za-z0-9])/;
 
+/** Removes HTML tags until none is left: taking out an inner tag can complete an outer one (`<scr<b>ipt>`). */
+const stripTags = (text) => {
+    let previous;
+    let out = text;
+    do {
+        previous = out;
+        out = out.replace(/<[^<>]*>/g, '');
+    } while (out !== previous);
+    return out;
+};
+
 /** Plain lower-case words: markdown, quotes and dash styles flattened, nothing else removed. */
 const flatten = (raw) =>
-    raw
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-        .replace(/<[^>]*>/g, '')
-        // One pass over nested or unclosed tags can leave a `<`: no angle bracket survives.
+    stripTags(raw.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'))
+        // A tag that never closes (`A <b B`) leaves its `<`: no angle bracket survives.
         .replace(/[<>]/g, '')
         .replace(/[`*~]/g, '')
         .replace(/(?<![A-Za-z0-9])_|_(?![A-Za-z0-9])/g, '')
