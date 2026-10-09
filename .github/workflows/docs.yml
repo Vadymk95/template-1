@@ -1,8 +1,9 @@
 name: Docs
 
 # The mechanical half of doc drift (scripts/docs-check.mjs) runs in pre-commit when docs are
-# staged; this weekly job adds the one check that must not block a commit: revisit / trigger
-# dates that have passed. A missing trace log here is a loud skip, not a pass.
+# staged; this weekly job runs the same checks on a repo nobody committed to, so a test
+# quarantine that expires in a quiet week still turns it red. No check reads a date out of
+# prose. A missing trace log here is a loud skip, not a pass.
 
 on:
     schedule:

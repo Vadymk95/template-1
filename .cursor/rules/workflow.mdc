@@ -14,37 +14,17 @@ Gate by **risk, not LOC**.
 | Task Risk | Protocol |
 |---|---|
 | Trivial leaf edit (no danger zone, no contract change) | Proceed with brief notification |
-| Touches SKELETONS danger zone, Zustand store / TanStack Query contract, API payload contract, or router | Present plan → wait for approval → implement |
+| Touches a SKELETONS danger zone, Zustand store / TanStack Query contract, API payload contract, router | Present plan → wait for approval → implement |
 | New architecture pattern | Always present plan |
 
-**FORBIDDEN**: Starting implementation of a non-trivial task before approval.
+**FORBIDDEN**: starting implementation of a non-trivial task before approval.
 
-For a task bigger than a one-sentence diff the approval is the non-author PR review of `SPEC.md`/`PLAN.md` (`AGENTS.md` › Before code); the table above is the chat-level gate for tasks below that size.
+For a task bigger than a one-sentence diff the approval is the non-author PR review of `SPEC.md`/`PLAN.md` (`AGENTS.md` › Before code); the table is the chat-level gate below that size. A plan is `.cursor/<feature-slug>/PLAN.md`, copied from `.cursor/templates/PLAN.md`. The steps are in `agent-pipeline.mdc`; Approve sits between Simulate and Execute.
 
 ## Scope Discipline
 
-- **Flag unrequested work the MOMENT it appears**, not in the final write-up. A padding fix that
-  arrives with a new animation, a new class name and a new test is scope creep even when each piece is
-  defensible on its own. The resolution is often to move the idea onto an existing primitive rather
-  than to revert it — but the flag is not optional and it is not late.
-- **A review finding must sit on a line the diff actually touches.** Whole-file context tempts you
-  toward legacy lines; that temptation is how a one-file fix becomes a refactor. Discovered debt gets
-  its own issue, never this diff.
-
-## Planning
-
-A plan is `.cursor/<feature-slug>/PLAN.md`, copied from `.cursor/templates/PLAN.md` (law: `AGENTS.md` › Before code).
-
-## Implementation Workflow
-
-The steps: `agent-pipeline.mdc` (Discover → Simulate → Execute → Verify → Brain Sync → Confidence); the Approve step sits between Simulate and Execute and is § The Approval Law above.
-
-## Hook vs Utility Extraction Policy (MANDATORY)
-
-- **Extract to hook** when logic requires React runtime: `useEffect` orchestration, subscriptions, timers, browser/DOM APIs, store mutations/selectors, router navigation, async UI state handling in event handlers.
-- **Extract to utility** when logic is pure and deterministic: mapping, filtering, sorting, formatting, parsing, validation, data transformation.
-- **Mandatory split rule**: if a hook contains pure computation, extract that computation to a utility first. The hook must stay a thin orchestration layer.
-- **Never keep pure business computation in hooks** when it can be unit-tested as a utility.
+- **Flag unrequested work the MOMENT it appears**, not in the final write-up. A padding fix that arrives with a new animation, a new class name and a new test is scope creep even when each piece is defensible. The resolution is often to move the idea onto an existing primitive rather than revert it, but the flag is not optional and not late.
+- **A review finding must sit on a line the diff touches.** Discovered debt gets its own issue, never this diff.
 
 ## Post-Edit Verification
 
@@ -52,30 +32,6 @@ After every change: `agent-pipeline.mdc` § 4.1 (the iteration tier).
 
 ## Git Commits
 
-### Format
+Format and types: `AGENTS.md` › Commit format. English, imperative mood ("add", not "added"), no Co-authored-by tags.
 
-```
-type(scope): description
-```
-
-- **Types**: `feat` `fix` `chore` `docs` `style` `refactor` `perf` `test` `revert` `build` `ci`
-- **Max 96 chars** on header line.
-- **English only**, imperative mood ("add", not "added" or "adds").
-- **No Co-authored-by tags**.
-
-### Before Committing
-
-- [ ] `npm run verify:iter` green (the pre-commit hook enforces the commit moment; the push runs the chain)
-- [ ] `git diff` reviewed — no unintended changes
-- [ ] No `console.log` left in production code
-
-### Examples
-
-```
-feat(auth): add JWT token refresh on 401 response
-fix(store): prevent race condition in userStore setUser
-chore(deps): update react-router-dom to 7.13.1
-refactor(api): extract query key factory to userKeys
-perf(query): set staleTime on user queries to reduce refetches
-test(store): add edge cases for logout with expired session
-```
+Before committing: `npm run verify:iter` green (the pre-commit hook enforces the commit moment; the push runs the chain), `git diff` reviewed for unintended changes, no `console.log` in production code.

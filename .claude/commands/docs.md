@@ -11,8 +11,9 @@ until the operator approves them.**
 - `.cursor/brain/PROJECT_CONTEXT.md` — purpose, stack, layout, the gate.
 - `.cursor/brain/MAP.md` — routes, files, responsibilities.
 - `.cursor/brain/SKELETONS.md` — danger zones, with the risk AND the mitigation.
-- `.cursor/brain/DECISIONS.md` — append an entry when a decision was made and has a rationale that
-  git history does not capture.
+- `.cursor/brain/DECISIONS.md` — decisions true today, each at most 30 lines with an evidence link.
+  Add or edit an entry when a decision has a rationale that git history does not capture; delete an
+  entry that is no longer true (history lives in `git log -p` and the PRs).
 - `.cursor/brain/TEMPLATE_SEEDS.md` — what must not be deleted as dead code.
 - `.cursor/brain/VERIFICATION.md` — mechanics and measured timings.
 - `.cursor/brain/READING_INDEX.md` — situations, pointers only.
@@ -54,7 +55,8 @@ line — that is how a wrong doc survives another five sessions.
 
 - No invented rationale. If you cannot find why something is the way it is, write what it does and
   say the reason is unrecorded.
-- No trivia. A decision with a trade-off earns a `DECISIONS.md` entry; a rename does not.
+- No trivia. A decision with a trade-off earns a `DECISIONS.md` entry; a rename does not. Dead or
+  superseded content is deleted, never moved to an archive file.
 - No dates, ticket ids, or provenance ("as discussed", "per the chat"). State the constraint itself.
 - No absolute local paths in committed files.
 

@@ -1,872 +1,660 @@
 # Architectural Decisions
 
-## [2026-10] Dependency refresh (2026-10-07): `msw` stays 2.x, every hold re-checked
-
-**Hold: `msw` stays `^2.15.0`; 3.0.2 exists and is not compatible.** `@vitest/mocker` (4.1.11 and the latest,
-5.0.3) peers `msw ^2.4.9`, and its browser entry (`dist/browser.js`) imports `msw/core/http`, an export `msw` 3
-removed (its `exports` map has no `./core/*`). npm accepts `msw` 3 only through an override of the mocker's
-peer, which would hide a real break in vitest browser mode, so no override is added. `dependabot.yml` ignores
-`msw >=3`. Lift it when a vitest release widens the mocker's `msw` peer to include 3. The migration then needs:
-handlers imported from `msw/http`; `onUnhandledRequest` renamed `onUnhandledFrame`; `public/mockServiceWorker.js`
-regenerated with `npx msw init public/ --no-save`; and a pause of the MSW server in the two test files that probe
-real sockets (`scripts/run-on-free-port.test.mjs`, `scripts/check-gate-env.test.mjs`), because `msw` 3
-intercepts raw `net.connect`: while `server.listen()` is active every connect reports success, so a probe sees
-a free port as taken.
-
-**Two new lint rules fired on unchanged code.** `oxlint` 1.86 turned `react/purity` on: the footer year is
-now read once at module load (`CURRENT_YEAR`) instead of calling `Date` during render. `typescript-eslint`
-8.71 added `no-unsafe-enum-assignment` to `strictTypeChecked`; it reports a false positive on the computed
-key in `src/store/utils/createSelectors.ts` (upstream typescript-eslint#12966, still open on 8.71.1), so that
-one file carries a scoped, commented override in `eslint.config.js`. Remove it when the upstream issue is fixed.
-
-**The `eslint-plugin-import` override is gone.** The package is not in the tree (`npm ls eslint-plugin-import`
-prints nothing, and it was absent on master), so its `$eslint` override mapped nothing and was deleted.
-
-**Holds re-checked 2026-10-07, all stand.**
-
-- `typescript` stays `~6.0.x`: `typescript-eslint` 8.71.1 still peers `>=4.8.4 <6.1.0`; TypeScript latest is 7.0.2.
-- `eslint` stays on 10.x with the `$eslint` overrides: `eslint-plugin-react` 7.37.5 peers up to `^9.7` and
-  `eslint-plugin-jsx-a11y` 6.10.2 up to `^9`; both are the latest releases of those plugins.
-- `@types/node` stays 24.x: 24.19.1 is the newest 24.x; latest is 26.6.4, above `engines.node >=24`.
-- `vitest` and `@vitest/coverage-v8` stay 4.1.11: see the probe numbers in § "[2026-10] vitest 5 hold".
-- `qs` stays 6.15.1 under `typed-rest-client` 2.3.1, which pins it exactly and arrives through
-  `@stryker-mutator/core` 10.0.0 (latest, depends on `typed-rest-client ~2.3.0`; `typed-rest-client` 3.1.1 and later
-  (`qs ^6.16.0`) carry the fix): two moderate advisories on a dev-only chain, below the `audit:gate` threshold.
-  Lift with a Stryker release that moves `typed-rest-client`.
-
-**Installed under the one-off `--min-release-age=0` operator override (2026-10-07).** `.npmrc` keeps
-`min-release-age=3`; a plain `npm ci` installs the resulting lockfile. Each version below was younger than 3
-days when taken; publish date and npm provenance (`npm view <pkg>@<v> dist.attestations`):
-
-- `@radix-ui/react-slot` 1.4.0, 2026-10-05, provenance
-- `@vitejs/plugin-react` 6.1.2, 2026-10-05, provenance
-- `eslint-plugin-better-tailwindcss` 4.9.0, 2026-10-05, no provenance
-- `eslint-plugin-oxlint` 1.87.0, 2026-10-05, provenance
-- `oxlint` 1.87.0 with its `@oxlint/binding-*` platform packages 1.87.0, 2026-10-05, provenance
-- `react-i18next` 17.0.16, 2026-10-06, no provenance
-- `typescript-eslint` 8.71.1 with its `@typescript-eslint/*` packages 8.71.1, 2026-10-05, provenance
-- `vite` 8.3.3, 2026-10-06, provenance
-- `web-vitals` 6.2.3, 2026-10-05, no provenance
-- Transitives moved by `npm update --min-release-age=0`, 2026-10-05, provenance: `@conventional-changelog/git-client`
-  3.2.0, `@napi-rs/wasm-runtime` 1.2.5, `@oxc-project/types` 0.153.0, `conventional-changelog-conventionalcommits`
-  10.4.1, `conventional-commits-parser` 7.1.3, `nanoid` 3.3.20, `postcss` 8.5.29. Same date, no provenance:
-  `@bramus/specificity` 2.4.3, `acorn` 8.19.0.
-- Transitives, 2026-10-07, provenance: `@babel/core`, `helper-compilation-targets`,
-  `helper-create-class-features-plugin`, `helpers`, `parser`, `preset-typescript`, `traverse` 8.0.7 and
-  `@babel/helpers`, `runtime`, `traverse` 7.29.10; `rolldown` 1.2.13 with its `@rolldown/binding-*` platform
-  packages 1.2.13; `caniuse-lite` 1.0.30001815; `electron-to-chromium` 1.5.450.
-
-## [2026-10] zizmor audits the workflow files; this closes the 2026-07-17 watch item
-
-**Decision**: the `zizmor` job in `security.yml` ("Workflow audit (zizmor)") runs on every pull request,
-every push to the default branch and the weekly cron, and fails at Medium severity or above. It is one step:
-`zizmorcore/zizmor-action` v0.6.4, SHA-pinned like every other action, with `version: 1.30.1`,
-`inputs: .github/workflows` and `config: .github/zizmor.yml`. The action runs zizmor from a container image
-pinned by digest; `version` is the pin, Dependabot moves the action's SHA, and a newer zizmor is a deliberate
-edit of `version`. The watch item opened 2026-07-17 named one condition (checked 2026-10-08: met), "workflows
-grow beyond ~2 files per repo"; there are five workflow files in `.github/workflows`, so the item is closed.
-
-**One pass, and a remap so it reads the same everywhere.** The action audits online by default (it verifies
-that every pinned SHA belongs to its repository and version comment, and flags actions with a published
-advisory), and online zizmor grades a checkout that leaves its token in `.git` (`artipacked`) one level lower
-than offline. Measured with zizmor 1.30.1 on a throwaway copy of the tree before the fix (7 such checkouts):
-online, 7 Low findings (and no Medium, so the Medium gate exited 0); offline, 7 Medium (exit 13). A single
-removed `persist-credentials: false` behaved the same: exit 0 online, 13 offline. The answer is
-`rules.artipacked.remap.severity: medium` in `.github/zizmor.yml`: with it the same removal exits 13 online and
-offline. The job and the local command (`uvx zizmor@1.30.1 .github/workflows`, which discovers the same file)
-therefore give one verdict, and the job needs no second, offline pass.
-
-**What it found, fixed at the source**: 7 `artipacked` findings, one per checkout that never pushes, now
-`persist-credentials: false` in `ci.yml`, `docs.yml`, `mutation.yml` and `security.yml` (the zizmor job's own
-checkout sets it too). 3 `adhoc-packages` findings remain, for the `npm install -g npm@^11.14.0` steps in
-`ci.yml`; they are a deliberate exception in `.github/zizmor.yml` (one rule, one whole file, with the reason),
-not a blanket ignore. A run with no severity filter and no config reports exactly those 3 and nothing else.
-
-**Required check.** The job's context, `Workflow audit (zizmor)`, is in `required_status_checks` of
-`.github/ruleset.json` (`docs:check` verifies that a workflow job produces it), so a pull request that adds an
-unpinned action or a credential-persisting checkout cannot merge. The file is the written-down ruleset; the
-live one in the repository settings changes when the owner re-posts it (README § "What your fork does not
-inherit"). As with every required check, it must have reported once before the ruleset is posted; the job
-runs on every pull request, so the first one does that.
-
-## [2026-10] A test that passes only on retry fails the CI run
-
-**Decision**: `failOnFlakyTests` is on whenever `CI` is set, in `playwright.config.ts` and
-`playwright.dev.config.ts` (the two configs CI uses). CI keeps `retries: 2`; locally there are no retries.
-
-**Why**: a retry exists so one flake cannot block a merge, but with the default a test that fails and then
-passes is reported as "1 flaky" and the run is green, so the flake is never fixed and never counted.
-Measured: with `CI=1` and the option forced off, a test failing once exited 0 and printed "1 flaky"; with the
-option on the same run exited 1. Measured here: 0 of 23 completed `ci.yml` runs carry a "flaky" line, so
-the change costs nothing today and turns the first flake into a visible red instead of a silent green.
-
-**Rule it adds**: a red caused by this is fixed, or quarantined with a date (`docs:check` tracks
-quarantines); a retry count is never raised to make it pass.
-
-`scripts/check-playwright-gate-config.test.mjs` pins both configs (retries and `failOnFlakyTests` on in CI,
-both off on the desk run); it failed 4 of 8 cases against the previous configs and passes 8 of 8 now.
-
-## [2026-10] axe-core scans the rendered pages inside the existing specs
-
-**Decision**: `e2e/support/a11y.ts` runs an axe-core scan (`@axe-core/playwright`, `^4.12.1`) at the end of
-the home, login and not-found specs, after each page's own heading is visible. A `serious` or `critical`
-violation fails the spec and prints the rule id and the selectors. `target-size` (WCAG 2.2 SC 2.5.8) is
-switched on because axe ships it disabled. No `test()` was added, so the browser suite did not grow.
-
-**Why**: `eslint-plugin-jsx-a11y` reads JSX; it cannot see a missing accessible name, a contrast failure or
-an undersized target that only exists in the rendered page.
-
-**Proved in both directions** (dev server, `e2e:one`): an `<img>` without `alt` on the home page failed the
-smoke spec with `image-alt` (critical) and exit 1; two 10 px buttons failed it with `target-size` (serious)
-and exit 1; with the `target-size` override removed from the helper the same two buttons passed, so the
-override is what makes the rule fire. The clean pages pass (exit 0). `minor` and `moderate` findings stay
-advisory on purpose.
-
-## [2026-10] Every GitHub Action is SHA-pinned; workflow tokens start read-only
-
-**Decision**: every `uses:` in `.github/workflows/*.yml` is a full 40-hex commit SHA with the version as a
-trailing comment (`uses: actions/checkout@<sha> # v7.0.1`), since 2026-10-04. This replaces the earlier
-split where only gitleaks was SHA-pinned and the official `actions/*` stayed on floating `@vN` tags.
-
-**Why**: GitHub's immutable releases lock only a release's own tag, and only when the publisher opts in. At
-the time of the change `actions/setup-node` v7.0.0 was published immutable, while `actions/checkout`
-v7.0.1 and `googleapis/release-please-action` v5.0.0 were not, so a floating `@vN` tag stays movable and
-the official-action exemption protected nothing. Each pin is the SAME version the workflows ran before:
-no upgrade rode along.
-
-**How it stays fresh**: `.github/dependabot.yml` keeps its `github-actions` ecosystem, which updates a SHA
-pin and its version comment together. A new action is added pinned the same way, never as `@vN`.
-
-**Token permissions**: `release.yml` declares `permissions: contents: read` at the workflow level and gives
-the `release-please` job its own `contents`, `issues` and `pull-requests` write scopes; `security.yml`
-declares `permissions: contents: read` at the top, and its jobs keep their own scopes. The effective
-permissions of every job are unchanged; the point is that a job added later starts read-only (the
-OpenSSF Scorecard Token-Permissions check reads the workflow level).
-
-## [2026-10] delta audit fixes
-
-A second audit round found two silent gaps that the sibling templates (`template-spa-pwa`,
-`template-next-seo`, `template-rn`) also had, and this repo closed the same way.
-
-**`no-empty` was not enabled anywhere** — ESLint's `no-empty` is not in this repo's rule set, so a
-`catch {}` passed every check silently. Added `'no-empty': ['error', { allowEmptyCatch: false }]`
-to `eslint.config.js` next to `no-console`. Proven: a probe file with an empty `catch {}` turns
-`error` red (`Empty block statement`); no existing code in this repo had one to fix.
-
-**The pre-commit `docs:check` trigger (`.husky/pre-commit`) missed the checker's own files.** The
-`grep -qE` gate that decides whether a staged commit runs `docs:check` matched doc/rule/workflow
-paths but not `scripts/docs-check.*` or `package.json`, so a broken checker or a renamed npm
-script could commit clean and surface only on the weekly CI run. Added
-`|^scripts/docs-check\.|^package\.json$` to the regex. Proven: `scripts/docs-check.mjs` does not
-match the old pattern (exit 1) and does match the new one (exit 0); same for `package.json`.
-
-**Not applicable here, checked and confirmed:** the sibling delta audit also covers a cross-origin
-token-leak guard (`isSafeForAuth`) and a persist-hydration gate with a `partialize` token
-exclusion in `template-spa-pwa`'s `client.ts` / `userStore.ts` / `ProtectedRoute.tsx`. This repo's
-equivalent files have neither mechanism (no origin/protocol guard in `client.ts`, no
-`_hasHydrated` flag or `partialize` option in `userStore.ts`), so there is nothing to port.
-
-## [2026-10] guard audit fixes
-
-An audit sabotaged 73 guards in this repo and 53 caught the injected defect. These close the holes
-that reproduced, were silent, and sit on a path a normal fork or a real incident would hit.
-
-**F1 — `docs:check` flags a CI step that bypasses the gate.** New check derives every `run:` step
-in a PR-triggered workflow — a single line or every non-empty line inside a `run: |`/`run: >`
-block scalar, each reported at its OWN line — and compares it against `gate-tiers.json` §
-`ci.allowedRunSteps`; anything else names the file:line and asks for it to move into `verify` or
-be listed with a reason. Replays the 2026-07-28 "gate lied" defect (`fb36cde`): an unlisted
-`npm run lint:extra` step, both as its own step and written inside a block scalar alongside an
-allowed line, turned `docs:check` red on exactly that line; the four current workflows measure
-clean with no allowlist additions needed beyond install/tooling steps and the CI-only lanes the
-tier law already names. (Review finding R1, 2026-10-03: the first cut skipped block scalars
-outright — the most common way to write a multi-line step — so a check added as a block bypassed
-F1 with `docs:check` green. Fixed by reading the block's own lines instead of skipping them.)
-
-**F2 — `docs:check` flags a ruleset context no workflow produces.** New check derives each job's
-required-status-check name (its `name:` or id, plus matrix values from an inline `[a, b]` list or
-a block `- value` list, GitHub's own convention) from every workflow and compares it against
-`.github/ruleset.json`'s `required_status_checks`; a mismatch names the file:line and asks for the
-job to be renamed back or the context listed in `ci.rulesetContextAllowlist` with a reason. A job
-whose exact context GitHub renders only at runtime — a matrix `include:`/`exclude:` key, or a
-`name:` carrying a `${{ }}` expression — is never compared strictly: it prints one loud,
-non-failing line (`cannot derive the status-check names of <file>:<line> job <id> (<reason>)`) and
-every ruleset context starting with that job's static base name is exempted, while every other
-context still has to resolve exactly. Reproduces the class `6e47f3d` (#70) fixed — a renamed or
-deleted job leaves every pull request Pending forever with no error: renaming the `cross-browser`
-job to `cross-browser-v2` turned `docs:check` red; all five current contexts resolve to a real job
-today, and none of them is a block-list matrix, an `include`/`exclude` matrix or an expression
-name, so the exemption path never fires on real data. (Review finding R2, 2026-10-03: the first
-cut read only an inline matrix and had no notion of either undecidable shape, so a fork that wrote
-its matrix as a block list, or used `include`/`exclude`, or an expression job name, got a false
-red that no amount of allowlisting could fix short of disabling the check.)
-
-**F3 — a total-JS size budget.** `.size-limit.json` budgeted only 5 named chunks, so a dynamically
-imported chunk under a different name shipped unseen. Measured total `dist/assets/*.js` (brotli)
-2026-10-03: 166.31 kB. Budget set to 183 kB (measured +10%, rounded up). Reproduced the historical
-defect: dropping the `import.meta.env.DEV &&` gate in `main.tsx` shipped a 409.60 kB
-(72.93 kB brotli) MSW chunk with the 5 old named entries still green and the new total-JS entry red
-("exceeded by 58.1 kB"); reverting the gate brought the total back to 166.31 kB, green.
-
-**F4 — `scrollbar-gutter: stable` guard.** One assertion added inside the existing
-`e2e/layout-geometry.spec.ts` (not a new `test()`): computed `scrollbar-gutter` on `<html>` is
-`stable`. Red with the rule removed from `src/index.css` (`auto` measured, all 5 width cases fail);
-green with it restored.
-
-**F5 — `App` error-boundary wiring.** `src/App.test.tsx` renders the real `App` behind a memory
-router with a throwing child route and asserts the fallback (`role="alert"`) renders. Red with
-`<ErrorBoundary>` removed from `App.tsx` (the throw escapes render, uncaught); green restored.
-
-**F6 — `safeFetch` contract test.** `src/lib/api/safeFetch.test.ts` covers: valid data returns
-parsed; a schema mismatch throws `SchemaValidationError`; a non-2xx response throws an
-`ApiError` carrying the status (so the default retry skips a 4xx); `safeFetchQueryFn` re-throws `AbortError` unchanged. Red when the
-schema-mismatch throw was replaced with `return raw` (only that one case failed); green restored.
-
-**F7 — dead `cross-fetch` shim removed.** `npm ls cross-fetch` is empty, and
-`i18next-http-backend`'s own 4.0.2 changelog says v4 dropped the `cross-fetch` ponyfill it used to
-bundle. The `vite.config.ts` alias to `src/lib/cross-fetch-native.ts` redirected an import nothing
-issues any more. Removed the alias and the shim file; no other reference existed (brain docs,
-seeds list, tests all measured clean by `docs:check` before the removal). `npm run verify:measure`
-still builds clean afterward.
-
-## [2026-10] vitest 5 hold (2026-10-02)
-
-**Decision**: `vitest` and `@vitest/coverage-v8` held back to `^4.1.11` in THIS repo. The weekly
-`mutation.yml` job (cold, no incremental cache — `actions/checkout` + `npm ci` every run) went red on
-2026-09-14, 09-21 and 09-28. A cold local re-run on the unchanged tree (vitest 5.0.2,
-`@stryker-mutator/vitest-runner` 10.0.0) confirmed it: **mutation score 9.59** (60 killed, 7 timed out,
-464 survived, 168 in code no test covers, 2.67 tests per mutant on average) against
-`thresholds.break: 40` in `stryker.config.json` — files with full unit coverage scored mutants as
-undetected, the runner's per-test coverage data effectively not reaching most mutants. Holding vitest at
-4.1.11 and re-running cold on the same tree scored **43.49** (304 killed, 0 timed out, 227 survived, the
-same 168 no-coverage, 4.33 tests per mutant) — above the floor, with the no-coverage count unchanged,
-showing the fix is in the runner pairing, not in test coverage. `npm run test:coverage`
-passes unchanged under 4.1.11 (333/333 tests, thresholds met) — the 2026-09-06 move to vitest 5 needed no
-vitest-5-only adaptation here (unlike the probe/`coverage.exclude` fixes in the sibling `template-next-seo`
-Next.js template), so nothing else moved.
-
-**Why not the same root cause as the sibling Next.js template.** `template-next-seo` measured
-`Ran 0.00 tests per mutant` under vitest 5 — the runner selected no test for any mutant at all. This repo's
-vitest-5 run selected SOME tests (2.67 per mutant average, 60 genuinely killed), so the regression here is
-partial, not total; the net effect is the same (gate red, below floor) and the fix is the same (hold at
-4.1.11), but "the runner returns zero coverage" does not generalise to every template on this version pair.
-
-**An earlier same-day local measurement reported 38.48 for both vitest 5 and 4.1.11 — wrong, not a second
-data point.** `stryker.config.json`'s `incremental: true` reused `reports/stryker-incremental.json` (a
-local, gitignored file) across both runs, so the second run mostly replayed the first run's cached
-per-mutant results instead of re-testing under the new runner. The CI job never has this file (fresh
-checkout, `reports/` gitignored), so it measures cold every time; a trustworthy local comparison has to
-delete `reports/` (and `.stryker-tmp/`) before each run, matching what CI does. The two numbers above are
-both cold.
-
-**Lift trigger** (next check 2026-11-02): a `@stryker-mutator/vitest-runner` release dated after 2026-08-14 (latest as of
-2026-10-02, per `npm view @stryker-mutator/vitest-runner time`) that passes a one-file probe
-(`stryker run --mutate <a covered file>` under `vitest@5` scoring near its 4.1.11 baseline, not near zero)
-— take vitest 5 when it kills mutants again, in the same commit that drops the `dependabot.yml` ignore.
-
-**Re-checked 2026-10-07, hold stands.** Latest `vitest` is 5.0.3 and `@stryker-mutator/vitest-runner` is
-still 10.0.0 (2026-08-14), so the condition above has not been met. The one-file probe, run cold (no `reports/`,
-no `.stryker-tmp/`) in a throwaway copy of this tree with `msw` 2.15.0, `stryker run --mutate src/lib/api/safeFetch.ts`:
-vitest 4.1.11 scored **88.24** (15 killed, 2 survived, 1.35 to 2.12 tests per mutant over three cold runs);
-vitest 5.0.3 scored **5.88** (1 killed, 16 survived, 0.41 tests per mutant), below the `thresholds.break` floor of 40.
-Next check 2026-11-02.
-
-## [2026-10] `brace-expansion` floor raised past three new high advisories (2026-10-02)
-
-**Decision**: root override `"brace-expansion": ">=5.0.9 <6"` raised to `">=5.0.12 <6"`, same entry,
-same cap — not a second line. The 5.0.9 floor had aged into three new high advisories published after
-it was written: `GHSA-q2hr-2g5m-vwhr` (quadratic-time `{a},b}` expansion, fixed 5.0.12),
-`GHSA-qhr7-859c-m2p7` (unbounded recursion on nested brace groups, fixed 5.0.11), `GHSA-6j4f-fj2g-mc7p`
-(unbounded recursion in `parseCommaParts`, fixed 5.0.10). 5.0.12 clears all three in one floor.
-`npm audit --audit-level=high` and `audit:gate` both report zero high/critical afterward (2 moderate,
-pre-existing `qs`/`fast-uri`, untouched). Exactly the aging class the 2026-08-09 sweep below predicted
-for an uncapped floor — this one already carried a cap, so raising it was a one-line edit rather than a
-new allowance.
-
-## [2026-10] Playwright `maxFailures: 10` on the gate run and in CI
-
-**Decision**: `playwright.config.ts` caps `maxFailures` at 10 when `usePreview` is true (CI or
-`PLAYWRIGHT_USE_PREVIEW=1`); the desk run against the dev server stays uncapped. Each config also
-writes to its own `outputDir` (`test-results/e2e`, `test-results/dev`) so `--last-failed` never
-reads the wrong suite's record.
-
-**Why**: measured in a sibling product forked from this template over 30 days — 22 of 60 pushes
-went red, and a red push ran up to 21 minutes against ~5 for a green one because every failing
-test waited out its own timeout with no cap. The cap value comes from one measured break of a
-shared invariant in that product (630 tests, six workers): uncapped, the run took 7.5 min and
-reported 55 failures; capped at 10 it stopped at 21 s; capped at 5 it stopped at 15 s — 5 s less,
-at the cost of reporting half as many of the failing neighbours. 10 is the value that measurement
-settled on.
-
-## [2026-09] Agent limits in a committed `.claude/settings.json`; one Dependabot group; release token wired
-
-**Decision**: `.claude/settings.json` is tracked and denies, in every permission mode: reading .env files
-other than the example, editing itself, force pushes, `--no-verify`, `git reset --hard`, `git clean -f`; it
-asks before edits of the gate files. The rule text lives in `AGENTS.md` § Lanes. Reopened on 2026-09-28 by
-the owner's decision: the 2026-09-12 review had deferred it until an agent was seen editing a listed file,
-and two public guides now name a deny list as the baseline of a professional agent setup.
-
-**What it is not**: a security boundary. Per the Claude Code permissions docs, a Bash rule matches the
-command as written, and `sh -c`, a full binary path or a `git -C` / `git -c` prefix walks past it; Read and
-Edit denies cover the built-in file tools and the file commands Claude Code recognises in Bash (`cat`,
-`head`, `tail`, `sed`, `tee`), not a script that opens the file itself nor `grep -r` run over the folder.
-The boundary stays the required CI check. Cursor and Codex do not read the file.
-
-**Review, 2026-09-28** (two adversarial passes before merge): a force push through a `+branch` refspec and
-through a bundled `-fu` got past the first rules, both reproduced in a scratch repo, so `git push -f*`,
-`git push *+*` and `git commit -n*` replaced the space-anchored forms. `-uf` and a trailing `-n` still get
-through; more wildcards would start catching commit messages, so they stay documented, not chased. A claim
-that deny rules lapse in `bypassPermissions` was checked and rejected: the permission-modes docs say deny
-rules block in every mode, bypass included.
-
-**Dependabot**: the production and development groups both rewrote `package-lock.json`, so the second PR
-conflicted once the first merged (2026-09-27). One `minor-and-patch` group now carries every non-major
-update; a major still opens its own PR.
-
-**Release token**: `release.yml` passes `secrets.RELEASE_PLEASE_TOKEN || github.token`. With the secret
-absent nothing changes (release PR runs wait in `action_required` for one approval); with a fine-grained
-PAT in it, release PRs get CI like any other PR.
-
----
-
-## [2026-09] `extract-zip` closed by one override: `@puppeteer/browsers`, not `puppeteer-core`
-
-**Closed 2026-09-13**: `@size-limit/preset-app` was replaced by `@size-limit/file`. The running-time plugin (`@size-limit/time` → `estimo` → `puppeteer-core`) measured nothing any budget used and cost 15–19 s per CI run (6.5 s → 0.7 s locally, sizes identical). `estimo` and `puppeteer-core` left the tree, and the `@puppeteer/browsers` and `estimo` overrides went with them.
-
-**Decision**: a single root override, `"@puppeteer/browsers": ">=3.0.2 <4"`. Both `extract-zip` advisories (`GHSA-jmr9-qjv8-65gv` path traversal, `GHSA-7pqw-9j4j-h8q3`) reached this repo only through `@size-limit/preset-app → @size-limit/time → estimo`, which pins `find-chrome-bin@2.0.4` and `puppeteer-core@24.22.0` by exact version — both of which pinned `@puppeteer/browsers@2.10.10`, and every published `extract-zip` sits inside the advisory range. `@puppeteer/browsers` drops the dependency at 3.0.2 (the 2.x line never does), so overriding that one package removes `extract-zip` from the tree entirely and takes seven high findings to zero.
-
-**`puppeteer-core` must NOT be overridden — measured, not assumed.** npm's `fixAvailable` proposed `@size-limit/preset-app@11.0.0`, a semver-major downgrade, rejected per the capped-floor doctrine. The obvious alternative — force `puppeteer-core` past its own advisory range (`19.8.4 - 24.43.1`) — was tried and broke the size gate: `estimo/src/utils.js` deep-imports `puppeteer-core/lib/cjs/puppeteer/revisions.js`, and 25.0.2 moved that tree from `lib/cjs/puppeteer/` to `lib/puppeteer/`. Every `puppeteer-core` version that drops `extract-zip` is 25.x, so every one of them breaks `estimo`. With the browsers-only override `puppeteer-core` stays at 24.22.0 and leaves the audit anyway, because its only finding was *via* `@puppeteer/browsers`. Proof: `npm run size:check` launches headless Chrome and all five brotli budgets pass.
-
-**The allowance was removed in the same commit**, per the rule recorded under the gate decision below: the moment the override lands, `GHSA-jmr9-qjv8-65gv` disappears from the audit, which makes the allowance stale, which fails `audit:gate` by design. `scripts/audit-allowlist.json` is now empty, and the gate passes with 0 high and 0 critical (2 moderate remain, `qs` via `typed-rest-client` via `@stryker-mutator/core`).
-
----
-
-## [2026-09] Test toolchain majors: vitest 5, Stryker 10, jsdom 30
-
-**Decision**: take the three majors in one pass, one commit each, measured on the same tree. TypeScript stays `~6.0.x` because `typescript-eslint@8.69` still peers `<6.1.0`.
-
-**What moved**: vitest 5 exposes `document` as a getter-only global in the jsdom environment, so a plain `globalThis.document = stub` throws — `scripts/probe.test.mjs` now uses `vi.stubGlobal` / `vi.unstubAllGlobals`. Stryker 10 changes the mutant set: the same tree scored 44.43 on 9.6.1 and 41.95 on 10.0.0, still above the `thresholds.break` floor of 40, which stays where it is (a floor is raised after a good run, never moved to fit a tool). jsdom 30 requires Node `^24.15.0`; `.nvmrc` says `24`, so `nvm use` resolves to the newest installed 24.x and the hooks run there — a machine on an older 24.x fails `engine-strict` at install, which is the intended signal, not a bug.
-
-**Why**: Dependabot kept opening grouped major bumps that the audit gate refused for unrelated reasons (new transitive advisories, a stale allowance). Taking the majors deliberately, with the mutation run and the coverage gate as proof, closes that queue instead of ignoring it.
-
----
+History lives in `git log -p -- .cursor/brain/DECISIONS.md` and the linked PRs. This file holds only
+decisions that are true today: an entry that stops being true is edited or deleted, never kept as a
+log. Each entry is at most 30 lines and ends with an evidence link. A fork starts its own file and
+points here (README § fork checklist).
+
+| Entry                                                              | Date    | Status         |
+| ------------------------------------------------------------------ | ------- | -------------- |
+| vitest 5 and the Stryker runner                                    | 2026-10 | held           |
+| `msw` stays 2.x                                                    | 2026-10 | held           |
+| TypeScript 6.0.x, held below 6.1                                   | 2026-04 | held           |
+| ESLint 10 and `settings.react.version`                             | 2026-07 | in force, held |
+| Advisories close with capped override floors                       | 2026-10 | in force       |
+| The gate is `verify`; `verify` is a superset of CI                 | 2026-07 | in force       |
+| Guard audit: what each new guard watches                           | 2026-10 | in force       |
+| zizmor audits the workflow files                                   | 2026-10 | in force       |
+| Every GitHub Action is SHA-pinned; workflow tokens start read-only | 2026-10 | in force       |
+| A test that passes only on retry fails the CI run                  | 2026-10 | in force       |
+| Playwright `maxFailures: 10` on the gate run and in CI             | 2026-10 | in force       |
+| axe-core scans the rendered pages inside the existing specs        | 2026-10 | in force       |
+| Agent limits in a committed `.claude/settings.json`                | 2026-09 | in force       |
+| Gate hygiene: fail-open shapes closed                              | 2026-08 | in force       |
+| Cross-engine coverage is opt-in and scoped                         | 2026-08 | in force       |
+| Complexity ratchet                                                 | 2026-08 | in force       |
+| Mutation testing: weekly strength gate, outside `verify`           | 2026-08 | in force       |
+| Content variance is measured in a browser, not asserted in jsdom   | 2026-08 | in force       |
+| The 44px touch floor is a ratchet                                  | 2026-08 | in force       |
+| `outline-hidden`, never `outline-none`                             | 2026-08 | in force       |
+| Tailwind class hygiene                                             | 2026-08 | in force       |
+| Magic strings → constants (Zustand keys + devtools labels)         | 2026-05 | in force       |
+| Boundary validation via Zod safeFetch wrapper                      | 2026-05 | in force       |
+| size-limit brotli budgets                                          | 2026-05 | in force       |
+| REJECT list: explicit non-adoption                                 | 2026-05 | rejected       |
+| MSW browser worker and its dev opt-out                             | 2026-04 | in force       |
+| i18n init failure falls back to English-only                       | 2026-04 | in force       |
+| Web Vitals chunk split is checked after the build                  | 2026-04 | in force       |
+| `eslint-import-resolver-typescript` reads one solution `tsconfig`  | 2026-04 | in force       |
+| Component pattern: arrow function plus `FunctionComponent`         | 2026-04 | in force       |
+| Build stack: Tailwind v4, Vite 8 with Rolldown, `plugin-react` v6  | 2026-03 | in force       |
+| No FSD; Zustand for client state, TanStack Query for server state  | 2026-03 | in force       |
+
+## [2026-10] vitest 5 and the Stryker runner
+
+**Status:** held. The range, reason and lift live in `scripts/version-holds.json`; Dependabot
+ignores `vitest` and `@vitest/coverage-v8` `>=5`.
+
+**Context:** the weekly `mutation.yml` job (cold: fresh checkout, no incremental cache) went red
+three weeks running. Under vitest 5 with `@stryker-mutator/vitest-runner` 10.0.0 the full gate
+scored 9.59 against `thresholds.break: 40`; held at 4.1.11 on the same tree it scored 43.49. Unit
+tests and coverage pass under both, so the fault is the runner pairing, not test coverage.
+
+**Decision:** hold `vitest` and `@vitest/coverage-v8` at `>=4.1.11 <5` together.
+
+**Lift:** a `@stryker-mutator/vitest-runner` release newer than 10.0.0 (published 2026-08-14) that
+passes the one-file probe. Delete `reports/` and `.stryker-tmp/`, then run
+`npx stryker run --mutate src/lib/api/safeFetch.ts` under vitest 5. It must score near its 4.1.11
+baseline (88.24 against 5.88 on 5.0.3 when measured 2026-10-07), not near zero. Lift in the same
+commit that drops the Dependabot ignore and the `version-holds.json` entries.
+
+**Trap:** `stryker.config.json` sets `incremental: true`, so a local A/B that keeps
+`reports/stryker-incremental.json` replays cached results and reports the same score for both
+versions (an early run read 38.48 for both). CI never has that file, so always delete `reports/` and
+`.stryker-tmp/` before comparing.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/e332981b4941ee4a851b57dc01a0af558d293881
+
+## [2026-10] `msw` stays 2.x
+
+**Status:** held (`scripts/version-holds.json`; Dependabot ignores `msw` `>=3`).
+
+**Context:** `@vitest/mocker` (4.1.11 and 5.0.3) peers `msw ^2.4.9`, and its browser entry imports
+`msw/core/http`, an export `msw` 3 removed. npm accepts `msw` 3 only through an override of the
+mocker's peer, which would hide a real break in vitest browser mode.
+
+**Decision:** stay on `msw` `^2.15.0` and add no override.
+
+**Lift:** a vitest release whose `@vitest/mocker` peer admits `msw` 3. The migration then needs:
+handlers imported from `msw/http`; `onUnhandledRequest` renamed `onUnhandledFrame`;
+`public/mockServiceWorker.js` regenerated with `npx msw init public/ --no-save`; and the MSW server
+paused in the two tests that probe real sockets (`scripts/run-on-free-port.test.mjs`,
+`scripts/check-gate-env.test.mjs`), because `msw` 3 intercepts raw `net.connect` and reports every
+port as taken.
+
+**Evidence:** https://github.com/Vadymk95/template-1/pull/95
+
+## [2026-04] TypeScript 6.0.x, held below 6.1
+
+**Status:** held (`scripts/version-holds.json`; Dependabot ignores `typescript` `>=6.1`).
+
+**Context:** `typescript-eslint` 8 peers `typescript >=4.8.4 <6.1.0`, so a bump to 6.1 or 7 fails
+both `npm install` and `npm ci` with ERESOLVE and the whole tree stops resolving. TypeScript 6
+deprecated `baseUrl`; it was removed from `tsconfig.json` and `tsconfig.app.json` because `paths`
+works without it.
+
+**Decision:** stay on `~6.0.x`.
+
+**Lift:** a `typescript-eslint` release whose `typescript` peer admits the next minor or major.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/937333a
+
+## [2026-07] ESLint 10 and `settings.react.version`
+
+**Status:** in force; `eslint` and `@eslint/js` held to 10.x (`scripts/version-holds.json`;
+Dependabot ignores `>=11`).
+
+**Context:** `eslint-plugin-react` peers `eslint` up to `^9.7` and `eslint-plugin-jsx-a11y` up to
+`^9`, so each gets a `package.json` `overrides` entry mapping its `eslint` peer to `$eslint`. The
+9.x line reached end of life on 2026-08-06.
+
+**Decision:** run ESLint 10 with those two overrides. Do not use `--legacy-peer-deps`: a blanket
+flag is not a posture for a repo with a hardened `.npmrc`. Do not remove an override until the
+plugin's own peer admits the installed `eslint`.
+
+**Rule:** `settings.react.version` is a literal that matches the `react` major.minor in
+`package.json`, never `'detect'`. `eslint-plugin-react` resolves `'detect'` through
+`context.getFilename()`, which ESLint 10 removed, so every rule needing the version throws at load.
+A trailing config object with no `files` key repeats the literal so no shared config can reintroduce
+`'detect'`.
+
+**Lift (the eslint hold):** the plugins (and `typescript-eslint`) declare an `eslint` peer that
+includes 11 without the override.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/fb36cde
+
+## [2026-10] Advisories close with capped override floors
+
+**Status:** in force. Floors live in `package.json` `overrides`; exceptions in
+`scripts/audit-allowlist.json`.
+
+**Decision:**
+
+- A high or critical advisory is closed by a root `overrides` floor with a major cap,
+  `">=fixed <next-major"`. An uncapped floor ages into the next vulnerable range and becomes the
+  reason the gate is red (`brace-expansion >=5.0.8` and `fast-uri >=3.1.4` both did).
+- When a later advisory lands on a floored package, raise that floor in place (`brace-expansion`
+  went `5.0.9` to `5.0.12` for three advisories); do not add a second line.
+- An allowance in `audit-allowlist.json` (advisory id, reason, expiry) is the last resort. Read the
+  advisory's fixed range directly instead of trusting `npm audit`'s `fixAvailable`: it proposed a
+  semver-major downgrade of `eslint-plugin-react` for an advisory that a transitive override closed.
+- Adding the override and removing the allowance are one commit: once the override lands the
+  advisory disappears, the allowance goes stale, and a stale allowance fails the gate by design.
+
+**Consequences:** `audit:gate` (in `verify:ci`) fails on any high or critical advisory, an expired
+or stale allowance, and its own inability to complete; lowering `--audit-level` is not available.
+`scripts/audit-gate.test.mjs` covers the fail-closed paths. The Stryker runner's dependency tree is
+inside the gate. Open and below the threshold: two moderate `qs` advisories on the dev-only chain
+`@stryker-mutator/core` 10.0.0 to `typed-rest-client` 2.3.1; they close with a Stryker release that
+moves `typed-rest-client` to 3.1.1 or later.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/07e5fff and
+https://github.com/Vadymk95/template-1/commit/8b982b1
 
 ## [2026-07] The gate is `verify`; `verify` is a superset of CI
 
-**Decision.** Every check lives in `package.json`, never only in a workflow file. `verify` holds all
-offline checks; `verify:ci` is `audit:gate && verify` and is what both `.husky/pre-push` and GitHub
-Actions run. The CI job is one step: `npm run verify:ci`, plus only what CI alone can do — dependency
-install, the browser cache, artifact upload.
+**Status:** in force. The tier law is `AGENTS.md` § Commands / the gate; the phase table is
+`scripts/gate-tiers.json`.
 
-**Why.** CI used to list its own steps, and two of them (`npm audit`, `verify:web-vitals-chunks`) were
-absent from `verify`, while `size:check` lived in `ci:local` and therefore ran in no pipeline at all. So
-a green local gate did not predict a green CI, and one gate never ran anywhere. Both are the same
-defect: a check added to the workflow instead of to the script.
+**Context:** CI once listed its own steps. Two checks (`npm audit`, `verify:web-vitals-chunks`) were
+absent from `verify`, and `size:check` ran in no pipeline at all, so a green local gate did not
+predict a green CI.
 
-**Consequence, accepted.** `verify` is slower — it now also builds, checks the web-vitals chunk split,
-checks the size budget and runs Playwright. It can go red on a dependency bump rather than on your own
-code. That is the cost of a gate that no longer lies. If it becomes intolerable, a check comes out of
-BOTH the script and CI, so the superset property survives.
+**Decision:** every check lives in `package.json`, never only in a workflow file. `verify` holds the
+offline checks; `verify:ci` is `audit:gate && verify` and is the only thing CI runs besides what CI
+alone can do (install, browser cache, artifact upload). `audit:gate` stays out of `verify` because
+it needs the network. `.husky/pre-push` runs the phase-aware `verify:push`.
 
-**`audit:gate` is in `verify:ci`, not `verify`,** because it needs the network. An implementer working
-offline must still be able to run the complete offline gate.
+**Consequences:** `verify` is slower and can go red on a dependency bump rather than on your own
+code; that is the cost of a gate that does not lie. If a check becomes intolerable it leaves BOTH
+the script and CI, so the superset survives. If `verify` crosses roughly five minutes locally, move
+e2e into its own CI job and out of the pre-push hook together with the workflow, never one alone.
+`docs:check` (`ciSteps`) fails a PR-triggered workflow step that bypasses the gate.
 
-**Pre-commit is repo-scoped.** `lint-staged` fixes and re-stages the staged set, but for a partially
-staged file it restores the unstaged hunks *after* fixing, so formatting drift survived the commit and
-only failed at push — leaving files that were already fixed and never committed. The hook now also runs
-`lint:oxlint` and `format:check` over the whole repo and refuses the commit, naming the remedy
-(`npm run fix && git add -u`). ESLint stays on pre-push: type-aware and slow. **Not adopted:** a hook
-that commits for you. It would sweep whatever else is dirty into the commit and has no honest message
-to use.
+**Pre-commit is repo-scoped.** `lint-staged` restores a partially staged file's unstaged hunks after
+fixing, so formatting drift survived the commit and failed at push. The hook therefore also runs
+`lint:oxlint`, `format:check` and `typecheck` over the whole repo and names the remedy
+(`npm run fix && git add -u`). ESLint stays on pre-push (type-aware, slow). A hook that commits for
+you is not adopted: it sweeps whatever else is dirty into the commit.
 
-**Advisory exceptions are data, not thresholds.** `audit:gate` fails on every high or critical
-advisory, on an expired allowance, on an allowance whose advisory has disappeared, and on its own
-inability to complete. Lowering `--audit-level` to make a finding go away is not available; writing
-down the reason with an expiry is. `scripts/audit-gate.test.mjs` covers the fail-closed paths,
-including the invalid-payload one — a security gate that reports success when it cannot run is worse
-than no gate.
+**Evidence:** https://github.com/Vadymk95/template-1/commit/fb36cde
 
-**An allowance is the last resort, not the first.** `GHSA-mh99-v99m-4gvg` (brace-expansion,
-unbounded expansion → OOM) was allowlisted here on the reading that `minimatch@3` is pinned by
-eslint's own dependencies and by `eslint-plugin-react` / `eslint-plugin-jsx-a11y`, so nothing could be
-bumped. That was true of the *direct* dependencies and wrong about the *transitive* one:
-`brace-expansion@5.0.8` sits outside the advisory range `<=5.0.7`, and a root override
-`"brace-expansion": ">=5.0.8"` closes the advisory with `minimatch@3` untouched — 5.0.8 is
-dual-published, so `require()` still resolves a CommonJS build. `npm audit` goes to zero for it and the
-full gate stays green. What made the allowance look inevitable was npm's own suggested remediation:
-`eslint-plugin-react@7.22.0`, a semver-major **downgrade**. Read the advisory's fixed range directly
-instead of trusting `fixAvailable`.
+## [2026-10] Guard audit: what each new guard watches
 
-**Removing an allowance and adding the override are ONE commit.** The moment the override lands the
-advisory disappears from the audit, which makes the allowance **stale**, which fails the gate by
-design. Verified rather than assumed: re-adding the entry after the override produces
-`Stale allowlist entry: GHSA-mh99-v99m-4gvg` and exit 1. That is the stale check doing its job — it is
-what stops allowances outliving the problem they described.
+**Status:** in force. An audit sabotaged 73 guards and 53 caught the injected defect; these close
+the holes that reproduced and sit on a path a fork or a real incident would hit.
 
-**Revisit trigger:** if `verify` crosses roughly five minutes locally, move e2e into its own CI job and
-out of the pre-push hook — but out of `verify` only together with the workflow, never one alone.
+- **CI step bypass (`docs:check` `ciSteps`).** Every `run:` step in a PR-triggered workflow,
+  including each line of a `run: |` block, must appear in `gate-tiers.json` `ci.allowedRunSteps`, or
+  it moves into `verify`. A multi-line step is the common way to hide one.
+- **Ruleset context with no producer (`docs:check` `rulesetContexts`).** Each
+  `required_status_checks` context in `.github/ruleset.json` must be produced by a workflow job
+  (`name:` or id, plus matrix values). A context GitHub renders only at runtime prints one
+  non-failing line. A renamed job otherwise leaves every PR Pending forever.
+- **Total-JS budget (`.size-limit.json`).** A `dist/assets/*.js` total entry catches a dynamically
+  imported chunk under an unbudgeted name; dropping the `import.meta.env.DEV` gate on MSW in
+  `main.tsx` turns it red.
+- **Tests that pin a wiring:** `scrollbar-gutter: stable` inside `e2e/layout-geometry.spec.ts`; the
+  `App` error boundary in `src/App.test.tsx`; the `safeFetch` contract in
+  `src/lib/api/safeFetch.test.ts`.
+- **`no-empty`** is an ESLint error with `allowEmptyCatch: false`, so a `catch {}` fails lint.
+- **Pre-commit `docs:check` trigger.** The `grep -qE` in `.husky/pre-commit` also matches
+  `scripts/docs-check.*` and `package.json`, so a broken checker or a renamed npm script cannot
+  commit clean.
 
-## [2026-07] ESLint 10; `settings.react.version` must be a literal
+**Evidence:** https://github.com/Vadymk95/template-1/commit/cb92490 and
+https://github.com/Vadymk95/template-1/commit/ce22788
 
-**Decision.** ESLint 10, ahead of the 9.x end of life on 2026-08-06. Three plugins still cap their
-`eslint` peer below 10 — `eslint-plugin-react` at `^9.7`, `eslint-plugin-jsx-a11y` at `^9`, and
-`eslint-plugin-import` at `^9`, which arrives transitively — so each gets an `overrides` entry mapping
-its peer to `$eslint`. `npm install` and `npm ci` both succeed with **no `--legacy-peer-deps`**; the
-blanket flag was rejected as a permanent posture in a repo with a hardened `.npmrc`. Update 2026-10-07:
-`eslint-plugin-import` is not in the tree any more, so its override is gone and two plugins remain.
+## [2026-10] zizmor audits the workflow files
 
-**`settings.react.version` is `'19.2'`, never `'detect'`.** `eslint-plugin-react` resolves `'detect'`
-through `detectReactVersion` → `resolveBasedir`, which calls the `context.getFilename()` API that
-ESLint 10 removed; every react rule needing the version then throws at load. A trailing config object
-with no `files` key repeats the pin so no shared config can reintroduce `'detect'` for its own
-patterns. Keep it in step with the `react` major/minor in `package.json`.
+**Status:** in force. The `zizmor` job in `security.yml` ("Workflow audit (zizmor)") runs on every
+pull request, every push to the default branch and the weekly cron, and fails at Medium severity or
+above.
 
-**The green was checked for fail-open**, because a silent no-op looks identical to a clean run: under
-ESLint 10 the config declares 1252 rules with 237 active and 10 plugins loaded on a real source file.
-ESLint 10 also caught a genuine dead store that 9.x did not — `no-useless-assignment` on an error
-message initialised and then unconditionally overwritten in both branches below it.
+**Decision:** one step, `zizmorcore/zizmor-action` (SHA-pinned like every action) with
+`version: 1.30.1`, `inputs: .github/workflows` and `config: .github/zizmor.yml`. `version` is the
+zizmor pin; Dependabot moves the action's SHA, and a newer zizmor is a deliberate edit of `version`.
 
-**Still held:** TypeScript stays `~6.0.x` (`typescript-eslint@8.65.0` peers `typescript >=4.8.4
-<6.1.0`), and `@types/node` stays 24.x to match `engines.node`. Both were re-verified, not assumed.
+**Why the remap:** the action audits online by default, and online zizmor grades a checkout that
+leaves its token in `.git` (`artipacked`) one level lower than offline, so the Medium gate let it
+through. `rules.artipacked.remap.severity: medium` in `.github/zizmor.yml` makes the job and the
+local command (`uvx zizmor@1.30.1 .github/workflows`) give one verdict with no second offline pass.
+
+**Consequences:** every checkout that never pushes sets `persist-credentials: false`. The only
+exception is `adhoc-packages` for the `npm install -g npm@^11.14.0` steps in `ci.yml`, one rule and
+one whole file with the reason written in `zizmor.yml`; there is no blanket ignore. The job's
+context is in `required_status_checks` in `.github/ruleset.json` (`docs:check` verifies a job
+produces it), so an unpinned action or a credential-persisting checkout cannot merge. The ruleset
+file changes the live ruleset only when the owner re-posts it (README § "What your fork does not
+inherit").
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/dd6c487
+
+## [2026-10] Every GitHub Action is SHA-pinned; workflow tokens start read-only
+
+**Status:** in force; zizmor reports an unpinned action (see the previous entry).
+
+**Decision:** every `uses:` in `.github/workflows/*.yml` is a full 40-hex commit SHA with the
+version as a trailing comment (`uses: actions/checkout@<sha> # v7.0.1`). A new action is added
+pinned the same way, never as `@vN`. `.github/dependabot.yml` keeps its `github-actions` ecosystem,
+which updates a SHA and its version comment together. `release.yml` and `security.yml` declare
+`permissions: contents: read` at the workflow level and give each job its own write scopes, so a job
+added later starts read-only.
+
+**Why:** a floating `@vN` tag stays movable unless the publisher opted in to immutable releases (at
+the time `actions/setup-node` had, `actions/checkout` and `release-please-action` had not), so
+exempting the official actions protected nothing.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/717fce9
+
+## [2026-10] A test that passes only on retry fails the CI run
+
+**Status:** in force.
+
+**Decision:** `failOnFlakyTests` is on whenever `CI` is set, in `playwright.config.ts` and
+`playwright.dev.config.ts`. CI keeps `retries: 2`; local runs have none. By default a test that
+fails then passes is reported as "1 flaky" and the run is green, so the flake is never fixed or
+counted.
+
+**Consequences:** a red caused by this is fixed, or quarantined with a date (`docs:check` tracks
+quarantines). A retry count is never raised to make it pass.
+`scripts/check-playwright-gate-config.test.mjs` pins both configs (retries and `failOnFlakyTests` on
+in CI, both off on the desk run).
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/dd6c487
+
+## [2026-10] Playwright `maxFailures: 10` on the gate run and in CI
+
+**Status:** in force.
+
+**Decision:** `playwright.config.ts` caps `maxFailures` at 10 when `usePreview` is true (CI or
+`PLAYWRIGHT_USE_PREVIEW=1`); the desk run against the dev server stays uncapped. Each config writes
+to its own `outputDir` (`test-results/e2e`, `test-results/dev`) so `--last-failed` never reads the
+other suite's record.
+
+**Why:** in a product forked from this template, a red push ran up to 21 minutes against about 5 for
+a green one, because every failing test waited out its own timeout. One measured break of a shared
+invariant (630 tests, six workers): uncapped 7.5 min and 55 failures reported; capped at 10, 21 s;
+capped at 5, 15 s with half the failing neighbours reported. 10 is the value that measurement
+settled on.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/fd5c8ab
+
+## [2026-10] axe-core scans the rendered pages inside the existing specs
+
+**Status:** in force.
+
+**Decision:** `e2e/support/a11y.ts` runs an axe-core scan (`@axe-core/playwright`) at the end of the
+home, login and not-found specs, after each page's own heading is visible. A `serious` or `critical`
+violation fails the spec and prints the rule id and selectors; `minor` and `moderate` stay advisory.
+`target-size` (WCAG 2.2 SC 2.5.8) is switched on because axe ships it disabled. No `test()` was
+added, so the browser suite did not grow.
+
+**Why:** `eslint-plugin-jsx-a11y` reads JSX; it cannot see a missing accessible name, a contrast
+failure or an undersized target that exists only in the rendered page. Proved in both directions: an
+`<img>` without `alt` fails with `image-alt`, two 10 px buttons fail with `target-size`, and
+removing the override makes the same buttons pass.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/dd6c487
+
+## [2026-09] Agent limits in a committed `.claude/settings.json`
+
+**Status:** in force. The rule text is `AGENTS.md` § Lanes.
+
+**Decision:** `.claude/settings.json` is tracked. It denies, in every permission mode, reading
+`.env` files other than the example, editing itself, force pushes, `--no-verify`, `git reset --hard`
+and `git clean -f`, and it asks before edits of the gate files. Two public guides name a deny list
+as the baseline of a professional agent setup; the earlier "wait until an agent is seen editing a
+listed file" deferral was dropped.
+
+**It is not a security boundary.** A Bash rule matches the command as written, so `sh -c`, a full
+binary path or a `git -C` prefix walks past it, and Read/Edit denies cover the built-in file tools,
+not a script that opens the file itself. `git push -f*`, `git push *+*` and `git commit -n*`
+replaced space-anchored forms after a `+branch` refspec and a bundled `-fu` got through; `-uf` and a
+trailing `-n` still do, and more wildcards would start catching commit messages. The boundary stays
+the required CI check. Cursor and Codex do not read the file.
+
+**Also decided that day:** one Dependabot group, `minor-and-patch`, carries every non-major update
+(two groups both rewrote `package-lock.json` and conflicted); a major opens its own PR.
+`release.yml` passes `secrets.RELEASE_PLEASE_TOKEN || github.token`; without the secret release PRs
+wait in `action_required` for one approval, with a fine-grained PAT they get CI like any PR.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/96e3abb
+
+## [2026-08] Gate hygiene: fail-open shapes closed
+
+**Status:** in force. Each shape is a gate that reported success while checking less than it
+claimed.
+
+- **Coverage dropout.** An unparseable file in the coverage scope makes vitest print
+  `Failed to parse <file>. Excluding it from coverage.` and exit 0, so the percentage describes a
+  smaller set. `scripts/check-coverage.mjs` wraps the run and refuses on that marker (a marker, not
+  a file-count baseline: a baseline in a template records an empty scaffold).
+- **A second list of the gate's steps drifts narrower.** `bench:verify` derives its steps from the
+  `verify` script and throws on a segment it cannot parse, so a step cannot silently leave the
+  benchmark.
+- **`npx` without `--no-install`** in `ensure-playwright.mjs` fetches the newest Playwright and
+  installs browsers for a version this repo does not pin.
+- **A tool's temp directory belongs in every ignore list the gate reads.** `.stryker-tmp` is in
+  `.gitignore`, `.prettierignore` and ESLint's global ignores; a crashed Stryker run left a sandbox
+  copy that reddened the next push with errors from inside the copy.
+- **A test budget is set by what the test does.** The `verify-push` CLI cases boot node, npm, node,
+  so the describe block carries a 20 s budget with the measurement next to it. A quarantine (`skip`)
+  was rejected: the cases prove the dispatcher's phase routing and exit-code passthrough, which a
+  silent pass would hide.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/8a394b5,
+https://github.com/Vadymk95/template-1/commit/15f3752 and
+https://github.com/Vadymk95/template-1/commit/6d72451
+
+## [2026-08] Cross-engine coverage is opt-in and scoped
+
+**Status:** in force.
+
+**Decision:** `CROSS_BROWSER=1` adds Firefox and WebKit projects, `testMatch`-scoped to the geometry
+specs. Not in the default run: three engines on every spec triple the local e2e time, and a WebKit
+font-metric difference in an unrelated spec would fail a push for a reason unconnected to the
+change.
+
+**Why it exists:** Firefox reports `clientWidth: 0` for an inline `<label>` (CSSOM defines an inline
+non-replaced element's client box as zero) while Chromium reports a box, so every label read as
+overflow in one engine only. The defect was in the rule, which now exempts exactly `display: inline`
+and is tested in both directions.
+
+**Consequences:** a `testMatch` that matches nothing collects zero tests and reports success, so
+`scripts/check-cross-browser-selection.mjs` asks Playwright whether every configured project has
+work and fails closed on a report it cannot read. The Firefox test browser runs with
+`browser.tabs.remote.useCrossOriginOpenerPolicy` off: `vite preview` sends
+`Cross-Origin-Opener-Policy: same-origin`, after which Firefox swaps processes on a test's first
+navigation and Playwright intermittently loses it (12 of 210 Firefox tests failed with COOP on, 0 of
+210 on master). The header stays sent, Chromium and WebKit enforce it, and the smoke spec asserts
+it.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/8a394b5
+
+## [2026-08] Complexity ratchet
+
+**Status:** in force. Rules and numbers: `eslint.config.js` (the block over `src/**/*.{ts,tsx}`);
+summary in `AGENTS.md`.
+
+**Decision:** five core rules gate production code only: `complexity` 10, `max-depth` 3,
+`max-params` 4, `max-lines-per-function` 120, `max-lines` 200. The thresholds sit above the tree's
+measured ceiling (complexity 9, depth 2, params 3, 89 lines per function, 142 per file on
+2026-08-09), so the gate is clean on day one and fires only on drift.
+
+**Consequences:** tests are exempt on purpose: a `describe` block is one function to these rules and
+table-driven suites are long by design, and indexing the ratchet on test style killed this rule set
+in a sibling repo. When a threshold fires, split the function; raising a number needs a fresh
+measurement, recorded in the comment above the block. Probe:
+`new ESLint({ overrideConfig: [{ rules: { complexity: ['warn', 0], ... } }] })`, take the max per
+rule from the report messages.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/07e5fff
+
+## [2026-08] Mutation testing: weekly strength gate, outside `verify`
+
+**Status:** in force. The vitest pairing is held (first entry).
+
+**Decision:** `npm run test:mutation` (StrykerJS with the vitest runner) measures whether the tests
+would catch a wrong implementation, which coverage cannot. `thresholds.break: 40` in
+`stryker.config.json` is a floor-of-record set from the first baseline (44.5% against a green
+coverage gate): the weekly `mutation.yml` job fails only when strength regresses below it. Raise the
+floor after a good run; never lower it to go green or fit a tool (Stryker 10 moved the same tree
+from 44.43 to 41.95 and the floor stayed).
+
+**Consequences:** not in `verify` or pre-push: a full run costs minutes and a per-push gate at that
+price teaches `--no-verify`. Scope mirrors the coverage excludes. `.env*` stays out of the sandbox
+copy through `ignorePatterns` (Stryker does not read `.gitignore`). Limits: the vitest runner
+mutates what unit and RTL tests see, so a defect only Playwright would catch is invisible; and it
+measures only the kill side, so an over-strict test that rejects a legitimate implementation stays
+with review (see the near-miss tests in `control-targets.test.ts`). `jsdom` 30 requires Node
+`^24.15.0` on the 24 line; a machine on an older 24.x fails `engine-strict` at install, which is the
+intended signal.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/07e5fff and
+https://github.com/Vadymk95/template-1/commit/bde48c9
+
+## [2026-08] Content variance is measured in a browser, not asserted in jsdom
+
+**Status:** in force. The rule: `AGENTS.md` § Critical rules › Content variance.
+
+**Decision:** every content-bearing primitive is rendered once per content state on the dev-only
+route `/dev/ui/content-stress` and measured by Playwright at 390 / 640 / 768 / 1024 / 1440. The
+invariants are pure predicates in `e2e/support/geometry.ts`, shared by that spec and by
+`e2e/layout-geometry.spec.ts` (which measures assembled pages): two consumers, one definition. jsdom
+has no layout, so a unit test can pin a class string and nothing more; the first run found 172 px of
+overflow from an unbroken 40-character token and 28 px of document scroll from the header on every
+route at 390.
+
+**Consequences:**
+
+- The fixture is dev-only, so it is unreachable from the `vite preview` run inside `verify`; it runs
+  in `verify:full` and the mandatory `dev-smoke` CI job. `playwright.config.ts` MUST keep `dev/**`
+  in `testIgnore`, or the production project collects the dev spec, the route 404s and the coverage
+  becomes an illusion that still passes.
+- Counts are derived: the fixture publishes `data-stress-total` and `data-stress-components` and the
+  spec compares what it found, never a literal `toHaveCount(32)`.
+- States are `minimal` (one character, not empty) / `typical` / `long` / `unbroken` for text and
+  `none` / `one` / `many` for collections. `unbroken` is the load-bearing one: a long sentence wraps
+  on its spaces and hides a missing wrap guard. No RTL state, because no RTL locale ships here.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/8a394b5
+
+## [2026-08] The 44px touch floor is a ratchet
+
+**Status:** in force. Guard: `e2e/support/control-targets.ts` with `control-targets.test.ts`.
+
+**Decision:** exactly two rendered sizes sit below the floor across every route and state: 40
+(`Button`, from `h-10` and `size-10`) and 36 (`Input`, from `h-9`), both shadcn's default scale. The
+guard accepts those two exact sizes with a stated reason and exit condition; every other size below
+44 fails. Raising the kit to 44 would change the visual scale of every app scaffolded from here,
+which is the consuming app's design call.
+
+**Consequences:** keying on exact size is what keeps it a ratchet (a 38 px control matches nothing).
+An acceptance list fails by wrongly accepting, which sabotage never shows, so the test is
+near-misses: 37/38/39/41/42 refused, and an icon-only control refused at an accepted height but a
+narrow width.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/8a394b5
+
+## [2026-08] `outline-hidden`, never `outline-none`
+
+**Status:** in force.
+
+**Decision:** use `outline-hidden`. Compiled from the installed Tailwind: `.outline-hidden` emits
+`outline-style: none` plus
+`@media (forced-colors: active) { outline: 2px solid transparent; outline-offset: 2px }`;
+`.outline-none` emits only the first. Every focusable control here pairs the reset with a `ring-*`
+(a `box-shadow`), and forced-colors suppresses box-shadows, so with `outline-none` a Windows
+high-contrast user has no focus indicator (WCAG 2.4.7).
+
+**Consequences:** pinned three ways, because no single one is enough: class-string tests
+(`focus-indicator.test.tsx`, `SkipLink.test.tsx`), the browser test that emulates the mode
+(`e2e/forced-colors.spec.ts`), and `better-tailwindcss/no-deprecated-classes`. On every Tailwind
+minor bump read the release notes for renamed utilities; the build emits no warning and only the
+lint rule catches a rename that is already known.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/8a394b5
+
+## [2026-08] Tailwind class hygiene
+
+**Status:** in force.
+
+**Decision:** `better-tailwindcss` rules `no-deprecated-classes` and `enforce-canonical-classes` are
+enabled (2 genuine findings and 0 on adoption). `no-unknown-classes` is NOT enabled, despite scoring
+zero: in a template its failure mode is a false positive on the first hand-written CSS class a
+consumer adds, and this repo applies `i18n-loading` imperatively, outside any `className` the rule
+can see. Zero findings today is not evidence it is safe for whatever gets scaffolded from here.
+
+**Evidence:** https://github.com/Vadymk95/template-1/commit/8a394b5
 
 ## [2026-05] Magic strings → constants (Zustand keys + devtools labels)
 
-**Decision**: extract magic strings used in 2+ places OR carrying external contract to named constants. Apply selectively per framework below. NOT a blanket "extract everything" — single-use strings stay inline (Ghost Principle).
+**Status:** in force. Rule: `.cursor/rules/constants.mdc`.
 
-**Extraction sites added this commit**:
+**Decision:** extract a magic string used in 2+ places, or carrying an external contract, to a named
+constant. Single-use strings stay inline (logger source tags, one-off event names, test selectors,
+self-documenting `aria-label`s, i18n keys, constants that already live in their module's
+`constants.ts`).
 
-- `src/store/keys.ts` — `STORAGE_KEYS` (Zustand `persist({ name })` + plain `localStorage.setItem(key)` keys — external contract: renaming breaks persisted user data), `DEVTOOLS_NAMES` (Zustand `devtools({ name })` labels — Redux DevTools panel grouping), `USER_STORE_ACTIONS` (per-store `set(..., false, { type })` labels — refactor safety + DevTools discoverability). Per-store ACTION constants keep namespaces short; do NOT roll into one mega-object as more stores land.
+**Pattern:** `as const` objects, not `enum` (no runtime cost, tree-shakeable, structural typing,
+`const enum` is known-broken in bundlers); type via `typeof OBJ[keyof typeof OBJ]`.
+`src/store/keys.ts` holds `STORAGE_KEYS` (persisted keys are an external contract: renaming breaks
+stored user data), `DEVTOOLS_NAMES` and per-store action constants such as `USER_STORE_ACTIONS`.
+Keep per-store action objects separate; do not roll them into one mega-object.
 
-**Pattern**: `as const` objects, NOT `enum`. Type via `typeof OBJ[keyof typeof OBJ]`. Reasons:
+**TanStack Query keys are deliberately not centralized.** `greetingKeys` / `exampleKeys` stay
+colocated with their `queryOptions()` factories in `src/lib/api/<domain>.queries.ts`: one file owns
+one feature's cache surface, deleting a feature deletes its keys, and there is no central import
+hotspot (TkDodo, "Effective React Query Keys"). A central `queryKeys.ts` would be a regression here.
 
-- Zero runtime overhead vs enum (~150 bytes per enum compiled)
-- Tree-shakeable (numeric enums have reverse-mapping bloat)
-- Plays better with structural type matching
-- Modern TS consensus (`const enum` known broken in bundlers per TS docs)
-
-**TanStack Query keys — INTENTIONALLY NOT centralized**: existing `greetingKeys` / `exampleKeys` factories stay **colocated** with their `queryOptions()` factories in `src/lib/api/<domain>.queries.ts`. This matches Dominik Dorfmeister's "Effective React Query Keys" recommendation (TkDodo blog, 2021; still current as of TanStack Query v5) — colocated factories scale better than a central `queryKeys.ts` registry because (a) one file owns one feature's cache surface, (b) deleting a feature deletes its keys with it, (c) no central import-fan-out hotspot. A centralized `src/lib/queryKeys.ts` would have been a regression here.
-
-**When NOT to extract** (do NOT pile in cosmetic refactors):
-
-- Single-use strings (logger source tags like `'[i18n]'`, one-off event names, test selectors)
-- Self-documenting at use site (`aria-label` on a close button)
-- i18n keys (handled by i18next)
-- Throwaway prototype scope
-- Already-extracted constants (`API_BASE_URL`, `I18N_HMR_EVENT`, `I18N_STORAGE_KEY` already live in their respective module's `constants.ts` — no second-mover refactor needed)
-
-**Revisit trigger**: if consumer fork adds >3 stores or grows `USER_STORE_ACTIONS` past ~6 entries, reassess the per-store-ACTIONS-object split (may want code-gen or a tighter naming convention). If a fork centralizes TanStack Query keys into one registry file and the codebase stays maintainable for >3 months, the Dorfmeister-colocated recommendation in this ADR is the one to revisit — not the other way around.
+**Evidence:** https://github.com/Vadymk95/template-1/commit/43a08eb
 
 ## [2026-05] Boundary validation via Zod safeFetch wrapper
 
-**Decision**: validate ALL API responses at boundary using Zod schemas via `src/lib/api/safeFetch.ts`. Reference example: `src/lib/api/greeting.queries.ts`. Pattern is opt-in for consumer forks — copy + extend per endpoint.
+**Status:** in force. Reference example: `src/lib/api/greeting.queries.ts`; pattern is opt-in for
+forks (copy and extend per endpoint).
 
-**Why**: catches BE shape drift at receive time (HTTP boundary) instead of buried in render. Removes "undefined → NaN → blank UI" class of bugs. Provides `z.infer<typeof Schema>` types for free (single source of truth).
+**Decision:** validate API responses at the boundary with Zod through `src/lib/api/safeFetch.ts`:
+`safeFetchQueryFn(url, schema)` for TanStack Query, `safeFetch(url, schema)` for direct calls,
+`Schema.safeParse(JSON.parse(raw))` for localStorage and sessionStorage reads. It catches backend
+shape drift at receive time instead of as "undefined, NaN, blank UI" in render, and `z.infer` gives
+the types for free.
 
-**Scope**:
+**Consequences:** no bundle cost (Zod is already a dependency for forms) and about 50 to 200
+microseconds per parse. Schemas duplicate backend types, which is acceptable at solo or small-team
+scale; at multi-team scale consider codegen (openapi-zod-client, @ts-rest). Skip it for tRPC or
+GraphQL with codegen, throwaway prototypes and high-frequency polling. `safeFetchQueryFn` re-throws
+`AbortError` unchanged so TanStack Query treats it as cancellation; `src/lib/devGuards.ts`
+`installDevGuards()` prevents leaked `AbortError` unhandled rejections in dev. A 4xx throws an
+`ApiError` carrying the status so the default retry skips it. Covered by
+`src/lib/api/safeFetch.test.ts`.
 
-- TanStack Query `queryFn` (use `safeFetchQueryFn(url, schema)`)
-- Direct fetch calls (use `safeFetch(url, schema)`)
-- localStorage / sessionStorage reads (use `Schema.safeParse(JSON.parse(raw))`)
+**Evidence:** https://github.com/Vadymk95/template-1/commit/98abf4b
 
-**When NOT to use**: tRPC / GraphQL with codegen (other pattern handles it); throwaway prototypes; high-frequency polling where ~50-200μs parse matters.
+## [2026-05] size-limit brotli budgets
 
-**Trade-offs**:
+**Status:** in force. The numbers live in `.size-limit.json`; `npm run size:check` runs inside
+`verify`.
 
-- +0 KB bundle (Zod already in deps for forms)
-- ~50-200μs parse per response (negligible)
-- Schemas duplicate BE types — acceptable for solo/small-team. For multi-team scale, consider codegen (openapi-zod-client, @ts-rest) later.
+**Decision:** `size-limit` with `@size-limit/file` budgets each vendor chunk (`react-vendor`,
+`i18n-vendor`, `state-vendor`, `ui-vendor`), the `index` entry and the total JS, all brotli. Budgets
+sit at the measured size plus roughly 10 to 20% headroom, in a standalone `.size-limit.json` rather
+than a `package.json` key, to keep budget changes out of dependency-bump diffs.
+`scripts/check-web-vitals-chunks.mjs` asserts chunk composition and `size-limit` asserts size; the
+axes do not overlap. `vite-plugin-bundlesize` was rejected as a second, single-vendor gate.
 
-**AbortError pairing**: `safeFetchQueryFn` re-throws `AbortError` unchanged so TanStack Query treats it as cancellation (not error). Pairs with `src/lib/devGuards.ts` `installDevGuards()` which preventDefault's leaked AbortError unhandledrejection events in dev.
+**Consequences:** a budget moves once, with the cause named, never to fit drift: the `index` budget
+went 25 to 27 KB after `zod` 4.5 to 4.6 alone grew the entry chunk by about 1.5 KB (bisected by
+pinning each updated package back). The total entry exists because five named chunks let a
+dynamically imported chunk under another name ship unseen. Recalibrate if a fork hits repeated false
+positives from legitimate feature work.
 
-**Revisit trigger**: if consumer fork ships ≥5 endpoints without using safeFetch pattern within 60 days of starting product, drop pattern from template seed (consumer can copy-paste from past commits).
+**Evidence:** https://github.com/Vadymk95/template-1/commit/c016070
 
-## [2026-05] `size-limit` per-chunk brotli budget — `ci:local` gate
+## [2026-05] REJECT list: explicit non-adoption
 
-**Superseded by "[2026-07] The gate is `verify`; `verify` is a superset of CI" above — `ci:local` is now an alias of `verify:ci`; kept for the reasoning.**
+**Status:** rejected. Listed so agents and forks do not re-litigate; revisit only on the stated
+condition.
 
-**Decision**: add `size-limit@^12.1.0` + `@size-limit/preset-app@^12.1.0` devDeps + `npm run size:check` script + `.size-limit.json` config with per-chunk brotli budgets. Wired into `ci:local` AFTER `verify:web-vitals-chunks` (asserts size, not composition — orthogonal to existing script). Per /consilium 2026-05-23 APPLY Item 6 (5/6 YES, 1 COND satisfied by pre-flight overlap check).
+| Item                                  | Why not                                                                                                                                                                            | Revisit only if                                                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| React Compiler                        | Reverses the Oxc-without-Babel choice (build-speed regression: Vite's own Vite 8 post warns Babel erases most Oxc gains) and open silent-bailout bugs facebook/react#35105, #35644 | Both bugs close, a named >100K-MAU Vite app publishes a "ruled out" retro and the Vite team blesses the path     |
+| Lighthouse CI                         | Enterprise SPA with no PWA contract: CI cost without proportional signal (the PWA sibling template ships it)                                                                       | A fork has a perf SLA and asks for the gate (lift the PWA template's `lighthouserc`)                             |
+| React Doctor as a lint-staged PR gate | Project-level scan, not a staged-file linter; Windows path issues (typicode/husky#1462)                                                                                            | React Doctor 1.0 ships and a fork shows a bug it would have caught (then ad hoc or a PR comment, never blocking) |
+| memlab                                | No published GitHub releases, none of the leaderboard flagship repos run it in CI                                                                                                  | v2.0 ships with formal releases and a named app publishes a CI case study                                        |
+| why-did-you-render                    | Template stays minimal; consumer choice (incompatible with React Compiler, which is not shipped here)                                                                              | Never needed; a fork may add it                                                                                  |
+| Zstd compression plugin               | Safari Zstd landed only in 26.3, global support is far from universal, Brotli stays mandatory and `vite-plugin-compression` already emits it                                       | caniuse global Zstd passes 80% and the CDN negotiates encoding automatically                                     |
+| `vite-plugin-bundlesize`              | `size-limit` already adopted; a second single-vendor size gate                                                                                                                     | `size-limit` is deprecated or unmaintained                                                                       |
 
-**Why**: `scripts/check-web-vitals-chunks.mjs` asserts chunk _composition_ (subscribeStandard vs subscribeAttribution split correctness), NOT chunk _size_. `chunkSizeWarningLimit: 600` (KB raw) in `vite.config.ts` is a Vite _warning_, not a CI fail. No per-chunk byte-budget gate currently exists. `size-limit` 868K weekly DLs is ~10× over `bundlesize@85K` (May 2026 npm registry direct) — clear winner.
+**Evidence:** https://github.com/Vadymk95/template-1/commit/c016070
 
-**Initial budgets (brotli)** — set at current size + ~20% headroom so first-fork CI passes:
+## [2026-04] MSW browser worker and its dev opt-out
 
-- `react-vendor`: 90 KB (current ~75 KB)
-- `i18n-vendor`: 22 KB (current ~18 KB)
-- `state-vendor`: 15 KB (current ~12 KB)
-- `ui-vendor`: 12 KB (current ~9 KB)
-- `index` entry: 25 KB (current ~20 KB)
+**Status:** in force.
 
-**Conditions** (Pragma + Mini /consilium): budgets live in standalone `.size-limit.json` (not `package.json` `"size-limit"` key) to keep diff noise low and isolate budget changes from dep-bump churn. Pre-flight verified zero overlap with `verify:web-vitals-chunks.mjs` (different verification axis).
+**Decision:** dev-only MSW uses `setupWorker` in `src/mocks/browser.ts`, with handlers shared with
+Vitest (`test/handlers`). `main.tsx` starts the worker when `import.meta.env.DEV` and
+`VITE_ENABLE_MSW !== 'false'` (default on in dev). This keeps worker setup out of the root file,
+reuses one handler list for Node and browser, and lets mocks be turned off without removing code.
+The `import.meta.env.DEV` guard and the dynamic import must stay: dropping them ships the MSW chunk
+to production (the total-JS budget turns red).
 
-**Revisit trigger (60-day, 2026-07-23; checked 2026-09-12, no fork data yet, re-armed 2026-12-01)**: if a fork hits ≥3 false-positive budget bumps from legitimate feature work in 60 days, recalibrate budgets to p75 of fork-distribution OR move size-limit out of `ci:local` into PR-comment-only (size-limit GH Action). If size-limit `--why` flag reports same vendor exceeding budget across 3 forks, raise the budget structurally.
+**Evidence:** https://github.com/Vadymk95/template-1/commit/b6be82f
 
-**Re-measured 2026-09-13**: the `index entry` budget 25 → 27 KB. The in-range update took `zod` 4.5.4 → 4.6.4, which alone grew the entry chunk by ~1.5 kB brotli (bisected by pinning each updated package back: zod restored 24.15 kB; react-hook-form, tailwind-merge and vite changed nothing). No app code changed; measured 25.65 kB against the 25 KB budget, so the number moves once with the cause named, not the rule.
+## [2026-04] i18n init failure falls back to English-only
 
-## [2026-05] REJECT list — explicit non-adoption (2026-05-23 /consilium)
+**Status:** in force.
 
-**Decision**: explicit DO-NOT-ADOPT register so future agents + forks don't re-litigate. Per /consilium 2026-05-23 APPLY Item 14 (6/6 voters YES). Sibling templates carry equivalent sections.
+**Decision:** if `i18nInitPromise` rejects, `main.tsx` removes `html.i18n-loading`, logs through
+`logger.error('[i18n] ...')` and renders `I18nInitErrorFallback` in fixed English (`t()` is
+unavailable on this branch). Before this, a locale JSON failure left the app on an empty tree
+forever.
 
-### React Compiler enable in template-1 (VETOED)
+**Evidence:** https://github.com/Vadymk95/template-1/commit/01bb446
 
-**Status**: skip. **Why**: /consilium 2026-05-23 Item 2 (`babel-plugin-react-compiler@1.0.0` + `@rolldown/plugin-babel`) — 1 YES / 3 NO / 2 COND + **Adversarial killer Q VETO** ("Name one Compiler-enabled production app at >100K MAU where #35105 or #35644 reproducers have been ruled out as of 2026-05-23" — unanswerable) + **ADR conflict**: reverses `[2026-03] @vitejs/plugin-react v6` Oxc-no-Babel decision. [Vite team Mar 2026 blog](https://vite.dev/blog/announcing-vite8) warns "adding babel-loader will eliminate most Oxc gains" — build-speed regression is concrete, Compiler benefit (Makarevich N=1 mixed-positive: 1-2 of 8-10 re-renders fixed) is workload-dependent. Open silent-bailout bugs: [facebook/react#35105](https://github.com/facebook/react/issues/35105), [#35644](https://github.com/facebook/react/issues/35644) (`Status: Unconfirmed`, no assignees, May 2026).
-**Revisit (quarterly, 2026-08-23; checked 2026-09-12: #35105 and #35644 both still open, hold stands, next 2026-12-01)**: if either bug closes AND ≥1 named >100K-MAU Compiler-enabled Vite app publishes "ruled out" retro AND Vite team blesses Babel-Compiler-Vite path explicitly, re-evaluate. `eslint-plugin-react-hooks@7.1.1` already loaded in `eslint.config.js` (`flat['recommended-latest']`) — Compiler correctness rules already fire as lint-only signal (no Compiler runtime needed for lint).
+## [2026-04] Web Vitals chunk split is checked after the build
 
-### Lighthouse CI in template-1 (not currently proposed, deferred)
+**Status:** in force. Guard: `scripts/check-web-vitals-chunks.mjs`, run inside `verify`.
 
-**Status**: skip. **Why**: template-1 is enterprise SPA without PWA contract — synthetic Lighthouse perf gate adds CI-time cost (see sibling `template-spa-pwa` LHCI for cost profile) without proportional signal. Sibling `template-spa-pwa` ships LHCI because PWA install + offline contracts depend on it.
-**Revisit (60-day, 2026-07-23; checked 2026-09-12, no fork with a perf SLA, re-armed 2026-12-01)**: if a fork ships perf-critical SLA AND consumer requests LHCI gate, lift sibling template-spa-pwa lighthouserc as starting point.
+**Decision:** after a build, `dist/assets` must contain only `subscribeStandard` and the standard
+`web-vitals` chunk by default; `npm run verify:web-vitals-chunks:full` also builds the attribution
+variant and asserts it. Branching on `env` from `@/env` pulled both dynamic imports into the graph;
+only `import.meta.env.VITE_WEB_VITALS_ATTRIBUTION` allows dead-code elimination.
 
-### React Doctor `lint-staged --staged --fail-on warning` PR-gate (REJECTED)
+**Evidence:** https://github.com/Vadymk95/template-1/commit/01bb446
 
-**Status**: skip. **Why**: /consilium 2026-05-23 Item 1 — 0 YES / 4 NO / 2 COND. Pragma+Mini gang-of-two NO + Ergo category error ("Doctor is project-level scan, not staged-file linter") + Adversarial flagged [typicode/husky#1462](https://github.com/typicode/husky/issues/1462) Windows-path issues on cross-platform forks.
-**Revisit (60-day, 2026-07-23; checked 2026-09-12: react-doctor 0.9.14, no 1.0, re-armed 2026-12-01)**: if React Doctor 1.0 ships AND ≥1 dated bug observed in a fork that Doctor would have caught, re-evaluate scoped to ad-hoc `npm run doctor` + GitHub Action `millionco/react-doctor@<commit-sha>` (NOT `@main`) with `--offline` + PR comment only (NOT lint-staged blocking).
+## [2026-04] `eslint-import-resolver-typescript` reads one solution `tsconfig`
 
-### memlab (Meta heap-snapshot leak detector)
+**Status:** in force.
 
-**Status**: skip by default. **Why**: 158K weekly DLs (May 2026), ZERO published GitHub releases ([facebook/memlab/releases](https://github.com/facebook/memlab/releases)), 0 of 8 React Doctor leaderboard flagship repos use in CI.
-**Revisit (90-day, 2026-08-23; checked 2026-09-12: still zero GitHub releases, re-armed 2026-12-01)**: if memlab ships v2.0+ with formal releases AND ≥1 named React app at >10K MAU publishes a memlab-CI case study, re-evaluate.
+**Decision:** `createTypeScriptImportResolver` is given `./tsconfig.json` only (the solution file
+with `references`), not an array of `tsconfig.*.json`. The resolver warns on multiple `project`
+entries; with one file it sets `references: 'auto'` and follows `tsconfig.app`, `tsconfig.node` and
+`tsconfig.vitest` like `tsc -b`.
 
-### why-did-you-render (WDYR)
+**Evidence:** https://github.com/Vadymk95/template-1/commit/2838737
 
-**Status**: skip as template default; consumer choice. **Why**: WDYR README declares "completely incompatible with React Compiler" — but template-1 doesn't ship Compiler, so WDYR is technically usable here for consumer forks. Template stays minimal; consumer adds WDYR if needed for re-render audit. Replacement for Compiler-on stacks: React DevTools Profiler "Memo ✨" badge.
-**Revisit (no trigger needed)**: consumer-choice category.
+## [2026-04] Component pattern: arrow function plus `FunctionComponent`
 
-### `react-native-flipper`
+**Status:** in force; ESLint enforces it.
 
-**Status**: not applicable (template-1 is web, not RN). Sunset since RN 0.74.
+**Decision:** components are `const X: FunctionComponent<Props> = () => {}`, never `FC` and never
+function declarations. `FC` is an alias, so `FunctionComponent` makes the type relationship
+explicit, and arrows match the hooks and utilities style. `no-restricted-imports` bans `FC` and
+`func-style: expression` bans declarations; `src/components/ui/` (shadcn-generated) is the
+exception.
 
-### Zstd compression plugin
+**Evidence:** https://github.com/Vadymk95/template-1/commit/937333a
 
-**Status**: skip. **Why**: Safari Zstd landed 26.3 Feb 11, 2026 ([WebKit blog](https://webkit.org/blog/17798/webkit-features-for-safari-26-3/)), caniuse global compat 45/100 — pre-26.3 long-tail huge, Brotli still mandatory. Existing `vite-plugin-compression@brotliCompress` covers requirement.
-**Revisit (no trigger needed)**: revisit only when caniuse Zstd global crosses 80/100 AND CDN/edge config supports automatic encoding negotiation.
+## [2026-03] Build stack: Tailwind v4, Vite 8 with Rolldown, `plugin-react` v6
 
-### `vite-plugin-bundlesize`
+**Status:** in force.
 
-**Status**: skip (use `size-limit` instead). **Why**: `size-limit@^12.1.0` adopted per /consilium Item 6. `vite-plugin-bundlesize` is a separate Vite-native gate (single-vendor) — size-limit has 10× wider adoption + ecosystem-shared config shape.
-**Revisit (no trigger needed)**: re-evaluate only if size-limit deprecates or becomes unmaintained.
+**Decision:**
 
-## [2026-04] MSW browser worker — `src/mocks/browser.ts` + dev opt-out
+- **Tailwind v4:** config lives in `src/index.css` (`@theme inline`), through the Vite-native
+  `@tailwindcss/vite` plugin with no PostCSS dependency. The `container` utility has no JS
+  `center`/`padding` option, so apply utilities directly; `tw-animate-css` (a CSS import) replaces
+  `tailwindcss-animate`.
+- **Vite 8:** the official `vite@^8` package, which ships Rolldown; no `rolldown-vite` alias or
+  `overrides`. Vendor chunks use `build.rolldownOptions.output.codeSplitting.groups`; the
+  `state-vendor` group includes `zustand`, `@tanstack/react-query` and `@tanstack/query-core` (the
+  analyzer showed `query-core` splitting out when only `react-query` matched).
+- **`@vitejs/plugin-react` v6:** Oxc-based refresh, Babel not required. React Compiler would need
+  `reactCompilerPreset` plus `@rolldown/plugin-babel`; see the REJECT list.
 
-**Decision**: DEV-only MSW uses `setupWorker` in `src/mocks/browser.ts` (handlers shared with Vitest via `test/handlers`). `main.tsx` starts the worker when `import.meta.env.DEV` and `import.meta.env.VITE_ENABLE_MSW !== 'false'` (opt-out; default-on in dev).
+**Evidence:** https://github.com/Vadymk95/template-1/commit/4299fce
 
-**Why**: Keeps the worker setup out of the root file, reuses one handler list for Node and browser, and allows turning mocks off without removing code.
+## [2026-03] No FSD; Zustand for client state, TanStack Query for server state
 
----
+**Status:** in force.
 
-## [2026-04] Verification guide (`.cursor/brain/VERIFICATION.md`) + `ci:local`
+**Decision:** a plain folder structure (`components/`, `hooks/`, `store/`, `lib/`, `pages/`), not
+FSD layers: FSD adds onboarding friction to a template meant to be cloned, and a consumer can layer
+it on. State has a hard boundary: no Zustand for server data and no TanStack Query for pure UI
+state. Mixing them causes cache inconsistency and double-refetch bugs; Zustand with devtools gives
+observable client state, and TanStack Query owns the whole async lifecycle (loading, error, stale,
+refetch).
 
-**Superseded by "[2026-07] The gate is `verify`; `verify` is a superset of CI" above — `ci:local` is now an alias of `verify:ci`; kept for the reasoning.**
-
-**Decision**: `.cursor/brain/VERIFICATION.md` defines minimal checks per task type; `npm run ci:local` mirrors CI with extras (audit, size). Agents should read it and avoid running audit/build/vitals-analyze for every trivial edit.
-
-**Why**: Reduces noise, latency, and false “full audit” habits while keeping a single command for full local CI confidence.
-
----
-
-## [2026-07] Playwright e2e inside `verify` + pre-push
-
-**Decision**: append build + `test:e2e:prod` (`PLAYWRIGHT_USE_PREVIEW=1`) to `npm run verify`, and point `.husky/pre-push` at full `npm run verify` (was typecheck-only). `ci:local` remains the stricter audit/size/LHCI-style (where applicable) superset.
-
-**Why**: Catch preview-mode e2e regressions before CI; typecheck-only pre-push left runtime gaps.
-
-**Trade-off**: pre-push is slower. Accepted so e2e cannot be skipped by habit.
-
-**Superseded in part (2026-08-30)**: `.husky/pre-push` now runs `verify:push`, which is phase-aware (`scripts/gate-tiers.json`): phase 0 skips build, size and e2e until the first deploy, phase 1 runs the full `verify:ci`; CI always runs the full chain. The e2e-inside-`verify` half of this decision stands. Tier law: `AGENTS.md` § Commands / the gate.
-
----
-
-## [2026-04] i18n init failure — English-only fallback
-
-**Decision**: If `i18nInitPromise` rejects, `main.tsx` removes `html.i18n-loading`, logs via `logger.error('[i18n] …')`, and renders `I18nInitErrorFallback` (fixed English; `t()` is not available).
-
-**Why**: Previously the app could stay on an empty tree forever when locale JSON failed to load. User-facing copy cannot use i18n in this branch.
-
----
-
-## [2026-04] Web Vitals chunk split — automated check
-
-**Decision**: `scripts/check-web-vitals-chunks.mjs` asserts `dist/assets` after build: default bundle must contain only `subscribeStandard` + standard `web-vitals` chunk; optional `npm run verify:web-vitals-chunks` runs two builds and asserts the attribution variant too.
-
-**Why**: Branching on `env` from `@/env` pulled both dynamic imports into the graph; `import.meta.env.VITE_WEB_VITALS_ATTRIBUTION` is required for dead-code elimination. The script catches regressions without manual bundle inspection.
-
----
-
-## [2026-03] Tailwind v4 migration
-
-**Decision**: Migrated from Tailwind v3 (config in `tailwind.config.ts`) to Tailwind v4 (config in `src/index.css`).
-
-**Why**: v4 uses a Vite-native plugin (`@tailwindcss/vite`) which is faster and eliminates PostCSS as a build dependency. CSS-based config (`@theme inline`) is more collocated with actual styles.
-
-**Trade-offs**: The `container` utility no longer has a JS-configurable `center`/`padding` option — apply utilities directly. `tailwindcss-animate` replaced by `tw-animate-css` (CSS import, no PostCSS plugin).
-
----
-
-## [2026-03] Vite 8 with built-in Rolldown
-
-**Decision**: Use the official **`vite@^8`** package. Removed `npm:rolldown-vite` alias and `overrides`.
-
-**Why**: Vite 8 ships Rolldown as the unified bundler ([announcement](https://vite.dev/blog/announcing-vite8)); the separate `rolldown-vite` preview is superseded. Aligns with ecosystem (e.g. `@vitejs/plugin-react` v6, Vitest 4.1 vite peer).
-
-**Config**: `build.rolldownOptions.output.codeSplitting.groups` replaces Rollup `manualChunks` for vendor chunks.
-
----
-
-## [2026-04] ESLint 9 (not 10) — intentional hold — SUPERSEDED
-
-**Superseded by "[2026-07] ESLint 10; `settings.react.version` must be a literal" above.** The hold
-was lifted before the 2026-08-06 end of life: the plugin peers still cap below 10, but three
-`overrides` entries resolve that without `--legacy-peer-deps`, and the one real crash path turned out
-to be `settings.react.version: 'detect'`. Kept for the reasoning, not as current guidance.
-
-**Decision**: Holding on ESLint **9.x**. Not upgrading to ESLint **10** yet.
-
-**Snapshot (2026-05-22)**: ESLint 10.0.0 shipped 2026-02-09; latest 10.4.0 shipped 2026-05-15. ESLint 9.x EOL is 2026-08-06. The 9.x line is on `maintenance` dist-tag (currently `9.39.4`).
-
-**Why**: `eslint-plugin-react@7.37.5` uses `context.getFilename()` + `sourceCode.isSpaceBetweenTokens` + `sourceCode.getAllComments` + RuleTester `type` field — all removed in ESLint 10 (runtime crash, not peer-warn). PR #3979 blocked transitively by `import-js/eslint-plugin-import#3230`. `eslint-plugin-jsx-a11y@6.10.2` peer caps `^9`, PR #1081 awaiting `ljharb` review since Mar 2026.
-
-**Closed 2026-09-12** (superseded, ESLint 10 is installed; the monthly review planned from 2026-07-01 no longer applies). The exit conditions were: either (a) `eslint-plugin-react` ships release widening peer to `^10`, OR (b) `eslint-plugin-jsx-a11y@7.x` ships, OR (c) we adopt forks:
-
-- `@eslint-react/eslint-plugin@5.8.4+` (peer `eslint ^10.3.0`, requires Node ≥22, NOT drop-in — rule rewrite)
-- `eslint-plugin-jsx-a11y-x@0.2.0+` (es-tooling org, peer `^9 || ^10`, drop-in)
-
----
-
-## [2026-04] eslint-import-resolver-typescript — single solution `tsconfig`
-
-**Decision**: `createTypeScriptImportResolver` uses **`./tsconfig.json`** only (solution file with `references`), not an array of `tsconfig.*.json`.
-
-**Why**: The resolver warns when multiple `project` entries are passed; its README recommends one config with project references. With a single file it sets `references: 'auto'` and follows `tsconfig.app` / `tsconfig.node` / `tsconfig.vitest` like `tsc -b`.
-
----
-
-## [2026-04] TypeScript 6 — upgraded
-
-**Decision**: Running **TypeScript 6.0.x** (`~6.0.3`).
-
-**Why**: `typescript-eslint` 8.58.1+ supports TypeScript 6 (peer relaxed to `<6.1.0`). One breaking change affected our config: `baseUrl` is deprecated in TS6. Fixed by removing `"baseUrl"` from both `tsconfig.json` and `tsconfig.app.json` — `paths` works without it in TS6.
-
----
-
-## [2026-04] Component pattern: arrow function + FunctionComponent
-
-**Decision**: All React components use `const X: FunctionComponent<Props> = () => {}`. No `FC`, no function declarations for components.
-
-**Why**: `FC` is an alias (`type FC<P> = FunctionComponent<P>`) — writing `FunctionComponent` makes the type relationship explicit. Arrow functions are consistent with hooks/utilities style. ESLint enforces both: `no-restricted-imports` bans `FC`, `func-style: expression` bans function declarations (exception: `src/components/ui/` which is shadcn-generated).
-
----
-
-## [2026-03] @vitejs/plugin-react v6
-
-**Decision**: `@vitejs/plugin-react@^6` with Vite 8 (Oxc-based refresh; Babel not required for default setup).
-
-**Why**: v6 matches Vite 8 peer range. React Compiler, if needed later, uses `reactCompilerPreset` + `@rolldown/plugin-babel` per plugin docs.
-
----
-
-## [2026-03] No FSD architecture in this template
-
-**Decision**: Using simple folder structure (`components/`, `hooks/`, `store/`, `lib/`, `pages/`) instead of FSD layers.
-
-**Why**: FSD is powerful but adds onboarding friction for a template. This template is meant to be cloned and extended. FSD can be layered on by the consumer if needed. Vibeten uses FSD and its rules can serve as reference.
-
----
-
-## [2026-03] Zustand for global state, TanStack Query for server state
-
-**Decision**: Hard boundary — no Zustand for server data, no TanStack Query for pure UI state.
-
-**Why**: Mixing responsibilities leads to cache inconsistency and double-refetch bugs. Zustand + devtools gives Redux-like observability for client state. TanStack Query owns all async lifecycle (loading, error, stale, refetch).
-
----
-
-## [2026-03] CI: production build + audit + Dependabot
-
-**Superseded by "[2026-07] The gate is `verify`; `verify` is a superset of CI" above — CI is one `verify:ci` step and `ci:local` an alias of it; kept for the reasoning.**
-
-**Decision**: GitHub Actions runs `npm ci` → audit → `typecheck` → `lint:oxlint` → `lint` (ESLint) → `format:check` → `test:coverage` → **`npm run build`** → **Web Vitals chunk verification** (`node scripts/check-web-vitals-chunks.mjs` on `dist/`). Triggers on PR and push to `master`. Dependabot opens weekly npm update PRs (capped at 8 open).
-
-**Why**: Typecheck and dual lint stages catch errors early; coverage in CI enforces thresholds from Vitest config. Production build gates bundler regressions; post-build chunk check catches accidental web-vitals graph coupling. Audit at moderate+ fails on registry-reported issues. Dependabot reduces manual drift for security patches.
-
-**Trade-offs**: `audit-level=moderate` may fail on moderate+ advisories that have no fix yet — then pin, ignore with documented exception, or wait for upstream (team choice).
-
----
-
-## [2026-03] Vendor chunks: `codeSplitting.groups` + `@tanstack/query-core`
-
-**Decision**: Under `build.rolldownOptions.output.codeSplitting.groups`, the **`state-vendor`** group includes paths for `zustand`, `@tanstack/react-query`, and **`@tanstack/query-core`**.
-
-**Why**: Analyzer runs showed `query-core` splitting out when only `react-query` matched. Same cacheable vendor boundary as the previous `manualChunks` logic.
-
-## Content variance is measured in a browser, not asserted in jsdom
-
-**Decision.** Every content-bearing primitive is rendered once per content state on a dev-only route
-(`/dev/ui/content-stress`) and MEASURED by Playwright at 390 / 640 / 768 / 1024 / 1440. The invariants
-live as pure predicates in `e2e/support/geometry.ts`, shared by that spec and by
-`e2e/layout-geometry.spec.ts`, which measures the assembled pages instead of the primitives. Two
-consumers, one definition — two copies of a rule is the defect the module exists to prevent.
-
-**Why a browser.** jsdom has no layout, so a unit test can pin a class string and nothing more. The
-defects this found on the first run were all invisible to the unit suite: 172px of overflow from a
-40-character unbroken token at 390, a button row 1161px wide inside a 798px container at 1440 (so NOT a
-narrow-viewport problem), and 28px of horizontal DOCUMENT scroll from the header on every route at 390.
-
-**Why the fixture is dev-only.** A stress page in the production bundle would be the wrong trade. That
-choice has a consequence worth stating: the fixture is unreachable from the `vite preview` run inside
-`verify`, so it needs its own server and its own rung — `verify:full`, plus a mandatory `dev-smoke` CI
-job. `playwright.config.ts` MUST keep `dev/**` in `testIgnore`: without it the production project
-collects the dev spec, runs it against `vite preview` where the route 404s, and the coverage becomes an
-illusion that still reports a pass.
-
-**Counts are derived, never literal.** The fixture publishes `data-stress-total` /
-`data-stress-components` from its own case list and the spec compares what it FOUND against those, with a
-floor and a named state set. A hardcoded `toHaveCount(32)` means adding a component silently requires
-editing the spec, and the version that forgets is green.
-
-**States: `minimal` / `typical` / `long` / `unbroken` for text, `none` / `one` / `many` for collections.**
-`unbroken` is the load-bearing one — a long sentence wraps on its spaces and hides a missing wrap guard.
-`minimal` is one character rather than the empty string, because an unreadable label is a content bug and
-not a layout one. **Not included, deliberately:** an RTL state, because no RTL locale ships here and
-adding one is a product decision, not a fixture decision.
-
-## The 44px touch floor is a ratchet here, not a redesign
-
-**Measured:** exactly two rendered sizes sit below the floor across every route and content state — 40
-(`Button`, from `h-10` and `size-10`) and 36 (`Input`, from `h-9`). Both are shadcn's default scale, which
-this template ships unaltered.
-
-**Decision.** `e2e/support/control-targets.ts` accepts those two EXACT sizes with a stated reason and an
-exit condition; every other size below the floor fails the gate. Raising the whole kit to 44 would change
-the visual scale of every app scaffolded from here, which is the consuming app's design decision. Keying
-on the exact size is what keeps this a ratchet: a 38px control matches nothing in the list.
-
-An acceptance list is the one gate component that fails by wrongly ACCEPTING, and sabotage never points
-that way, so `control-targets.test.ts` is all near-misses: 37/38/39/41/42 refused, an icon-only control
-refused at an accepted height but a narrow width, and the input entry proven unable to excuse an
-icon-only control.
-
-## `outline-hidden`, never `outline-none` — an accessibility change wearing a rename's clothes
-
-**Compiled from the installed Tailwind rather than recalled:** `.outline-hidden` emits
-`outline-style: none` PLUS `@media (forced-colors: active) { outline: 2px solid transparent;
-outline-offset: 2px }`; `.outline-none` emits only the first. Every focusable control here pairs the
-outline reset with a `ring-*`, which is a `box-shadow`, and `forced-colors` suppresses box-shadows. So
-with `outline-none` a Windows high-contrast user had NO focus indicator at all (WCAG 2.4.7).
-
-Swept in `button.tsx`, `input.tsx` and `SkipLink`. Pinned three ways, because no single one is enough:
-class-string assertions (`focus-indicator.test.tsx`, `SkipLink.test.tsx`), a committed browser test that
-emulates the mode (`e2e/forced-colors.spec.ts`), and `better-tailwindcss/no-deprecated-classes`. Mutation
-check: restoring `outline-none` makes the browser test report `outline=none shadow=none` and the unit test
-fail. **On every Tailwind minor bump, read the release notes for renamed utilities** — the build emits no
-warning and only the lint rule can catch a rename that is already known.
-
-## Tailwind class hygiene: two rules adopted on a pre-flight, one refused
-
-`no-deprecated-classes` 2 findings / 2 genuine · `enforce-canonical-classes` 0 · `no-unknown-classes` 0.
-The first two are enabled; `no-unknown-classes` is NOT, despite scoring zero, because its failure mode in
-a TEMPLATE is a false positive on the first hand-written CSS class a consumer adds, and this repo already
-applies `i18n-loading` imperatively rather than through a `className` the rule can see. Zero findings
-today is not evidence it is safe for whatever gets scaffolded from here. Both plugins stay — the rule sets
-do not overlap.
-
-## Gate hygiene: three fail-open shapes closed
-
-- **Coverage dropout.** Measured: with an unparseable file inside the coverage scope, vitest prints
-  `Failed to parse <file>. Excluding it from coverage.` and **exits 0**, so the percentage describes a
-  smaller set of files and can even go up. `scripts/check-coverage.mjs` wraps the run and refuses on that
-  marker; proven in both directions. Marker-based rather than a file-count baseline on purpose — a
-  baseline in a template would record the file count of an empty scaffold.
-- **`bench:verify` had drifted from the gate it claimed to mirror**, missing the `check-hooks` and
-  `ensure-playwright` steps while its own header said "same steps as `npm run verify`". The step list is
-  now DERIVED from the `verify` script and throws on a segment it cannot parse, so a step cannot silently
-  disappear from the benchmark. A second list claiming the gate's scope always drifts narrower than the
-  gate; the fix is to have no second list.
-- **`npx` without `--no-install`** in `ensure-playwright.mjs`: with an incomplete `node_modules`, npx
-  fetches the newest Playwright and installs browsers for a version this repo does not pin.
-
-## Cross-engine coverage is opt-in and scoped, and it earned its place immediately
-
-`CROSS_BROWSER=1` adds Firefox and WebKit projects, `testMatch`-scoped to the geometry specs. Not in the
-default run: three engines on every spec triples the local e2e wall-clock, and a WebKit font-metric
-difference in an unrelated spec would fail a push for a reason unconnected to the change.
-
-**What it found on the first run, which no amount of reasoning had:** Firefox reports `clientWidth: 0`
-for an inline `<label>` — CSS `overflow` does not apply to inline non-replaced elements and CSSOM defines
-their client box as zero — while Chromium reports a box. Every `<label>` on the page read as a 176px
-overflow in one engine and as nothing in the other. The engine difference is real; the defect was in the
-rule, which now exempts exactly `display: inline` and is tested in both directions.
-
-A `testMatch` that matches nothing collects ZERO tests and reports success, so
-`scripts/check-cross-browser-selection.mjs` asks Playwright whether every configured project actually has
-work, and fails closed on a report it cannot read.
-
-**2026-10-08: the Firefox test browser runs with `browser.tabs.remote.useCrossOriginOpenerPolicy` off.**
-`vite preview` now sends `Cross-Origin-Opener-Policy: same-origin`, and Firefox then swaps processes on the first
-navigation of a test and Playwright intermittently loses it (`page.goto` times out with every request finished).
-Measured, geometry spec x6 on 3 engines, `--workers=4`, same machine load: 12 of 210 Firefox tests failed with
-COOP and 0 of 210 on master; with the pref off, 0 of 90 failed where the same tree failed 5 of 90. The header stays
-sent, Chromium and WebKit enforce it, the smoke spec asserts it, and a dropped `font-src` still turns Firefox red.
-
-## Complexity ratchet: thresholds above the measured ceiling, production code only
-
-Five ESLint core rules (`complexity` 10, `max-depth` 3, `max-params` 4, `max-lines-per-function` 120,
-`max-lines` 200) gate `src/**` excluding tests. Thresholds were set from a measurement, not taste:
-an ESLint API probe with every rule at warn-zero measured the tree's ceiling at complexity 9 /
-depth 2 / params 3 / 89 lines per function / 142 per file (2026-08-09), so the gate is clean on day
-one and fires only on future drift. **Tests are exempt on purpose** — a `describe` block is one
-function to these rules and table-driven suites are long by design; indexing the ratchet on test
-style was the failure mode that killed this rule set in a sibling repo. When a threshold fires,
-split the function; raising a number requires a fresh measurement recorded here. The probe pattern:
-`new ESLint({ overrideConfig: [{ rules: { complexity: ['warn', 0], … } }] })`, take the max per rule
-from the report messages.
-
-## Mutation testing: weekly strength gate, deliberately outside `verify`
-
-`npm run test:mutation` (StrykerJS 9.6.1 + vitest runner) measures what coverage cannot: whether the
-tests would CATCH a wrong implementation, not whether code runs under them. Baseline measured
-2026-08-09: **mutation score 44.5%** — 279 of 627 mutants killed, 207 survived, 141 in code no test
-covers — against a green 57% coverage gate. That gap is the reason the tool exists here.
-`thresholds.break: 40` is a floor-of-record: the weekly `mutation.yml` job (cron + dispatch) fails
-only when strength regresses below the measured baseline. Raise the floor after a good run; never
-lower it to go green. NOT in `verify`/pre-push: a full run costs 3m25s locally (627 mutants,
-incremental re-run 24s) and minutes-to-tens on CI runners — a per-push gate at that price teaches
-`--no-verify`. Scope mirrors the coverage excludes (`src/**` minus tests, `env.ts`, `main.tsx`,
-shadcn `ui/**`, lazy barrels). Two hardenings that came from an external review of this exact
-proposal: `.stryker-tmp`/`reports` are gitignored AND `ignorePatterns` keeps `.env*` out of the
-sandbox copy (Stryker does not read `.gitignore`); and the runner's dependency tree enters the
-fail-closed audit gate — the day that tree carries a high advisory, the remedy is an override floor
-with a major cap, not an allowlist entry. Known limit, stated honestly: the vitest runner mutates
-what unit/RTL tests can see; a defect only Playwright would catch is invisible to this score.
-Second limit, same honesty: mutation testing measures only the kill side of test strength (would
-the suite catch a breakage); an over-strict test that wrongly rejects a legitimate implementation
-is invisible to it, and that side stays with review discipline (this repo's refusing-direction
-test culture, e.g. the `control-targets.test.ts` near-misses).
-
-## Override floors: fresh-advisory sweep of 2026-08-09, and two floors that had aged
-
-Five high advisories published upstream landed on the existing tree at once: `js-yaml` <4.3.1 (via
-commitlint→cosmiconfig), `undici` <7.29.0 (via jsdom), `nanoid` <5.1.16 and <3.3.17 (via
-size-limit→estimo and postcss), `brace-expansion` <5.0.9, `fast-uri` <4.1.2. Every one is closed by
-an override floor **with a major cap** (`">=fixed <next-major"`); `nanoid` floors are scoped under
-`estimo` and `postcss` because the two majors need different floors and a top-level pin would force
-postcss's v3 line onto v5. Two of the failing floors were our own: `brace-expansion: ">=5.0.8"` and
-`fast-uri: ">=3.1.4"` were written WITHOUT caps, aged into the vulnerable ranges, and the overrides
-that once cleared advisories became the reason the gate was red — the exact class the sibling
-template documented on 2026-08-04. An uncapped floor is a delayed regression; cap the major, always.
-
-## [2026-09] Gate hygiene: the Stryker sandbox is ignored by prettier and ESLint, not only by git
-
-A Stryker run that crashed in a sibling template left `.stryker-tmp/sandbox-*` behind, and the next push
-there failed with 44 lint errors that were all inside that copy of the repo (prettier "Delete ⏎" on the
-copied files, ESLint "multiple candidate TSConfigRootDirs"). `.stryker-tmp` was in `.gitignore` only, in
-all four templates. It is now also in `.prettierignore` and in ESLint's global ignores here: a tool's temp
-directory belongs in every ignore list the gate reads, or a crashed tool run reddens the gate for an
-unrelated change and reads as a regression.
-
-## [2026-09] Gate hygiene: a test budget is set by what the test does
-
-The `verify-push` CLI cases in `scripts/verify-push.test.mjs` timed out at vitest's 5 s default inside the
-full coverage run while passing alone in ~260 ms each. Each case boots node → npm → node, and an npm boot
-on a machine with every vitest worker busy takes seconds, so the budget was a unit-test budget applied to a
-process-spawn test. The describe block now carries a 20 s budget with the measurement next to it. A
-quarantine (`skip`) was rejected: the cases prove the push dispatcher's phase routing and exit-code
-passthrough, the exact thing a silent pass would hide.
+**Evidence:** https://github.com/Vadymk95/template-1/commit/4299fce

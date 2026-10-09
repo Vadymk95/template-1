@@ -102,7 +102,7 @@ To update after MSW upgrade: `npx msw init public/`.
 ## CI / Supply chain
 
 - The gate, its moments and phases: `AGENTS.md` § Commands / the gate; CI = `.github/workflows/ci.yml` (one `verify:ci` step + `dev-smoke` + `cross-browser`), `security.yml`, `mutation.yml`.
-- Dependencies: `.github/dependabot.yml` (weekly, cooldown, holds mirrored from `DECISIONS.md`).
+- Dependencies: `.github/dependabot.yml` (weekly, cooldown, holds listed in `scripts/version-holds.json`).
 
 ## Layout invariants and content variance
 

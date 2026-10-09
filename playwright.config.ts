@@ -43,8 +43,9 @@ export default defineConfig({
     ...(process.env.CI ? { workers: 1 } : {}),
     // A red run must not cost a green run's wall clock: without a cap, every failure waits out its
     // own timeout, and CI's retries pay for each failure three times over. 10 is the measured
-    // value — see DECISIONS.md [2026-10] for the numbers. The desk run against the dev server
-    // (`usePreview` false) stays uncapped — it is not what a push or CI pays for.
+    // value — see DECISIONS.md "Playwright `maxFailures: 10`" for the numbers. The desk run
+    // against the dev server (`usePreview` false) stays uncapped — it is not what a push or CI
+    // pays for.
     maxFailures: usePreview ? 10 : undefined,
     reporter: [['html', { open: 'never' }], ['list']],
     timeout: 60_000,
@@ -73,7 +74,7 @@ export default defineConfig({
                            * intermittently loses that navigation under load: `page.goto` never resolves
                            * although every request finished. The header stays SENT (Chromium and WebKit
                            * enforce it, and the smoke spec asserts it); only this test browser stops
-                           * swapping processes. DECISIONS.md has the measured numbers.
+                           * swapping processes. DECISIONS.md (Cross-engine coverage) has the numbers.
                            */
                           launchOptions: {
                               firefoxUserPrefs: {

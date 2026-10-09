@@ -45,7 +45,7 @@ The push gate's preflight takes `--kill-port` (SIGTERM, re-probe, refuse if it w
   dirty, `--changed` runs the FULL suite (those files are force-rerun triggers); and `--changed` follows
   the import graph only, so cross-cutting suites surface at the full-gate run, not during iteration.
 - **`npm run verify`** — every **offline** check. Stage order: the `verify:inner` script; the superset
-  rule and the push/CI split: `AGENTS.md` § the gate; why: `DECISIONS.md` [2026-07].
+  rule and the push/CI split: `AGENTS.md` § the gate; why: `DECISIONS.md` § The gate is `verify`.
 - **`npm run verify:ci`** — `audit:gate && verify`. The audit gate needs the network, which is why it
   is not inside `verify`: an offline implementer can still run the complete offline gate.
 - **`npm run verify:full`** — `verify:ci && smoke:dev`. `smoke:dev` measures the content-variance
@@ -57,7 +57,7 @@ The push gate's preflight takes `--kill-port` (SIGTERM, re-probe, refuse if it w
 ## After a red push: re-run only what failed
 
 Both Playwright configs cap failures (`maxFailures`) on the gate run and in CI, and each writes
-`.last-run.json` to its own `outputDir` — see `AGENTS.md` § the gate and `DECISIONS.md` [2026-10].
+`.last-run.json` to its own `outputDir` — see `AGENTS.md` § the gate and `DECISIONS.md` § Playwright `maxFailures: 10`.
 The re-run after a fix, production-mode suite (`npm run build` first in both cases):
 
 - **The red stopped at the cap**: `PLAYWRIGHT_USE_PREVIEW=1 npx playwright test <failed spec files from the red output>`
@@ -72,7 +72,7 @@ the suite instead of only what failed.
 `npm run bench:verify` runs the same steps with per-step timings when the gate feels slow.
 
 `npm run test:mutation` (StrykerJS) sits outside every rung on purpose: it rides the weekly
-`mutation.yml` cron and is never part of `verify` — see AGENTS.md § Mutation testing.
+`mutation.yml` cron and is never part of `verify` — see `DECISIONS.md` § Mutation testing.
 
 ---
 
@@ -85,7 +85,7 @@ Targeted checks are for the iteration loop. The gate is what says "done".
 - **i18n copy only** (value edits in `public/locales/**/*.json`) — `npm run format:check`; wrapping and
   overflow for new copy lengths belong to the content-variance tier, not to a per-edit run
 - **TS/TSX / tests** (logic, components, hooks, stores) — `npm run verify:iter`
-- **Docs, rules, commands, brain, tier data** (`*.md`, `*.mdc`, `scripts/gate-tiers.json`) — `npm run docs:check` (the pre-commit hook runs it when such files are staged; `--weekly` adds past revisit dates; it also refuses a focused test, an unconditional skip without `quarantine until YYYY-MM-DD` + reason, and an agent-memory import: an `@` pointer in `CLAUDE.md` or `AGENTS.md` that names a file, which Claude Code would load into every session; write it as a backticked path instead)
+- **Docs, rules, commands, brain, tier data** (`*.md`, `*.mdc`, `scripts/gate-tiers.json`) — `npm run docs:check` (the pre-commit hook runs it when such files are staged; `--weekly`, the scheduled Docs workflow's flag, runs the same checks so a quarantine that expires while nobody pushes still turns it red; it also refuses a focused test, an unconditional skip without `quarantine until YYYY-MM-DD` + reason, and an agent-memory import: an `@` pointer in `CLAUDE.md` or `AGENTS.md` that names a file, which Claude Code would load into every session; write it as a backticked path instead)
 - **Proposing a new browser spec** — the suite is counted in invariants, not screens (`AGENTS.md` § the gate); `npm run docs:check` reports the suite against the ceiling in `scripts/gate-tiers.json` § suites
 - **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing) — `npm run e2e:one -- <spec>`. Locally a failure is a failure (no retries). In CI a test gets two retries so one flake cannot block a merge, but a test that only passed on a retry still fails the run (`failOnFlakyTests`): fix it or quarantine it (`docs:check` tracks quarantines), never let it pass quietly. Specs that run against the built app import `test` from `e2e/support/test.ts`: it fails a test on a Content-Security-Policy violation, read from the console and from the `securitypolicyviolation` event so every engine reports it, because `vite preview` sends the shipped headers (`vite-plugins/security-headers.ts`, whose unit test pins the set). A spec that visits a route also runs the axe scan (`e2e/support/a11y.ts`); a serious or critical violation, or a control under the WCAG 2.2 target-size minimum, fails it, and the failure prints the rule id and the selectors.
 - **A shared UI primitive, the layout shell, or `src/index.css`** — the MEASURE moment:
@@ -140,7 +140,7 @@ The rule: `AGENTS.md` § Critical rules › Content variance. Why and what it fo
 
 Pre-commit is **repo-scoped**, not staged-scoped: `lint-staged` fixes and re-stages the staged set, then
 the hook runs `lint:oxlint`, `format:check` and `typecheck` over the whole repo and refuses the commit if
-any fails. Why the repo-wide pass exists: `DECISIONS.md` [2026-07] § Pre-commit is repo-scoped. Remedy on
+any fails. Why the repo-wide pass exists: `DECISIONS.md` § The gate is `verify` ("Pre-commit is repo-scoped"). Remedy on
 refusal: `npm run fix && git add -u`.
 
 The same hook blocks a staged `src` logic file with no co-located `*.test.*`

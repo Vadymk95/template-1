@@ -35,6 +35,21 @@ describe('parseVerifySteps', () => {
         expect(labels).toContain('ensure-playwright');
     });
 
+    it('keeps the version-holds check in the gate, so a bump past a hold turns verify red', () => {
+        const labels = parseVerifySteps(verifyScript()).map((step) => step.label);
+
+        expect(labels).toContain('check-version-holds');
+    });
+
+    it('keeps the version-holds check in verify:scaffold, the push gate before the first deploy', () => {
+        const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+        const labels = parseVerifySteps(resolveScript(manifest.scripts, 'verify:scaffold')).map(
+            (step) => step.label
+        );
+
+        expect(labels).toContain('check-version-holds');
+    });
+
     it('labels an npm step by its script name and a node step by its file', () => {
         expect(parseVerifySteps('npm run typecheck && node scripts/check-hooks.mjs')).toEqual([
             { label: 'typecheck', command: 'npm', args: ['run', 'typecheck'] },

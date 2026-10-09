@@ -6,7 +6,7 @@ job: the trigger, not the content. **It points and never restates** — a line s
 the moment that doc changes; a line naming the doc and its section does not. Where two files could
 answer, the entry says which one WINS.
 
-Why it exists: `AGENTS.md` § Entering this repo cheaply.
+Why it exists: `AGENTS.md` § Start here.
 
 ## 1. Picking this repo up cold
 
@@ -48,8 +48,8 @@ Why it exists: `AGENTS.md` § Entering this repo cheaply.
 
 ## 6. About to add a dependency, or an advisory went red
 
-- `.cursor/brain/DECISIONS.md` + `AGENTS.md` § Version holds — WINS: a floor carries a major cap, and
-  an allowance is the last resort and needs an expiry.
+- `scripts/version-holds.json` (the holds), `.cursor/brain/DECISIONS.md` (why) + `AGENTS.md` § Version
+  holds — WINS: a floor carries a major cap, and an allowance is the last resort and needs an expiry.
 - `scripts/audit-allowlist.json` — the current allowances and their reasons.
 
 ## 7. About to wire a real backend, auth, monitoring, analytics, flags, more languages or a host

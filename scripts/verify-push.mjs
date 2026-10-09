@@ -2,7 +2,7 @@
 /**
  * Phase-aware push gate: what a push must prove depends on whether a prod boundary exists yet.
  *
- * Phase 0 (scaffold, pre-deploy): audit + hooks + oxlint + format + types + lint + coverage. The
+ * Phase 0 (scaffold, pre-deploy): audit + hooks + version holds + oxlint + format + types + lint + coverage. The
  * build, the chunk and size checks and the prod e2e suite are SKIPPED — before the first deploy there is no production
  * boundary for them to guard, and paying ~30s per push to check a boundary that does not exist
  * is how gates teach people to bypass them. The skip is printed LOUDLY on every push: a silent
