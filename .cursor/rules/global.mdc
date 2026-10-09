@@ -9,34 +9,25 @@ priority: 95
 
 ## Pipeline Initialization (CRITICAL)
 
-- **Any task MUST begin by initializing the protocol defined in `agent-pipeline.mdc`.**
-- The pipeline (Priority 100) orchestrates all steps: Discovery → Simulation → TDD Execution → Verification → Brain Sync → Confidence.
-- Domain standards live in their respective rules. The pipeline enforces them — never bypass it.
+Any task MUST begin by initializing the protocol in `agent-pipeline.mdc` (Discovery → Simulation → TDD Execution → Verification → Brain Sync → Confidence). Domain standards live in their own rules; the pipeline enforces them — never bypass it.
 
 ## 0.1 Conditional Rule Routing
 
-Do NOT assume Cursor auto-attaches every rule. The always-on rules (`alwaysApply: true`) — this file, `agent-pipeline.mdc`, `workflow.mdc`, `project-config.mdc` — load automatically. The glob-scoped conditional rules (`alwaysApply: false`) often do NOT attach reliably. Before planning/editing in a task area, **explicitly read the matching conditional rules**:
+Cursor does NOT reliably auto-attach glob-scoped rules (`alwaysApply: false`). The always-on rules — this file, `agent-pipeline.mdc`, `workflow.mdc` — load on their own. Before planning or editing in a task area, **explicitly read the matching rules**:
 
-- **React / UI / component / hook / page / HOC work** → `react-patterns.mdc`, `engineering-standards.mdc`, `performance.mdc`
-- **New behavioral component / changed component behavior** → also `test-driven-development.mdc` before implementation
-- **Tests / fixtures / mocks / coverage** → `test-driven-development.mdc`
-- **API client / TanStack Query hooks / data-fetching / payload contracts** → `api.mdc`, `state-management.mdc`, `resilience.mdc`
-- **Zustand stores / TanStack Query state / `createSelectors`** → `state-management.mdc`, `resilience.mdc`, `test-driven-development.mdc`
-- **Routing / route organization / lazy pages** → `routing.mdc`, `react-patterns.mdc`
+- **React / UI / component / hook / page / HOC** → `react-patterns.mdc`, `engineering-standards.mdc`, `performance.mdc`
+- **New or changed component behaviour, tests, fixtures, mocks, coverage** → `test-driven-development.mdc` (before implementing)
+- **Styling / Tailwind / theme tokens / i18n strings / accessibility / path aliases** → `project-config.mdc`
+- **API client / TanStack Query / data fetching / payload contracts** → `api.mdc`, `state-management.mdc`, `resilience.mdc`
+- **Zustand stores / `createSelectors`** → `state-management.mdc`, `resilience.mdc`, `test-driven-development.mdc`
+- **Routing / lazy pages** → `routing.mdc`, `react-patterns.mdc`
 - **Async / error handling / debugging** → `resilience.mdc`
-- **Styling / render-perf / memo / list keys / bundle budgets** → `performance.mdc` + `react-patterns.mdc`
+- **Render performance / memo / list keys / bundle budgets** → `performance.mdc`, `react-patterns.mdc`
 - **Constants / magic strings / config values** → `constants.mdc`, `engineering-standards.mdc`
 
-## Language
+## Standards
 
-- **Codebase:** English only — source, identifiers, comments, JSDoc, tests, and Git messages (`type(scope): subject`). Brain/docs under `.cursor/brain/` may be English for template consistency; do not mix Russian into production code or commits.
-
-## Intelligence & Context
-
-- **Reasoning**: Use `sequential-thinking` (if available in your environment) for logic and `context7` for docs lookups.
-- **Authority**: `AGENTS.md` § Source of truth — code is ground truth, `AGENTS.md` the canonical guide, `.cursor/brain/` the depth layer; sync drift in the same session.
-- **Stack**: Strict **TypeScript**. React 19. Prioritize existing libs over custom logic.
-- **Quality**: Minimalist code. No magic strings — use constants or i18n keys.
-- **Clean Code**: Descriptive naming, performance-oriented. Explain complex logic with single-line `//` only.
-- **Hygiene**: Keep AI metadata and agent-only specs in `.cursor/`. Normal project docs like `README.md` or deployment checklists may live in root when they are part of the template contract.
-- **Git**: `type(scope): description` — English, max 96 chars. No "Co-authored-by" tags.
+- **Language:** English only in source, identifiers, comments, JSDoc, tests and Git messages. Brain docs under `.cursor/brain/` too.
+- **Authority:** code is ground truth, `AGENTS.md` the canonical guide, `.cursor/brain/` the depth layer (`AGENTS.md` § Source of truth); sync drift in the same session.
+- **Code:** strict TypeScript; existing libraries over custom logic; minimal code; no magic strings (constants or i18n keys); `sequential-thinking` (if available) for logic, `context7` for library docs.
+- **Git:** `type(scope): description`, English, max 96 chars, no "Co-authored-by" tags (`workflow.mdc` § Git Commits).

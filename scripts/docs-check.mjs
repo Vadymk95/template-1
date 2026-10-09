@@ -30,15 +30,24 @@
  *              ci.allowedRunSteps (a check running only in CI, not in `verify`), with a reason
  *   rulesetContexts  every required status check in .github/ruleset.json is produced by a workflow
  *              job (its `name:` or id, plus matrix values) or listed in ci.rulesetContextAllowlist
+ *   pointers   a section pointer, `file` § Heading, in any tracked .md/.mdc file (DECISIONS.md
+ *              included) must resolve to a heading of that file (rules above checkSectionPointers)
  *   budget     (report only) the push budget vs the p90 of traced pushes IN THE SAME PHASE; a
  *              missing log or too few rows prints a loud skip, never a silent pass
- *   revisit    (--weekly only) "revisit / re-check / trigger" lines whose latest date is past
  *
  * The discipline itself is data in scripts/gate-tiers.json (`docs` block + the `docs:check` entry);
- * this file names no sentinel and no version of its own. History files (DECISIONS.md) are exempt
- * from everything but the dead-doc check because they are supposed to quote the past.
+ * this file names no sentinel and no version of its own. History files (DECISIONS.md) are skipped
+ * by the paths, scripts, sentinels and versions checks (an entry's evidence link names the tree as
+ * it was when the decision was taken) and read only by the dead-doc and section-pointer checks.
+ *
+ * No check reads a date out of prose: a revisit line carrying a date was read as a deadline and was
+ * gamed by rewording. Dates are checked only where they are structured data: `quarantine until` on
+ * a skipped test (above), `expires` in scripts/audit-allowlist.json (scripts/audit-gate.mjs) and
+ * `reviewBy` in scripts/version-holds.json (scripts/check-version-holds.mjs).
  *
  * Usage: node scripts/docs-check.mjs [--weekly] [--root <dir>]
+ *   --weekly  the flag the scheduled Docs workflow passes; it runs the same checks, so a quarantine
+ *             that expires while nobody pushes still turns the scheduled run red
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -75,8 +84,6 @@ const TOKEN_PATTERN = /`([^`\n]+)`/g;
 /** Relative markdown link targets, `[text](.cursor/brain/MAP.md#anchor)`; URLs and pure anchors are skipped. */
 const LINK_PATTERN = /\]\((?!https?:|mailto:|#)([^)\s#]+)(?:#[^)]*)?\)/g;
 const VERSION_PATTERN = /\b([A-Za-z][A-Za-z.]*[A-Za-z])\s+v?(\d+)(?:\.(\d+))?(?:\.(\d+))?\b/g;
-const DATE_PATTERN = /\b(20\d\d)-(\d\d)-(\d\d)\b/g;
-const REVISIT_PATTERN = /\b(revisit|re-check|recheck|checkpoint|trigger|re-measure|re-evaluate)\b/i;
 const DEFAULT_INTERNAL_SCRIPTS = [':inner$', '^(pre|post)?(install|prepare|publish)$', '^_'];
 
 const isRecord = (value) => typeof value === 'object' && value !== null;
@@ -319,6 +326,296 @@ export const checkDeadDocs = ({ docs, extraText = '' }) => {
         }
     }
     return findings;
+};
+
+/* Section pointers. The convention across the agent docs is `<file>` § <Heading>: a path (in
+   backticks, as a markdown link target, or a plain file name), the section sign, and the heading it
+   names. Nothing else checks the heading half, so a pointer outlives the section it names: a pass
+   that renames or removes a heading leaves every pointer to it pointing at nothing, and a reader
+   (or an agent) lands on the wrong rule or on none.
+   What is judged: every `§` outside fenced blocks that follows a path to a tracked .md/.mdc file;
+   a path to anything else (a JSON file, a script) is not judged, and a bare `§ 4.1a` with no path
+   before it is not judged either (it points inside its own file or at a file named earlier). A `§`
+   chained after a pointer by "and", "or", "&", "," or "/" (`api.mdc § 2 and § 4`) inherits that path;
+   a path at the end of one line with the `§` opening the next is joined.
+   The heading phrase is compared case-insensitively with markdown formatting, quotes and one
+   trailing parenthetical removed. A heading answers to its whole text and to its parts: the number
+   alone (`4.1a`), the title without the number, and each side of " / ", " - " or ": " (`the gate`
+   for `Commands / the gate`). The phrase ends at the first of `;`, `, `, `. `, a dash, an
+   unmatched `)` or the line end; a quoted phrase ends at the closing quote; prose that follows a
+   whole heading name without punctuation is tolerated (`§ the gate and none of ...`). A
+   `A › B` chain needs A to be a heading and B to be a heading under it or a name that appears in
+   A's section (a bold lead-in such as `Content variance` is not a heading). A target that is
+   named by a bare file name resolves by basename; several matches mean any of them may answer. */
+const HEADING_LINE = /^ {0,3}(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/;
+const DATE_PREFIX = /^\[\d{4}-\d{2}(?:-\d{2})?\]\s*/;
+const NUMBER_PREFIX = /^(\d+(?:\.\d+)*[a-z]?)(?:[.):])?(?=\s|$)/;
+const CONNECTOR_END = /(?:\band|\bor|&|,|\/)\s*$/i;
+/** The character after a matched name: not the middle of a word or of a number such as 4.1a. */
+const NAME_END = /^(?![A-Za-z0-9]|\.[A-Za-z0-9])/;
+
+/** Removes HTML tags until none is left: taking out an inner tag can complete an outer one (`<scr<b>ipt>`). */
+const stripTags = (text) => {
+    let previous;
+    let out = text;
+    do {
+        previous = out;
+        out = out.replace(/<[^<>]*>/g, '');
+    } while (out !== previous);
+    return out;
+};
+
+/** Plain lower-case words: markdown, quotes and dash styles flattened, nothing else removed. */
+const flatten = (raw) =>
+    stripTags(raw.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'))
+        // A tag that never closes (`A <b B`) leaves its `<`: no angle bracket survives.
+        .replace(/[<>]/g, '')
+        .replace(/[`*~]/g, '')
+        .replace(/(?<![A-Za-z0-9])_|_(?![A-Za-z0-9])/g, '')
+        .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '')
+        .replace(/[“”"]/g, '')
+        .replace(/[‘’]/g, "'")
+        .replace(/\s+[–—-]+\s+/g, ' - ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+/** A heading or pointer phrase as the comparison sees it: flattened, one trailing parenthetical and end punctuation gone. */
+export const normalizeHeading = (raw) =>
+    flatten(raw)
+        .replace(/[.:;,!?]+$/, '')
+        .replace(/\s*\([^()]*\)$/, '')
+        .replace(/[.:;,]+$/, '')
+        .trim();
+
+/** Every name a heading answers to. */
+const headingKeys = (flattened) => {
+    const normalized = normalizeHeading(flattened);
+    const keys = new Set([normalized]);
+    const parenthetical = /\(([^()]+)\)\s*[.:;,]*$/.exec(flattened.replace(/[.:;,!?]+$/, ''));
+    if (parenthetical) keys.add(normalizeHeading(parenthetical[1]));
+    const undated = normalized.replace(DATE_PREFIX, '');
+    const numbered = NUMBER_PREFIX.exec(undated);
+    const title = numbered ? undated.slice(numbered[0].length).trim() : undated;
+    keys.add(undated);
+    if (numbered) {
+        keys.add(numbered[1]);
+        if (title) keys.add(title);
+    }
+    for (const part of title.split(/ \/ | - |: |; /)) {
+        if (part.trim()) keys.add(part.trim());
+    }
+    return keys;
+};
+
+/** Headings outside fenced blocks and front matter, each with its section's line range. */
+const collectHeadings = (lines) => {
+    const headings = [];
+    let inFrontMatter = lines[0]?.trim() === '---';
+    lines.forEach((line, index) => {
+        if (inFrontMatter) {
+            if (index > 0 && line.trim() === '---') inFrontMatter = false;
+            return;
+        }
+        const match = HEADING_LINE.exec(line);
+        if (!match) return;
+        const keys = headingKeys(flatten(match[2]));
+        if (keys.has('')) return;
+        headings.push({ level: match[1].length, line: index, end: lines.length, keys });
+    });
+    headings.forEach((heading, position) => {
+        const next = headings.slice(position + 1).find((other) => other.level <= heading.level);
+        if (next) heading.end = next.line;
+    });
+    return headings;
+};
+
+/** Cut a pointer phrase where the sentence around it takes over. */
+const cutPhrase = (raw) => {
+    const text = raw.trimStart();
+    const quoted = /^["“]([^"”]+)["”]/.exec(text);
+    if (quoted) return quoted[1];
+    let depth = 0;
+    for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+        const after = text[index + 1] ?? '';
+        if (char === '`') {
+            const close = text.indexOf('`', index + 1);
+            if (close === -1) break;
+            index = close;
+        } else if (char === '(' || char === '[') {
+            depth += 1;
+        } else if (char === ')' || char === ']') {
+            if (depth === 0) return text.slice(0, index);
+            depth -= 1;
+        } else if (
+            char === ';' ||
+            (char === '.' && /\s|^$/.test(after)) ||
+            (char === ',' && /\s/.test(after))
+        ) {
+            return text.slice(0, index);
+        } else if (/\s/.test(char) && /^(?:[—–]|--)\s/.test(text.slice(index + 1))) {
+            return text.slice(0, index);
+        }
+    }
+    return text;
+};
+
+const stripConnector = (phrase) => phrase.replace(CONNECTOR_END, '');
+
+/** The file a pointer's path token names: a list of tracked markdown files, none, or "not judged". */
+const resolveTarget = (token, source, files) => {
+    const clean = token
+        .trim()
+        .replace(/^\.\//, '')
+        .replace(/[:,]+$/, '');
+    if (!clean || /[<>*{}$\s]/.test(clean)) return { skip: true };
+    const markdown = /\.mdc?$/.test(clean);
+    for (const candidate of [clean, path.posix.join(path.posix.dirname(source), clean)]) {
+        const normalized = path.posix.normalize(candidate);
+        if (files.has(normalized)) return { files: [normalized] };
+    }
+    if (!clean.includes('/')) {
+        const named = [...files].filter((file) => {
+            const base = path.posix.basename(file);
+            return base === clean || (!markdown && base.replace(/\.mdc?$/, '') === clean);
+        });
+        if (named.length > 0) return { files: named };
+    }
+    return markdown ? { missing: clean } : { skip: true };
+};
+
+/** The path token written just before a `§`, with how it was written. */
+const pathBefore = (before) => {
+    const link = /\[[^\]]*\]\(([^)\s#]+)(?:#[^)]*)?\)[*_]*\s*$/.exec(before);
+    if (link) return { token: link[1], form: 'link' };
+    const ticks = /`([^`\n]+)`[*_)\]]*\s*$/.exec(before);
+    if (ticks) return { token: ticks[1], form: 'ticks' };
+    const plain = /(?:^|[\s([])([\w./-]+)\s*$/.exec(before);
+    if (plain) return { token: plain[1], form: 'plain' };
+    return null;
+};
+
+const startsWithName = (text, key) => text.startsWith(key) && NAME_END.test(text.slice(key.length));
+
+/** A heading answers to a name that opens one of its keys (`Cross-engine coverage` for `Cross-engine coverage is opt-in`) or that one of its keys opens (a name followed by prose). */
+const answers = (heading, name) =>
+    name !== '' &&
+    [...heading.keys].some((key) => startsWithName(key, name) || startsWithName(name, key));
+
+/** Does one phrase (and the prose it may carry) resolve to a heading of this file? */
+const phraseResolves = ({ headings, lines }, phrase, running) => {
+    const [first, ...rest] = flatten(stripConnector(phrase)).split(' › ').map(normalizeHeading);
+    if (!first) return true;
+    const resolved = headings
+        .filter((heading) => answers(heading, first))
+        .some((heading) => {
+            const section = flatten(lines.slice(heading.line + 1, heading.end).join(' '));
+            return rest.every(
+                (name) =>
+                    headings.some(
+                        (other) =>
+                            other.line > heading.line &&
+                            other.line < heading.end &&
+                            answers(other, name)
+                    ) || section.includes(name)
+            );
+        });
+    if (resolved || rest.length > 0) return resolved;
+    const prose = flatten(running);
+    return headings.some((heading) => [...heading.keys].some((key) => startsWithName(prose, key)));
+};
+
+export const checkSectionPointers = ({ docs }) => {
+    const findings = [];
+    const files = new Set(docs.map(([file]) => file));
+    const texts = new Map(docs);
+    const index = new Map();
+    const targetOf = (file) => {
+        if (!index.has(file)) {
+            const lines = outsideFences(texts.get(file));
+            index.set(file, { headings: collectHeadings(lines), lines });
+        }
+        return index.get(file);
+    };
+    for (const [file, text] of docs) {
+        const lines = outsideFences(text);
+        lines.forEach((line, row) => {
+            if (!line.includes('§')) return;
+            const parts = line.split('§');
+            let inherited = null;
+            for (let part = 1; part < parts.length; part += 1) {
+                const before = parts.slice(0, part).join('§');
+                const next = lines[row + 1]?.trim() ?? '';
+                const local = parts[part];
+                const lineEnds = part === parts.length - 1;
+                const extended = lineEnds && next ? `${local} ${next}`.split('§')[0] : local;
+                let written = pathBefore(before);
+                if (!written && before.trim() === '' && row > 0) {
+                    written = pathBefore(lines[row - 1].trimEnd());
+                }
+                if (written?.form === 'plain' && !/\.mdc?$/.test(written.token)) {
+                    if (resolveTarget(written.token, file, files).skip) written = null;
+                }
+                if (!written && inherited) written = inherited;
+                inherited = CONNECTOR_END.test(local.trim()) ? written : null;
+                if (!written) continue;
+                const target = resolveTarget(written.token, file, files);
+                const phrase = cutPhrase(local).trim();
+                const shown = stripConnector(phrase).slice(0, 80);
+                if (target.skip || (!phrase && !extended.trim())) continue;
+                const where = `${file}:${row + 1}`;
+                if (target.missing) {
+                    if (!target.missing.includes('/') || HISTORY_FILES.includes(file)) {
+                        findings.push(
+                            `${where}: "${target.missing} § ${shown}" — ${target.missing} is not a tracked markdown file`
+                        );
+                    }
+                    continue;
+                }
+                const candidates = [
+                    [phrase, local],
+                    [cutPhrase(extended).trim(), extended]
+                ];
+                const answered = target.files.some((name) =>
+                    candidates.some(([cut, running]) =>
+                        phraseResolves(targetOf(name), cut, running)
+                    )
+                );
+                if (!answered) {
+                    findings.push(
+                        `${where}: "${written.token} § ${shown}" — no heading in ${target.files.join(' or ')} matches`
+                    );
+                }
+            }
+        });
+    }
+    return findings;
+};
+
+/** Every tracked (or about-to-be-tracked) .md/.mdc file, for the pointer check; the doc lists when git is absent. */
+export const listMarkdownFiles = (root) => {
+    let listed;
+    try {
+        listed = execFileSync(
+            'git',
+            ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+            {
+                cwd: root,
+                encoding: 'utf8',
+                stdio: ['ignore', 'pipe', 'pipe']
+            }
+        )
+            .split('\0')
+            .filter(Boolean);
+    } catch {
+        return listDocFiles(root);
+    }
+    return [...new Set(listed)].filter((file) => {
+        if (!DOC_EXTENSIONS.has(path.extname(file))) return false;
+        const absolute = path.join(root, file);
+        return existsSync(absolute) && statSync(absolute).isFile();
+    });
 };
 
 /** True when a workflow's `on:` trigger includes `pull_request:` (checked before its `jobs:` key). */
@@ -790,24 +1087,6 @@ export const budgetReport = ({
     };
 };
 
-export const checkRevisitDates = ({ docs, today }) => {
-    const findings = [];
-    for (const [file, text] of docs) {
-        text.split('\n').forEach((line, index) => {
-            if (!REVISIT_PATTERN.test(line)) return;
-            const dates = [...line.matchAll(DATE_PATTERN)].map((m) => `${m[1]}-${m[2]}-${m[3]}`);
-            if (dates.length === 0) return;
-            const latest = dates.sort().at(-1);
-            if (latest < today) {
-                findings.push(
-                    `${file}:${index + 1}: revisit/trigger dated ${latest} is in the past — act on it or re-date it`
-                );
-            }
-        });
-    }
-    return findings;
-};
-
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 
 const installedVersions = (root) => {
@@ -829,7 +1108,11 @@ const installedVersions = (root) => {
 
 const trackedFiles = (root) => {
     try {
-        return execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
+        return execFileSync('git', ['ls-files'], {
+            cwd: root,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe']
+        })
             .split('\n')
             .filter((line) => line.length > 0);
     } catch {
@@ -837,7 +1120,7 @@ const trackedFiles = (root) => {
     }
 };
 
-export const run = ({ root, weekly, today }) => {
+export const run = ({ root, today }) => {
     const tiers = readJson(path.join(root, 'scripts/gate-tiers.json'));
     const docsConfig = isRecord(tiers.docs) ? tiers.docs : {};
     const scripts = readJson(path.join(root, 'package.json')).scripts ?? {};
@@ -894,6 +1177,12 @@ export const run = ({ root, weekly, today }) => {
             internalScripts: [...DEFAULT_INTERNAL_SCRIPTS, ...(docsConfig.internalScripts ?? [])]
         }),
         ...checkDeadDocs({ docs, extraText: workflowText }),
+        ...checkSectionPointers({
+            docs: listMarkdownFiles(root).map((file) => [
+                file,
+                readFileSync(path.join(root, file), 'utf8')
+            ])
+        }),
         ...checkCiRunSteps({ workflows, allowedRunSteps: ciConfig.allowedRunSteps ?? [] }),
         ...rulesetCheck.findings
     ];
@@ -903,7 +1192,6 @@ export const run = ({ root, weekly, today }) => {
     ]);
     findings.push(...checkQuarantine({ tests, today }));
     if (tiers.suites) findings.push(...checkSuiteBudgets({ root, suites: tiers.suites }));
-    if (weekly) findings.push(...checkRevisitDates({ docs, today }));
 
     const pushLabel = tiers.moments?.push?.expected?.[0] ?? 'verify:push';
 
@@ -961,7 +1249,7 @@ const main = () => {
     const root = rootFlag === -1 ? process.cwd() : path.resolve(argv[rootFlag + 1]);
     const weekly = argv.includes('--weekly');
     const today = new Date().toISOString().slice(0, 10);
-    const { findings, budget, notes } = run({ root, weekly, today });
+    const { findings, budget, notes } = run({ root, today });
 
     console.log(`docs:check${weekly ? ' (weekly)' : ''}`);
     console.log(`  ${budget.message}`);
@@ -969,7 +1257,7 @@ const main = () => {
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {
         console.log(
-            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, quarantines, suite ceilings, agent-memory imports'
+            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, section pointers, quarantines, suite ceilings, agent-memory imports'
         );
         process.exit(0);
     }

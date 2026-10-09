@@ -1,13 +1,10 @@
 ---
 description: 'Project configuration, Tailwind v4, i18n, and accessibility standards'
-alwaysApply: true
+globs: ['src/**/*.{ts,tsx,css}', 'index.html', 'public/locales/**/*.json']
+alwaysApply: false
 ---
 
 # Project Configuration
-
-## Technology Stack
-
-See `AGENTS.md` § Stack; versions are `package.json`.
 
 ## Tailwind v4 (CRITICAL)
 

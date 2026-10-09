@@ -1,0 +1,51 @@
+[
+    {
+        "package": "vitest",
+        "held": ">=4.1.11 <5",
+        "reason": "Under vitest 5 the weekly Stryker mutation gate collapses: the one-file probe scored 5.88 on 5.0.3 against 88.24 on 4.1.11, and the full gate scored 9.59 against a floor of 40 (thresholds.break).",
+        "lift": "A @stryker-mutator/vitest-runner release dated after 2026-08-14 that passes the one-file probe under vitest 5 (probe: .cursor/brain/DECISIONS.md, entry 'vitest 5 and the Stryker runner'). Lift vitest and @vitest/coverage-v8 together.",
+        "evidence": "https://github.com/Vadymk95/template-1/commit/e332981b4941ee4a851b57dc01a0af558d293881"
+    },
+    {
+        "package": "@vitest/coverage-v8",
+        "held": ">=4.1.11 <5",
+        "reason": "Pinned to the vitest version exactly (peer), so it holds with vitest.",
+        "lift": "Lifts together with vitest.",
+        "evidence": "https://github.com/Vadymk95/template-1/commit/e332981b4941ee4a851b57dc01a0af558d293881"
+    },
+    {
+        "package": "msw",
+        "held": ">=2.15.0 <3",
+        "reason": "msw 3 removes the msw/core/http export that @vitest/mocker imports in vitest browser mode, and the mocker peers msw ^2.4.9.",
+        "lift": "A vitest release whose @vitest/mocker peer admits msw 3.",
+        "evidence": "https://github.com/Vadymk95/template-1/pull/95"
+    },
+    {
+        "package": "typescript",
+        "held": ">=6.0.3 <6.1.0",
+        "reason": "typescript-eslint 8 peers typescript >=4.8.4 <6.1.0; a bump to 6.1 or 7 fails both npm install and npm ci with ERESOLVE, so the whole tree stops resolving.",
+        "lift": "A typescript-eslint release whose typescript peer range admits the next TypeScript minor or major.",
+        "evidence": "https://github.com/Vadymk95/template-1/commit/46ec7e3"
+    },
+    {
+        "package": "eslint",
+        "held": ">=10.12.0 <11",
+        "reason": "eslint-plugin-react and eslint-plugin-jsx-a11y peer eslint only up to 9 and are forced onto the installed eslint through package.json overrides; a major would again outrun those peers.",
+        "lift": "Both plugins (and typescript-eslint) declare an eslint peer that includes 11 without needing the override.",
+        "evidence": "https://github.com/Vadymk95/template-1/commit/46ec7e3"
+    },
+    {
+        "package": "@eslint/js",
+        "held": ">=10.0.1 <11",
+        "reason": "Moves in lockstep with eslint (peers eslint ^10.0.0).",
+        "lift": "Lifts together with eslint.",
+        "evidence": "https://github.com/Vadymk95/template-1/commit/46ec7e3"
+    },
+    {
+        "package": "@types/node",
+        "held": ">=24.19.1 <25",
+        "reason": "Aligned with engines.node >=24 (Node 24 LTS): the type definitions must not describe APIs the runtime does not have.",
+        "lift": "engines.node moves to a newer major.",
+        "evidence": "https://github.com/Vadymk95/template-1/commit/c2faace"
+    }
+]

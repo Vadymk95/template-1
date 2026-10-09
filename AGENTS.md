@@ -1,115 +1,53 @@
 # react-enterprise-foundation — agent guide
 
-Production-ready React 19 + Vite 8 (Rolldown) + TypeScript 6.0 SPA template — routing, Zustand + TanStack Query, i18next, Tailwind v4, Vitest + Playwright pre-configured.
+Production-ready React 19 SPA template. Stack and versions: the table in `.cursor/brain/PROJECT_CONTEXT.md`.
 
 ## Start here
 
-1. Read `.cursor/brain/PROJECT_CONTEXT.md` before any task. Architecture map: `.cursor/brain/MAP.md`. Danger zones: `.cursor/brain/SKELETONS.md`. What to run per change: `.cursor/brain/VERIFICATION.md`. Template seeds (do NOT remove as "dead code"): `.cursor/brain/TEMPLATE_SEEDS.md`. Wiring recipes for a real backend, auth, monitoring, analytics, flags, languages and hosting: `.cursor/brain/EXTENSIONS.md`.
-2. `.cursor/rules/*.mdc` are **binding for the files they cover** — read the rules relevant to the area you touch before the first edit.
+1. Read `.cursor/brain/PROJECT_CONTEXT.md`, then `READING_INDEX.md` beside it: it maps a situation to the two or three files that answer it. Also there: `MAP.md` (architecture), `SKELETONS.md` (danger zones), `VERIFICATION.md` (what to run per change), `TEMPLATE_SEEDS.md` (seeds, NOT dead code), `EXTENSIONS.md` (backend, auth, monitoring, analytics, flags, languages, hosting).
+2. `.cursor/rules/*.mdc` are **binding for the files they cover**: read the ones for the area you touch before the first edit (`global.mdc` § 0.1 lists which).
+3. Before sweeping the source, confirm the work is still needed (`git log --oneline -15` plus one grep) and LOOK instead of inferring (`npm run probe`). Name the files when you dispatch work to another agent.
 
-## Source of truth (tiebreaker)
+## Source of truth
 
-- **This file is the canonical guide for every tool.** Cursor and Codex load it natively; Claude Code loads it through the one-line import in `CLAUDE.md`. Edit THIS file; never grow the shim.
-- **Code is ground truth; this file is a verifiable pointer.** If a line here conflicts with the code, follow the CODE and fix or flag the stale line in the same session.
-
-## Stack
-
-React 19 · TypeScript 6.0 strict · Vite 8 (Rolldown) · Tailwind **v4** · shadcn/ui · Zustand 5 · TanStack Query 5 · React Router 7 · i18next · Vitest 4.1 (held back, see Version holds) · Playwright
+- **This file is canonical for every tool** (Claude Code loads it through the import in `CLAUDE.md`). Edit THIS file; never grow the shim.
+- **Code is ground truth; this file is a verifiable pointer.** A line that conflicts with the code is stale: follow the code, fix or flag the line in the same session.
+- **One canonical place per fact:** versions → `package.json`, commands → the table below, holds → `scripts/version-holds.json`, size budgets → `.size-limit.json`, why → `.cursor/brain/DECISIONS.md`. Everything else points.
 
 ## Critical rules
 
-**Tailwind v4** — no `tailwind.config.ts`. Theme lives in `src/index.css` (`@theme inline {}`). Dark mode via `.dark` class. Animations via `tw-animate-css`.
-
-**Components** — always extract logic to `useComponentName.ts` hook alongside the component. Declare in/out explicitly: `const X: FunctionComponent<Props> = () => …` or an explicit return type (`(): ReactElement`, hooks `(): UseXResult`) — enforced by `@typescript-eslint/explicit-function-return-type` (inline callbacks exempt). Interface callbacks use property style (`onSelect: (id: string) => void`), not method style — enforced by `method-signature-style`.
-
-**Pages** — lazy by default (`PageName.tsx` + `index.ts` with `lazy()`), wrap with `WithSuspense` in router.
-
-**Stores** — Zustand with `createSelectors`. Files in `src/store/<domain>/`, tests alongside.
-
-**i18n** — no hardcoded strings. Every user-visible string goes through `t()`.
-
-**Imports** — `@/` alias only, no relative `../../`. Order enforced by eslint-plugin-import-x.
-
-**Reuse first** — before creating any function/util/component/constant, search for an existing equivalent and extend it. Duplicate utilities are a violation, not a style choice.
-
-**Consistency beats preference** — match the surrounding file's style and patterns.
-
-**Content variance** — anything that renders authored copy is proven against content it has NOT seen:
-`minimal` / `typical` / `long` / `unbroken` for text, `none` / `one` / `many` for collections. The fixture
-is `/dev/ui/content-stress` (dev-only), measured by `e2e/dev/content-stress.spec.ts` at
-390 / 640 / 768 / 1024 / 1440; the assembled pages are measured by `e2e/layout-geometry.spec.ts`. Add a
-case when you add a content-bearing component. Two rules earned the hard way: the RANGE of widths a guard
-covers is part of its specification (a guard proven at one width usually just moves the defect), and a
-wrap class with no red-to-green proof gets deleted rather than kept "to be safe".
-
-**Rendering differences are measured, not predicted** — engines disagree about intrinsic sizing, font
-metrics (so any `ch` measure), scrollbar gutters and `forced-colors`. `CROSS_BROWSER=1` adds Firefox and
-WebKit to the geometry specs; CI runs that as its own job. Measured here: Firefox reports
-`clientWidth: 0` for an inline `<label>` per CSSOM while Chromium reports a box. Never reason about what
-an engine does — run it.
-
-## Entering this repo cheaply (read this before sweeping the source)
-
-Measured on a sibling project 2026-08-30: an agent's entry is ~93% READING SOURCE to find where
-things are and whether the task is still needed, and ~7% the documents that load automatically. So
-the levers are pointing and looking, in this order:
-
-1. **Open `.cursor/brain/READING_INDEX.md` first** — it maps a SITUATION ("about to change a shared
-   primitive") to the two or three files that answer it. It is a pointer file: it never restates a
-   rule, so it cannot go stale in the way a summary does.
-2. **Check the work is still needed** — `git log --oneline -15` plus one grep for the thing the task
-   names. Two of five lanes in that measurement returned "already done" after ~430k tokens; both
-   were five minutes of grep.
-3. **LOOK instead of inferring** - `npm run probe -- <route> [widths]` renders the route, saves a PNG per width under `.probe/` and prints the quantities the layout guards measure. One measurement replaces a round of reasoning about pixels; it is an instrument, never a gate.
-4. **Name the files when you dispatch work to another agent.** The largest observed difference
-   between a 33-tool-call lane and a 191-tool-call lane was how precisely the task pointed.
-
-**Where a rule must live** (which tool reads which file, and why a rule that must reach every tool
-belongs in this file): § Commands / the gate › Lanes › _Two tools, one file_. Verify what each tool
-loads before moving a rule between files.
+- **Tailwind v4**: no `tailwind.config.ts`; theme in `src/index.css` (`@theme inline {}`), dark mode via `.dark`.
+- **Components**: logic in `useComponentName.ts` beside the component; explicit in/out (`const X: FunctionComponent<Props> = () => …` or an explicit return type); interface callbacks in property style. ESLint enforces both.
+- **Pages** are lazy (`PageName.tsx` + `index.ts` with `lazy()`) under `WithSuspense`. **Stores**: Zustand with `createSelectors` in `src/store/<domain>/`, tests alongside.
+- **i18n**: every user-visible string goes through `t()`. **Imports**: `@/` alias only, never `../../`.
+- **Reuse first**: search for an existing function, util, component or constant before creating one; match the surrounding file.
+- **Content variance**: UI that renders authored copy is proven against content it has NOT seen (`minimal` / `typical` / `long` / `unbroken` text, `none` / `one` / `many` collections) on `/dev/ui/content-stress` (`e2e/dev/content-stress.spec.ts`; widths in `DECISIONS.md`); assembled pages by `e2e/layout-geometry.spec.ts`. Add a case with every content-bearing component. A wrap class with no red-to-green proof is deleted.
+- **Rendering differences are measured, not predicted**: `CROSS_BROWSER=1` adds Firefox and WebKit to the geometry specs.
 
 ## Commands / the gate
 
-**Five agent commands** in `.claude/commands/`, each mirrored by a thin shim in `.cursor/commands/` so
-Cursor and Claude Code behave identically — edit the `.claude/` file, never the shim. Each one puts the
-agent in a role, with this repo's own gate, danger zones and test infrastructure named inside it — so
-nothing has to be guessed or invented.
+Five agent commands in `.claude/commands/` (`/onboard` `/feat` `/test` `/review` `/docs`), each mirrored by a thin shim in `.cursor/commands/`: edit the `.claude/` file, never the shim. The tier law is the shared block below; this table is the repo's command list.
 
 ```bash
-/onboard   # get genuinely oriented: read the brain, VERIFY it against the code, report drift, stop
-/feat      # implement a feature: reuse check → scope → plan → test-first → gate → report
-/test      # write tests that hunt corner cases at integration seams, not the happy path
-/review    # senior review of the diff: leaks, security, bug-hunt algorithm, test strength
-/docs      # bring AGENTS.md + .cursor/brain/ back in line with the code and with master's history
-```
-
-Scripts:
-
-```bash
-npm run fix          # oxlint --fix → eslint --fix → prettier --write — the one remedy command
-npm test             # vitest run (the gate uses test:coverage — thresholds only apply with --coverage)
-```
-
-The gate:
-
-```bash
-npm run dev           # Vite dev server
-npm run verify:iter   # iteration tier: oxlint → tsc → vitest --changed (seconds; run per change)
-npm run verify:measure # MEASURE moment: build + look; add `-- e2e/<f>.spec.ts` for one preview-mode spec
-npm run e2e:one -- <spec> # one Playwright spec, FREE port, through the tracer
-npm run verify:push   # what pre-push runs: phase-aware (see gate-tiers.json / § the gate)
+npm run dev                # Vite dev server
+npm run fix                # oxlint --fix → eslint --fix → prettier --write: the one remedy command
+npm test                   # vitest run (the gate runs test:coverage)
+npm run verify:iter        # iterate: oxlint → tsc → vitest --changed (seconds; per change)
+npm run verify:measure     # MEASURE: build + look; `-- e2e/<f>.spec.ts` for one preview-mode spec
+npm run e2e:one -- <spec>  # one Playwright spec, free port, through the tracer
+npm run test:one -- <file> # one unit test file, through the tracer
 npm run probe -- <route> [widths] # LOOK: render, screenshot per width, print measured quantities
-npm run test:one -- <file> # one unit test file, through the tracer (not around it)
-npm run trace:report  # findings from .gate-trace.log (forbidden moments, budgets, worktrees)
-npm run docs:check    # docs class: paths, scripts, sentinels, versions, command table, dead docs, test quarantines, agent-memory imports (pre-commit when docs are staged; weekly CI adds --weekly)
-npm run verify        # THE gate: hooks → preflight → oxlint → format → typecheck → eslint (cached) → coverage → build
-                      # → web-vitals chunks → size-limit → playwright browsers → e2e
-npm run verify:ci     # verify + audit:gate — the CI chain; the push runs it in phase 1 (see below)
-npm run verify:full   # verify:ci + smoke:dev — adds the content-variance fixture (needs a dev server)
-npm run smoke:dev     # the content-stress fixture alone, against `vite dev`
-npm run test:e2e:prod # Playwright against `vite preview` (same mode as the gate)
-npm run bench:verify  # the gate step by step with timings, to attribute a slow run
-npm run test:mutation # StrykerJS strength gate — weekly `mutation.yml` job, NOT in verify (3m+ per run)
+npm run verify:push        # what pre-push runs; phase-aware (gate-tiers.json)
+npm run verify             # THE gate: hooks → version holds → preflight → oxlint → format → typecheck → eslint
+                           # → coverage → build → web-vitals chunks → size-limit → playwright browsers → e2e
+npm run verify:ci          # verify + audit:gate, the CI chain (alias: ci:local)
+npm run verify:full        # verify:ci + smoke:dev; before a PR touching a shared UI primitive, the shell or index.css
+npm run smoke:dev          # the content-stress fixture alone, against `vite dev`
+npm run test:e2e:prod      # Playwright against `vite preview` (same mode as the gate)
+npm run bench:verify       # the gate step by step with timings
+npm run trace:report       # findings from .gate-trace.log
+npm run docs:check         # docs drift (paths, scripts, versions, command table, dead docs); weekly CI adds --weekly
+npm run test:mutation      # StrykerJS strength gate: weekly mutation.yml, NOT in verify
 ```
 
 <!-- shared-harness:begin -->
@@ -228,68 +166,33 @@ that lives only in a conversation is not a plan.
 
 <!-- shared-harness:end -->
 
-`verify:full` is the rung to run before a PR that touched a shared UI primitive, the layout shell or
-`src/index.css`. It is not inside `verify` because it needs a second server on its own port; CI runs it as
-a mandatory `dev-smoke` job instead, so it cannot be forgotten.
+## Working agreements
 
-`ci:local` is an alias of `verify:ci`, kept for muscle memory across templates.
-
-**Pre-commit is repo-scoped, not staged-scoped.** `lint-staged` fixes and re-stages what you are
-committing, but for a partially staged file it restores the unstaged hunks _after_ fixing — so
-formatting drift used to survive a commit and only fail at push, leaving "already fixed but never
-committed" files in the tree. The hook now also runs `lint:oxlint`, `format:check` and `typecheck` over
-the whole repo and refuses the commit, naming the remedy: `npm run fix && git add -u`.
-
-**Bootstrap after clone**: `npm run prepare` (once) — `.npmrc` disables lifecycle
-scripts as a supply-chain guard, so husky hooks don't install themselves; the
-verify gate fails loudly if hooks are missing. Dependency cooldown is also on
-(`.npmrc` `min-release-age=3`, DAYS): a brand-new package or urgent patch needs
-`npm install <pkg> --min-release-age=0`.
-
-The gate is **zero-warnings**: `eslint --max-warnings 0`, `oxlint --deny-warnings`. If it fails, fix the cause — do **not** downgrade rules, silence warnings, or sprinkle `eslint-disable`. A directive that must stay names its rule and carries its reason (`-- why`); `@eslint-community/eslint-comments` fails the lint on a bare or blanket one. If a rule is genuinely wrong for a class of files, add a documented file-scoped override in `eslint.config.js` stating why (see the shadcn/ui and `*.queries.ts` overrides for the pattern).
-
-**Complexity ratchet** — `complexity` 10 / `max-depth` 3 / `max-params` 4 / `max-lines-per-function` 120 / `max-lines` 200 over `src/**`, tests exempt. Thresholds sit above the measured ceiling (see `DECISIONS.md`), so a hit means new drift: split the function first; raising a number needs a fresh measurement and a `DECISIONS.md` line.
-
-**Mutation testing** — `npm run test:mutation` (StrykerJS, weekly `mutation.yml` CI job). Coverage proves code RUNS under tests; the mutation score proves tests would CATCH a wrong implementation — the two disagree here by design (73% coverage vs a 41.95 score after the Stryker 10 bump, 2026-09). `thresholds.break` in `stryker.config.json` is a measured floor-of-record: raise it after a good run, never lower it to go green.
+- **Bootstrap after clone**: `npm run prepare` once (`.npmrc` disables lifecycle scripts, so husky does not self-install; `verify` fails loudly without hooks). `.npmrc` `min-release-age=3` (days): a brand-new package or an urgent patch needs `npm install <pkg> --min-release-age=0`.
+- **Zero warnings** (`eslint --max-warnings 0`, `oxlint --deny-warnings`): fix the cause, never downgrade a rule or sprinkle `eslint-disable`. A directive that must stay names its rule and carries its reason (`-- why`). A rule wrong for a class of files gets a documented file-scoped override in `eslint.config.js`.
+- **Complexity ratchet**: `complexity` 10 / `max-depth` 3 / `max-params` 4 / `max-lines-per-function` 120 / `max-lines` 200 over `src/**`, tests exempt. A hit means new drift: split the function. Raising a number needs a fresh measurement (`DECISIONS.md`).
+- **Mutation score** shows whether tests would CATCH a wrong implementation; coverage only shows they RUN it. `thresholds.break` in `stryker.config.json` is a measured floor: raise it after a good run, never lower it to go green.
+- **Machine-agnostic configs**: no absolute local paths (the VS Code i18next extension rewrites `i18next.i18nPaths`: keep them relative), and no DURATION measured on one machine. `gate-tiers.json` holds a ratio and a sample size; the gate calibrates its own baseline into the gitignored `.gate-budget.json`.
 
 ## Version holds (do not "fix" by bumping)
 
-- **ESLint is 10.x** — the 9.x hold was lifted ahead of the 2026-08-06 end of life. Two plugins still cap their `eslint` peer below 10 (`eslint-plugin-react` at `^9.7` and `eslint-plugin-jsx-a11y` at `^9`), so each has an `overrides` entry mapping that peer to `$eslint`. Do not remove them, and do not reach for `--legacy-peer-deps`. **`settings.react.version` must stay a literal, never `'detect'`** — see `DECISIONS.md`.
-- **TypeScript stays `~6.0.x`** — `typescript-eslint` peer is `<6.1.0` (re-checked 2026-10-07 on 8.71.1). TS 7 exists; do not bump until the peer widens.
-- **`oxlint` tilde-tracks `eslint-plugin-oxlint`** — lockstep releases; the plugin pins `~<its version>`.
-- **`@types/node` stays 24.x** — types match `engines.node >= 24`, not the newest Node (2026-10-07: 24.19.1 is the newest 24.x).
-- **`msw` stays 2.x (`^2.15.0`)** — `msw` 3 removed the `msw/core/http` export that `@vitest/mocker` (4.1.11 and 5.0.3) imports in vitest browser mode, and the mocker peers `msw ^2.4.9`. `dependabot.yml` ignores `msw >=3`; do not paper over it with an `overrides` entry. Lift when a vitest release widens that peer to include 3; the migration notes are in `DECISIONS.md` § "[2026-10] Dependency refresh".
-- **vitest and `@vitest/coverage-v8` stay `^4.1.11` in this repo** — under vitest 5.0.2 the weekly
-  mutation gate scored 9.59 (cold run) against the `thresholds.break` floor of 40; on 4.1.11 it scores
-  43.49. Re-probed 2026-10-07 on vitest 5.0.3: the one-file probe scored 5.88 against 88.24 on 4.1.11 (msw 2.15.0).
-  `dependabot.yml` ignores `vitest >=5` and `@vitest/coverage-v8 >=5`. Lift trigger and the
-  numbers: `DECISIONS.md` § "[2026-10] vitest 5 hold".
+`scripts/version-holds.json` is the list (range, reason, lift condition, evidence). `scripts/check-version-holds.mjs`, inside `verify`, fails a manifest or lockfile outside a range and a missing Dependabot `ignore`. Why: `DECISIONS.md`.
 
-## Machine-agnostic configs
-
-Committed configs must never contain absolute local paths. The VS Code i18next extension rewrites `i18next.i18nPaths` with absolute paths when it can't resolve the configured ones — keep them relative and existing.
-
-**Nor a DURATION measured on one machine.** A committed number of seconds is the same mistake in a different costume: it describes the hardware that measured it, and a fork on slower hardware inherits a ceiling it may be unable to meet. Measured spread between this workstation and a two-core CI runner, same two suites: 5.6x and 10.5x. So the push budget in `scripts/gate-tiers.json` holds a RATIO and a sample size, never seconds; the gate calibrates its own baseline from its own first runs into the gitignored `.gate-budget.json`, ratchets it down when the gate gets faster, and reports drift. A clone starts with no baseline, no red reading, and no number belonging to someone else.
+- **`vitest` + `@vitest/coverage-v8` stay 4.x** (vitest 5 collapses the Stryker gate). **`msw` stays 2.x**: no `overrides` entry to paper over msw 3.
+- **TypeScript stays `~6.0.x`** (typescript-eslint peer). **`@types/node` stays 24.x** (matches `engines.node`).
+- **ESLint + `@eslint/js` stay 10.x**: keep the `$eslint` `overrides` for `eslint-plugin-react` and `eslint-plugin-jsx-a11y`, never `--legacy-peer-deps`; `settings.react.version` stays a literal, never `'detect'`.
+- **`oxlint` tilde-tracks `eslint-plugin-oxlint`** (lockstep releases).
 
 ## Out of scope (ask before touching)
 
-- Weakening the verify gate, lint severities, or coverage thresholds to get green.
-- Removing template scaffolding listed in `.cursor/brain/TEMPLATE_SEEDS.md`.
-- Node engine bump (`engines.node`).
+Weakening the verify gate, lint severities or coverage thresholds to get green · removing scaffolding listed in `.cursor/brain/TEMPLATE_SEEDS.md` · a Node engine bump (`engines.node`).
 
 ## Changes reach master through a pull request
 
-Branch, run the gate, push the branch, open a PR, merge when CI is green.
+Branch, run the gate, push the branch, open a PR, merge when CI is green. Here `master` has a ruleset requiring the `validate` check, and the owner role can bypass it with a direct push: don't. **A fork inherits files, not settings:** it arrives with the whole gate and none of the enforcement until you switch it on (`README.md` § "What your fork does not inherit").
 
-In THIS repository that is not only a habit: `master` carries a ruleset requiring the `validate` check, and a direct push bypasses it, because the owner role always may. A rule bypassed on every change is worse than no rule — it reads as protection to the next person and to every agent, and protects nothing.
-
-**In YOUR fork the habit is all there is, until you set the rest up.** Rulesets, branch protection and required checks are repository SETTINGS, and settings do not travel with a fork — only files do. So a fork arrives with the whole gate and none of the enforcement: the hooks still run locally, CI still runs on pull requests, and nothing at all stops a push straight to your default branch. `README.md` § "What your fork does not inherit" lists what to switch on and in what order.
-
-## Commit format
-
-`type(scope): description` — max 96 chars.
-Types: `feat` `fix` `chore` `docs` `style` `refactor` `perf` `test` `revert` `build` `ci`
+**Commit format**: `type(scope): description`, max 96 chars. Types: `feat` `fix` `chore` `docs` `style` `refactor` `perf` `test` `revert` `build` `ci`.
 
 ## Maintaining this file
 
-Treat it like code. Add a rule when an agent or developer makes the same mistake twice — one line tied to the observed failure. Prune stale lines; a bloated file reduces compliance. One-line digests only — depth lives in `.cursor/brain/`.
+Keep it under 200 lines. Add a rule when an agent or developer makes the same mistake twice: one line tied to the observed failure. Prune stale lines; a bloated file reduces compliance. Depth lives in `.cursor/brain/`.

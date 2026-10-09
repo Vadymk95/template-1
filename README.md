@@ -62,6 +62,7 @@ After cloning, these are the exact files / symbols to edit to make the template 
 - **`src/index.css`** — brand theme tokens in `:root` and `.dark`: the HSL triples `--primary`, `--secondary`, `--accent`, `--ring`, `--chart-1`…`--chart-5`, plus the `--radius` scale. Currently Google Blue.
 - **`LICENSE`** + **`README.md`** — replace the copyright holder (currently `Vadym Kononenko`) and the `# React Enterprise Foundation` heading / intro. MIT suits an open-source fork; for a proprietary app, swap the MIT text for a proprietary or `UNLICENSED` notice.
 - **Template seeds** — when you outgrow the demo modules, follow [`.cursor/brain/TEMPLATE_SEEDS.md`](.cursor/brain/TEMPLATE_SEEDS.md) to graduate or remove them.
+- **Decisions and holds** — start your own `.cursor/brain/DECISIONS.md` fresh with a one-line pointer to this template's history (`git log -p -- .cursor/brain/DECISIONS.md` in the template repo). Keep `scripts/version-holds.json`: `verify` fails on a drift, and each hold is re-checked against your own Dependabot PRs, lifted when its condition is met.
 
 ## 🚀 Tech Stack
 
@@ -269,7 +270,7 @@ Five commands in `.claude/commands/` (`/onboard`, `/feat`, `/test`, `/review`, `
 2. TDD gate — a staged `src` logic file with no co-located `*.test.*` blocks the commit
 3. **Repo-wide** `lint:oxlint`, `format:check` and `typecheck`
 
-Why step 3 exists: `.cursor/brain/DECISIONS.md` [2026-07] § Pre-commit is repo-scoped. On failure the
+Why step 3 exists: `.cursor/brain/DECISIONS.md` › "The gate is `verify`", paragraph "Pre-commit is repo-scoped". On failure the
 hook prints the remedy: `npm run fix && git add -u`.
 
 **Commit message** (Commitlint): `type(scope): subject`, max 96 chars.

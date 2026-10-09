@@ -7,8 +7,7 @@ actual gate, its actual reuse locations and its actual danger zones, so nothing 
 
 ## 0. Before reading anything: is this still needed, and where does it live?
 
-Two questions, both cheap; both measured as the largest recoverable waste in a lane's entry
-(`AGENTS.md` § Entering this repo cheaply):
+Two questions, both cheap (`AGENTS.md` § Start here):
 
 1. **Is the work still needed?** `git log --oneline -15` and one grep for the thing the task names.
    Say what you checked.

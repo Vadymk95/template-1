@@ -1,15 +1,15 @@
 # react-enterprise-foundation — Project Context
 
-## Purpose
-
-Production-ready React SPA template. Copy, rename, start building. Includes all the boring setup (DX tooling, i18n, routing, state, testing, CI) so you don't repeat it.
+Production-ready React SPA template. Copy, rename, start building: DX tooling, i18n, routing, state, testing and CI are already wired.
 
 ## Tech Stack
+
+The one stack table. Versions are `package.json`; held packages are `scripts/version-holds.json`.
 
 | Layer        | Choice                            | Version                                   |
 | ------------ | --------------------------------- | ----------------------------------------- |
 | UI           | React                             | 19                                        |
-| Language     | TypeScript                        | 6.0 strict                                |
+| Language     | TypeScript                        | 6.0 strict (held)                         |
 | Bundler      | Vite + Rolldown (official `vite`) | 8                                         |
 | Styling      | Tailwind CSS                      | **v4** (CSS-based config)                 |
 | Components   | shadcn/ui (new-york)              | latest                                    |
@@ -18,7 +18,7 @@ Production-ready React SPA template. Copy, rename, start building. Includes all 
 | Routing      | React Router                      | 7                                         |
 | Forms        | react-hook-form + zod             | 7 / 4                                     |
 | i18n         | i18next + react-i18next           | 26 / 17                                   |
-| Testing      | Vitest + Testing Library          | 4.1 (held, see AGENTS.md § Version holds) |
+| Testing      | Vitest + Testing Library          | 4.1 (held)                                |
 | Linting      | ESLint 10 flat + Oxlint (staged)  | 10 / 1.x                                  |
 | Formatting   | Prettier                          | 3                                         |
 | Git hooks    | Husky + commitlint + lint-staged  | 9 / 21                                    |
@@ -28,109 +28,38 @@ Production-ready React SPA template. Copy, rename, start building. Includes all 
 ```
 src/
   components/
-    common/      # App-level: ErrorBoundary, RouteErrorBoundary, RouteSkeleton, SkipLink, I18nInitErrorFallback, ThemeToggle, LanguageSwitcher
-    layout/      # Header, Footer, Main (`#main` landmark + route-focus hook)
+    common/      # ErrorBoundary, RouteErrorBoundary, RouteSkeleton, SkipLink, I18nInitErrorFallback, ThemeToggle, LanguageSwitcher
+    layout/      # Header, Footer, Main (`#main` landmark)
     ui/          # shadcn/ui primitives
-  hocs/          # WithSuspense, ProtectedRoute (auth gate for nested routes)
-  hooks/
-    a11y/        # useRouteFocus — focus `#main` on client navigations (skips first paint)
-    i18n/        # useI18nReload (dev HMR)
-    theme/       # useTheme (light / dark / system)
-    <domain>/    # Feature hooks with tests alongside
-  mocks/
-    browser.ts   # DEV-only MSW `setupWorker` (handlers from `test/handlers`)
+  hocs/          # WithSuspense, ProtectedRoute
+  hooks/         # a11y/ (useRouteFocus), i18n/ (useI18nReload), theme/ (useTheme), <domain>/ with tests alongside
+  mocks/browser.ts   # DEV-only MSW worker (handlers from test/handlers)
   lib/
-    api/         # client, auth; `greeting.*` = minimal wired Query + transport (HomePage); `_example.*` = unwired pattern seeds
+    api/         # client, auth; `greeting.*` = wired Query + transport (HomePage); `_example.*` = unwired pattern seeds
     i18n/        # i18next setup, constants, resources
     webVitals/   # subscribeStandard / subscribeAttribution (loaded from vitals.ts)
-    queryClient.ts  # TanStack Query client factory
-    vitals.ts, logger, utils  # observability + cn()
-  pages/
-    HomePage/       # Index route (not lazy); `index.ts` re-exports `HomePage.tsx`
-    LoginPage/      # Auth UI (lazy)
-    DashboardPage/  # Behind ProtectedRoute (lazy)
-    NotFoundPage/   # Catch-all (lazy)
-    DevPlayground/  # DEV-only sandbox
-  router/
-    index.tsx    # createBrowserRouter assembly
-    modules/     # base.routes.tsx (+ future route modules)
-    routes.ts    # Path constants (e.g. DevPlayground → /dev/ui)
-  store/
-    user/        # userStore + tests
-    utils/       # createSelectors
-  test/
-    setup.ts, server.ts, handlers.ts, test-utils
+    queryClient.ts, vitals.ts, logger, utils (cn)
+  pages/         # HomePage (eager index route), LoginPage, DashboardPage (behind ProtectedRoute), NotFoundPage, DevPlayground (DEV-only) — all but the index lazy
+  router/        # index.tsx (createBrowserRouter), modules/ (route modules), routes.ts (path constants)
+  store/         # user/ (userStore + tests), utils/ (createSelectors)
+  test/          # setup.ts, server.ts, handlers.ts, test-utils
   env.ts         # @t3-oss/env-core validated public env
 ```
 
+Flows, the "add a page / feature" recipes, routing: `MAP.md`.
+
 ## Key Patterns
 
-### TanStack Query — `queryOptions()` + key factories
-
-New features add a `queries.ts` (or `*.queries.ts`) under `src/lib/api/`: a stable **key factory** and **per-query** `queryOptions()` factories. Components call `useQuery(...)` with those options directly; add a thin custom hook only when it wraps real logic (not for every fetch). Unwired pattern reference: `_example.queries.ts`; minimal wired example used on the home route: `greeting.queries.ts`.
-
-### Tailwind v4 (IMPORTANT — no tailwind.config.ts)
-
-- Config lives in `src/index.css` via `@theme inline {}`
-- Dark mode via `@custom-variant dark (&:where(.dark, .dark *))`
-- Animations via `tw-animate-css` (import in CSS, not a JS plugin)
-- Custom animations defined as `@keyframes` + `--animate-*` in `@theme`
-
-### Components: presentational + hook
-
-Feature components use a folder per component: UI in `ComponentName.tsx`, logic in `useComponentName.ts`, tests alongside. Layout and shared pieces follow the same idea where it applies.
-
-### Stores: Zustand + createSelectors
-
-`createSelectors` enables `useStore.use.field()` auto-selectors; the standard callback selector remains available. See `src/store/user/` for the persisted user store pattern.
-
-### Pages: lazy by default
-
-Non-index routes use `PageName.tsx` plus `index.ts` with `lazy(() => import('./PageName'))`; the router wraps lazy pages in `WithSuspense`. The home index route stays eager.
+- **TanStack Query**: a `queries.ts` under `src/lib/api/` holds a stable key factory and per-query `queryOptions()` factories; components call `useQuery(...)` with them directly, and a thin hook only wraps real logic. Unwired reference: `_example.queries.ts`; wired and minimal: `greeting.queries.ts`.
+- **Components**: a folder per component, UI in `Name.tsx`, logic in `useName.ts`, tests alongside (`react-patterns.mdc` § 2).
+- **Stores**: Zustand with `createSelectors` (`useStore.use.field()`); the persisted user store in `src/store/user/` is the pattern.
 
 ### i18n namespace strategy
 
-Current (`src/lib/i18n/constants.ts`): all four scaffolded namespaces are
-**eager** — `DEFAULT_NAMESPACES = ['common', 'errors', 'home', 'auth']`,
-`LAZY_NAMESPACES = []`. They preload alongside the i18n init promise the app
-gates on. To add a lazy feature namespace:
-
-1. Move it from `DEFAULT_NAMESPACES` (or add fresh) to `LAZY_NAMESPACES`.
-2. Inside the consuming feature: `useTranslation('feature-namespace')` triggers
-   the lazy fetch via `i18next-http-backend` on mount.
-3. Wrap in `<WithSuspense>` if you want a fallback during the fetch.
-
-The eager-by-default posture is intentional for a small (<10 KB) JSON tree —
-predictable LCP, no double waterfall, no "translation flash" on lazy mount.
-Once a namespace exceeds ~5 KB or is route-bounded, move it to lazy.
-
-### Route focus (a11y)
-
-- `useRouteFocus` in `App` receives a ref to `Main` (`#main`, `tabIndex={-1}`); on pathname change (not initial mount) focus moves to the landmark for WCAG 2.4.1; `data-route-focus` gates focus-ring styling in CSS.
-
-### Web Vitals
-
-- `src/lib/vitals.ts` — lazy reporting after hydration; optional `VITE_WEB_VITALS_ATTRIBUTION=true` loads `web-vitals/attribution` via `subscribeAttribution.ts` (flag also in `src/env.ts` for Zod/docs; **branch uses `import.meta.env`** so Vite drops the unused chunk). Load failures: `logger.warn` with context.
-- Custom backend: pass `reportWebVitals(yourReporter)`.
-- **Re-verify chunk split:** after `npm run build`, `npm run verify:web-vitals-chunks` (checks existing `dist/`; CI runs it after build). Full regression (two builds: default + attribution): `npm run verify:web-vitals-chunks:full`.
-
-### Pre-i18n shell
-
-- `index.html` `#i18n-boot` + `src/index.css`: decorative spinner while `html.i18n-loading` (no translated strings — i18n not ready).
+All four scaffolded namespaces are eager (`src/lib/i18n/constants.ts`: `DEFAULT_NAMESPACES = ['common', 'errors', 'home', 'auth']`, `LAZY_NAMESPACES = []`) and preload with the i18n init promise the app gates on. Eager is intentional for a small (<10 KB) JSON tree: predictable LCP, no double waterfall, no translation flash. Go lazy once a namespace exceeds about 5 KB or is route-bounded: move it to `LAZY_NAMESPACES`; `useTranslation('feature-namespace')` then fetches it through `i18next-http-backend` on mount, wrapped in `<WithSuspense>` for a fallback.
 
 ## Dev Tooling
 
-- **The gate, its moments and its scripts** — `AGENTS.md` § Commands / the gate is the only definition (which script belongs to which moment, the push phases, what is forbidden by hand). Stage timings and what was deliberately not added: `.cursor/brain/VERIFICATION.md`. The full script list: `package.json`. Nothing about the gate is repeated in this file.
-- `npm run audit:gate` — fail-closed dependency audit (`scripts/audit-gate.mjs`): blocks every high/critical advisory, an expired or stale allowance in `scripts/audit-allowlist.json`, and its own inability to complete.
-- `npm run test:e2e:prod` — Playwright against `vite preview` (same mode as CI / the gate); a fresh preview per run, retries and the single worker only on real `CI`, and there a test that passes only on retry still fails the run (`failOnFlakyTests`). Browsers are installed on demand by `scripts/ensure-playwright.mjs`, which reads the exact build paths out of `playwright install --dry-run`.
-- `npm run dev` — Vite dev server (`vite.config.ts` pins port 3000). ESLint runs via the IDE extension (recommended in `.vscode/extensions.json`) and in `lint-staged` — no in-Vite linter.
-- `npm run build` — `tsc -b` then Vite production build (Rolldown)
-- `npm run verify:web-vitals-chunks` — asserts chunk split on the current `dist/` (run after `build`); `verify:web-vitals-chunks:full` — two production builds asserting standard vs attribution variants (use after changing `src/lib/vitals.ts` or env wiring)
-- `npm run size:check` — per-chunk brotli budgets from `.size-limit.json`
-- `npm run build:analyze` — bundle visualizer (`ANALYZE=true`)
-- `npm run typecheck` — `tsc -b` only
-- `npm run test` — Vitest run; the gate uses `test:coverage` (`AGENTS.md` § Commands).
-- `npm run lint` — **ESLint 10** flat: `typescript-eslint` **strict + stylistic** (type-aware), `import-x` (**order**, **no-cycle**, **no-restricted-paths** for layer boundaries), `no-magic-numbers`, a raw-hex ban in `components`/`pages`, `i18next/no-literal-string`, parent-relative imports under `src/**` restricted (use `@/` or `@locales/`); `vite-plugins/**` may use `../src/**` (loads before Vite resolves `@/`). `settings.react.version` is pinned to a literal — `'detect'` crashes under ESLint 10, see `DECISIONS.md`.
-- **E2E** — Playwright (`e2e/`, `playwright.config.ts`): local default `npm run test:e2e` starts **`vite` dev** on port 3000; CI / `test:e2e:prod` / `PLAYWRIGHT_USE_PREVIEW=1` uses **`vite preview`** on 4173 after `build`. The home, login and not-found specs end with `expectNoSevereA11yViolations` (`e2e/support/a11y.ts`, axe-core): a serious or critical violation fails the spec, with `target-size` opted in because axe ships it off. The scan adds no `test()`; it rides on navigations the specs already make.
-- **Security workflow** — `.github/workflows/security.yml`: gitleaks over full history, CodeQL `security-extended` and zizmor over the workflow files (fails at Medium or above), on push, PR and a weekly cron. Runs in parallel with `validate`, not from `verify`. Exclusions live in `.github/codeql/codeql-config.yml` and `.github/zizmor.yml` with their reason.
-- **Agent commands** — `.claude/commands/`: `/onboard`, `/feat`, `/test`, `/review`, `/docs`, each mirrored by a shim in `.cursor/commands/`.
+- **The gate, its moments and scripts**: `AGENTS.md` § Commands / the gate is the only definition; stage timings and what was deliberately not added: `VERIFICATION.md`; the full script list: `package.json`.
+- `npm run dev` serves on port 3000 (`vite.config.ts`). ESLint runs through the IDE extension (`.vscode/extensions.json`) and `lint-staged`, not inside Vite.
+- **E2E**: Playwright (`e2e/`, `playwright.config.ts`). Local `npm run test:e2e` starts `vite` dev on 3000; CI, `test:e2e:prod` and `PLAYWRIGHT_USE_PREVIEW=1` use `vite preview` on 4173 after `build`. Browsers install on demand through `scripts/ensure-playwright.mjs`.

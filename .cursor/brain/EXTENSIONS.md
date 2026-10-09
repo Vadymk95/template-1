@@ -14,7 +14,7 @@ It points and never restates. Seeds and the graduation contract live in [`TEMPLA
 
 **Every install**, before the first line of integration code:
 
-1. `.cursor/rules/performance.mdc` § 4 is a hard gate: run `npm run build:analyze`, then `npm run size:check`. The total JS budget is 183 KB brotli and was measured at 166.31 KB on 2026-10-03 (`.cursor/brain/DECISIONS.md`), so about 16.7 KB of headroom is shared by everything below. A dependency that does not fit is dynamic-imported or replaced, never fitted by raising a cap; a raised cap needs explicit sign-off. Async chunks count toward the total.
+1. `.cursor/rules/performance.mdc` § 4 is a hard gate: run `npm run build:analyze`, then `npm run size:check`. The total JS budget in `.size-limit.json` is shared by everything below; `size:check` prints the current headroom (`.cursor/brain/DECISIONS.md` § size-limit brotli budgets). A dependency that does not fit is dynamic-imported or replaced, never fitted by raising a cap; a raised cap needs explicit sign-off. Async chunks count toward the total.
 2. `.npmrc` sets `min-release-age=3` (days): a package younger than that is refused. For an urgent or brand-new package use `npm install <pkg> --min-release-age=0`, and say why in the PR.
 3. `npm run audit:gate` is fail-closed and must stay green after the install.
 4. A change to a TanStack Query contract, an API payload, a Zustand store or the router is plan, then approval, then implementation (`.cursor/rules/workflow.mdc` § The Approval Law). Steps below marked **Approval Law** are such changes.
@@ -149,7 +149,7 @@ Copy the shape of `src/lib/api/_example.queries.ts` (`all` / `lists` / `list(fil
 The dev worker starts only when `import.meta.env.DEV && VITE_ENABLE_MSW !== 'false'` (`src/main.tsx`), so the default in dev is ON.
 
 1. Per developer: `VITE_ENABLE_MSW=false` in `.env.local` [vite-env].
-2. Per project: when most endpoints are real, flip the gate in `src/main.tsx` to opt-in. Keep the `import.meta.env.DEV` guard and the dynamic import: dropping it ships a 409.60 KB (72.93 KB brotli) MSW chunk, measured and recorded in `.cursor/brain/DECISIONS.md` (F3).
+2. Per project: when most endpoints are real, flip the gate in `src/main.tsx` to opt-in. Keep the `import.meta.env.DEV` guard and the dynamic import: dropping it ships the MSW chunk to production and turns the total-JS budget red (`.cursor/brain/DECISIONS.md` § Guard audit).
 3. Mixed mode: keep MSW for endpoints the backend does not have yet and let the rest through with `onUnhandledRequest: 'bypass'` (already set in `src/main.tsx`) [msw].
 
 `public/mockServiceWorker.js` stays for dev; the `removeMswPlugin` in `vite.config.ts` deletes it from `dist`. Handlers in `src/test/handlers.ts` match with `**/api/<path>` globs. If your real base path is not `/api`, they stop matching (_inference_), and `src/test/setup.ts` runs the server with `onUnhandledRequest: 'error'`, so the unit tests fail loudly rather than silently: good, then fix the globs to follow `API_BASE_URL`. Override per test with `server.use()` [msw].

@@ -39,7 +39,7 @@ export const Input: FunctionComponent<InputProps> = ({ label, ref, ...props }) =
 - **Components must be maximally presentational** — UI only.
 - **Extract runtime orchestration to a local hook** next to the component: `useComponentName.ts`.
 - **Extract pure deterministic computation to utilities** (`src/lib/` or local utility file).
-- **Mixed logic rule**: split pure computation out first; keep the hook as a thin orchestration layer.
+- **Mixed logic rule**: split pure computation out first; keep the hook as a thin orchestration layer. Hook = needs the React runtime (effects, subscriptions, timers, browser/DOM APIs, store mutations, navigation, async UI state in handlers); utility = pure and deterministic (mapping, filtering, sorting, formatting, parsing, validation). Never keep unit-testable business computation in a hook.
 - Component imports hook: `import { useComponentName } from './useComponentName'`.
 - **Folder ladder (this template, flat — not FSD):** `src/components/{ui,common,layout}` → `hocs/` → `hooks/<domain>/` → `pages/<Page>/` (with its page-local `use<Page>.ts`) → `router/`; `lib/` and `store/<domain>/` sit beneath the UI layers and never import `components` or `pages` (`import-x/no-restricted-paths` in `eslint.config.js`).
 

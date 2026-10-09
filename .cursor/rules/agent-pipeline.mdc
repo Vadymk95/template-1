@@ -5,102 +5,45 @@ alwaysApply: true
 priority: 100
 ---
 
-# Agent Pipeline — Principal Autonomy Engine
+# Agent Pipeline
 
-> Defines the **process**. Quality standards live in domain rules. Pipeline enforces them — never bypass it.
+> The **process**. Quality standards live in the domain rules; the pipeline enforces them — never bypass it.
 
----
+## Step 1: Discovery (mandatory)
 
-## Step 1: Deep Discovery (mandatory)
+Fast-track: a task touching only `*.css`, `public/locales/**/*.json`, `*.test.ts(x)`, `*.spec.ts` or `*.md` skips the Brain reads. State `Step 1 skipped — styling/i18n/test/docs task.` and still emit the Rule Receipt. In doubt, run the full step.
 
-### Step 1 Fast-Track
+1. Read `.cursor/brain/MAP.md` (topology, data flows, routes) and `.cursor/brain/SKELETONS.md` (danger zones).
+2. Search the codebase for existing implementations of similar logic.
+3. Read the conditional rules `global.mdc` § 0.1 maps to the task.
+4. Before any code, declare in one message: In-scope / Out-of-scope, SKELETONS zones touched (or "none"), and the Rule Receipt — `Rules loaded: <names>` or `Rules loaded: none (always-on only).`
 
-If the task targets **only** files matching `*.css`, `*.i18n.*`, `public/locales/**/*.json`, `*.spec.ts`, `*.test.ts`, or `*.md` — skip Brain reads and proceed directly to Step 3. State: `"Step 1 skipped — styling/i18n/test/docs task."` Still emit the **Rule Receipt** (step 7 below) for the conditional rules the task area maps to. When in doubt → run full Step 1.
+Gate: a SKELETONS zone touched → flag the risk and propose mitigation before Step 2.
 
----
+## Step 2: Simulation
 
-Before any reasoning about implementation:
+- A task over 3 steps: `sequential-thinking` (if available), `totalThoughts >= 3`, one thought adversarial ("what could break?").
+- Critique: `@/` aliases, no cycles; Zustand for global state only, TanStack Query for server state only (`createSelectors`, direct store import, no `index.ts` re-export); no magic strings, implicit coupling or untyped contracts; every planned edit strictly necessary.
+- Trace 1–2 cases (happy path + edge) per non-trivial function; a surprise revises the plan before code.
 
-1. **Brain Scan**: Read `.cursor/brain/MAP.md` (store topology, data flows, routes, component wiring).
-2. **Risk Detection**: Read `.cursor/brain/SKELETONS.md` — check if task touches any danger zone.
-3. **Context Gathering**: Identify affected files (components, hooks, stores, API). Search codebase for existing implementations of similar logic.
-4. **Scope Declaration**: Produce clear **In-scope / Out-of-scope** list.
-5. **Rule Routing**: Load the matching conditional rules using `global.mdc` §0.1 before planning edits.
-6. **Rule Receipt**: List the conditional `.mdc` rules actually loaded (e.g. `Rules loaded: react-patterns, performance, engineering-standards`). If none apply, state `"Rules loaded: none (always-on only)."`
-7. **Explicit declaration**: State in one message: scope + SKELETONS zones touched (or "none"). Do not code before this.
+Gate: present the critique; gate by **risk, not LOC** (`workflow.mdc` § The Approval Law).
 
-> **Gate**: If task touches a SKELETONS zone — flag the risk and propose mitigation before Step 2.
+## Step 3: TDD-first execution
 
----
-
-## Step 2: Architectural Simulation
-
-### Inference-Time Scaling
-
-Before simulating changes:
-
-- Activate `sequential-thinking` (if available in your environment) with `totalThoughts >= 3` for any task > 3 steps.
-- Dedicate at least one thought to **adversarial analysis**: "What could go wrong? What existing behavior might break?"
-
-### Architectural Critique
-
-1. **Layer Compliance**: Does change respect `@/` alias boundaries? No relative `../../`? No circular deps?
-2. **State Boundary**: Zustand for global state only. TanStack Query for server state only. Local state for component-only concerns.
-3. **Tech Debt Check**: Will this create magic strings, implicit coupling, or untyped contracts?
-4. **Ghost Principle Audit**: Is every planned modification strictly necessary? Flag "while I'm here" temptations.
-5. **Store Impact**: If Zustand touched — `createSelectors` used? Store isolated? Direct import (no index.ts re-export)?
-
-### Solver-Verifier (mental test cases)
-
-After the critique, generate **1–2 mental test cases** per non-trivial function:
-
-- Pick happy path + edge case.
-- Trace execution: "Given X, step 1 does A, step 2 does B, result is Y."
-- If trace reveals unexpected result — revise plan **before writing code**.
-
-> **Gate**: Present Architectural Critique. Gate by **risk, not LOC** (the risk list: `workflow.mdc` § The Approval Law). Trivial leaf edits proceed with brief notification.
-
----
-
-## Step 3: TDD-First Execution
-
-### For Business Logic (stores, hooks, utils)
-
-1. **Requirements**: List test cases explicitly in chat before coding.
-2. **Red**: Write failing tests (BDD: `describe`/`it`, Arrange-Act-Assert).
-3. **Green**: Write minimal code to pass.
-4. **Refactor**: Clean up while staying green.
-
-### For UI Components
-
-Implement directly → write integration tests via `renderWithProviders`.
+- Business logic (stores, hooks, utils): list the cases in chat → red (BDD, Arrange-Act-Assert) → minimal green → refactor.
+- UI components: implement, then integration tests via `renderWithProviders`.
 
 ### Iteration Protocol
 
-- **Batch size**: 1–2 files per iteration (an iteration is what sits between two `verify:iter` runs, INSIDE one PLAN slice — the slice is the 2-7 × <400-line unit of `AGENTS.md` › Before code). Never modify > 2 files without intermediate verification.
-- **Ghost Principle enforcement**: After each edit — "Did I modify ONLY what the task requires?"
-- **Pattern check**: Before writing new code — confirm no existing pattern already solves it.
-- **Style lock**: Match exact indentation (4 spaces), naming, formatting of surrounding code. Zero drift.
+- Batch of 1–2 files per iteration (what sits between two `verify:iter` runs, INSIDE one PLAN slice — the 2-7 × <400-line unit of `AGENTS.md` › Before code); never more than 2 files without verification.
+- After each edit: did I modify ONLY what the task requires? Does no existing pattern already solve it? Does it match the surrounding style (4 spaces, naming)?
+- Per file: read before editing; surgical edits; `@/` aliases; no magic strings; errors logged with module context (`resilience.mdc`), never bare `console.error(e)`; no `console.log`; orchestration in hooks, pure computation in utilities (`react-patterns.mdc` § 2).
 
-### Per-File Checklist
+## Step 4: Verification
 
-- [ ] Read file before editing (mandatory).
-- [ ] Surgical `StrReplace` — no full-file rewrites unless creating a new file.
-- [ ] Imports use `@/` aliases, never relative `../../`.
-- [ ] No magic strings/numbers — use constants.
-- [ ] Errors logged with explicit module context — follow `resilience.mdc` and never use bare `console.error(e)`.
-- [ ] No `console.log` left in code.
-- [ ] Hook vs utility split is explicit: runtime orchestration in hooks, pure computation in utilities.
-- [ ] If a hook contains pure computation, extract the pure part to a utility before finalizing.
+### 4.1 Automated checks
 
----
-
-## Step 4: Autonomous Verification Loop
-
-### 4.1 Automated Checks
-
-**The tier law lives in `AGENTS.md` § the gate — this file points at it and restates nothing.**
-What an implementer actually runs:
+The tier law lives in `AGENTS.md` § Commands / the gate › _The tier law_; this file restates nothing. What an implementer runs:
 
 ```bash
 npm run verify:iter                   # per change: oxlint → tsc (incremental) → vitest --changed
@@ -108,88 +51,38 @@ npm run e2e:one -- e2e/<file>.spec.ts # only the spec the change affects — fre
 npm run verify:measure                # need to LOOK at a built result? legal at any time
 ```
 
-Everything else about the gate — the push and its phases, CI, what is forbidden by hand, the
-superset rule, which scripts are drill-downs rather than moments — is `AGENTS.md` § Commands / the
-gate › _The tier law_, and is not repeated here.
-
 ### 4.1a Verification Integrity
 
 Green means nothing until you know the gate can go red.
 
-1. **Capture the exit code without a pipe**: `npm run verify:iter > /tmp/verify.log 2>&1; echo $?`. Piping
-   to `tail` returns the PIPE's status, so a failed build reads as a pass.
-2. **Mutation-check the tests (revert to prove failure)** — the manual discipline, not the
-   `npm run test:mutation` StrykerJS gate: if mentally reverting your change leaves the suite green,
-   the test is worthless. Writing a test is Step 3; proving it would have failed is this step.
-3. **Prove a new gate gates**: break it on purpose once — an expired entry in
-   `scripts/audit-allowlist.json`, a raw hex in a component, a staged `src` logic file with no
-   `*.test.*` sibling — and watch it refuse. Then revert the sabotage.
-4. **A check that reports success when it could not run is fail-OPEN.** Ask what it does on a missing
-   directory, an empty result, or no network — not only on the failure it was written for.
-5. **Name the condition under which the green would have been RED.** If you cannot name one, the check
-   proved nothing — and a check that cannot fail still gets recorded as evidence. Three real shapes in
-   this repo: a layout measurement taken while i18next still hides the document sees NO element and
-   passes every invariant vacuously; a Playwright `testMatch` that matches nothing collects zero tests
-   and exits 0; and `vitest --coverage` prints `Excluding it from coverage` for a file it could not
-   parse and then exits 0 with a percentage over a smaller set.
-6. **Check the cases that "cannot happen".** For UI that is: the shortest copy the schema allows, the
-   longest, one unbroken token with nothing to wrap on, zero items, one item, many — at every width
-   where it renders. That is the MEASURE moment — `npm run verify:measure -- <spec>` or
-   `npm run smoke:dev` for the dev-only fixture; `npm test` cannot see any of it, because jsdom has
-   no layout.
-7. **Do not reason about what a browser does — run it.** `CROSS_BROWSER=1` adds Firefox and WebKit to
-   the geometry specs (measured: `DECISIONS.md` § Cross-engine coverage).
+1. Exit code without a pipe: `npm run verify:iter > /tmp/verify.log 2>&1; echo $?`. A pipe to `tail` returns the pipe's status, so a failed build reads as a pass.
+2. Mutation-check the tests by hand (not the `test:mutation` StrykerJS gate): if mentally reverting your change leaves the suite green, the test is worthless.
+3. Prove a new gate gates: break it on purpose once (an expired `scripts/audit-allowlist.json` entry, a raw hex in a component, a staged `src` logic file with no `*.test.*` sibling), watch it refuse, revert.
+4. A check that reports success when it could not run is fail-open: ask what it does on a missing directory, an empty result, no network.
+5. Name the condition under which the green would have been RED; if you cannot, the check proved nothing. Real shapes here: a layout measurement taken while i18next still hides the document sees no element and passes vacuously; a Playwright `testMatch` matching nothing collects zero tests and exits 0; `vitest --coverage` prints `Excluding it from coverage` for a file it could not parse and exits 0.
+6. Check the cases that "cannot happen": shortest and longest copy, one unbroken token, zero / one / many items, at every width. That is the MEASURE moment (`npm run verify:measure -- <spec>`, `npm run smoke:dev` for the dev-only fixture); jsdom has no layout.
+7. Do not reason about what a browser does — run it (`CROSS_BROWSER=1`, `DECISIONS.md` § Cross-engine coverage).
 
-### 4.2 Self-Correction with Root Cause Analysis
+### 4.2 Root cause
 
-If any check fails:
+A failing check: no symptom patch. Trace to the origin (`sequential-thinking`), fix the cause, re-run the loop.
 
-1. **Do NOT patch the symptom.**
-2. Use `sequential-thinking` to trace error back to origin.
-3. Fix the **root cause**, not the surface error.
-4. Re-run full loop after fix.
+### 4.3 Review pass
 
-### 4.3 Manual Checks (code review pass)
+`rg` the changed files for `console.error(e)` without context; no new cycles or relative imports; no hardcoded user-visible strings (`t()`); no pure computation left in a hook.
 
-- Use `rg` on changed files to detect `console.error(e)` without context — all errors must follow the contextual pattern from `resilience.mdc`.
-- Verify no new circular imports or missing `@/` aliases.
-- Confirm no hardcoded user-visible strings — use `t()`.
-- Verify no pure business computation remains inside hooks when it is extractable to utility functions.
+### 4.4 Diff self-review (mandatory)
 
-### 4.4 Diff Self-Review (mandatory)
+Re-read every changed file: the diff matches the Step 2 plan, nothing is outside scope, no changed line breaks an existing caller.
 
-Re-read every changed file and verify:
+## Step 5: Brain sync
 
-1. **Plan alignment**: Does diff match Step 2 simulation? Flag unplanned additions.
-2. **Ghost Principle final check**: Anything outside original scope?
-3. **Regression scan**: Could any removed/changed line break an existing caller?
+Before completing, update `.cursor/brain/` where triggered: `MAP.md` (stores, routes, flows, wiring), `DECISIONS.md` (a pattern, deviation or trade-off true today; ≤30 lines, evidence link), `SKELETONS.md` (a risk found or mitigated). Nothing to update → `Brain sync: none needed.` Completing without the declaration is FORBIDDEN.
 
----
+## Step 6: Confidence
 
-## Step 5: Brain Auto-Sync
+Every task ends with `Confidence: HIGH | MEDIUM | LOW — <one-line reason>`.
 
-Before marking task complete:
-
-| Brain file (under `.cursor/brain/`) | Update trigger |
-|---|---|
-| `MAP.md` | New/changed stores, routes, data flows, component wiring |
-| `DECISIONS.md` | New architectural pattern, deviation from existing, trade-off made |
-| `SKELETONS.md` | New risk discovered, existing risk mitigated |
-| `DICTIONARY.md` | New domain term, acronym, or concept introduced |
-
-**Rule**: If no update needed — explicitly state: `"Brain sync: none needed."`
-**FORBIDDEN**: Completing a task without this declaration.
-
----
-
-## Step 6: Confidence Declaration
-
-Every task MUST end with:
-
-- `Confidence: HIGH` — all checks pass, diff aligns with plan, no SKELETONS touched, mental traces passed.
-- `Confidence: MEDIUM` — checks pass but task touched unfamiliar code or edge case not fully traceable. State what is uncertain.
-- `Confidence: LOW` — workaround applied, or SKELETONS risk mitigated but not eliminated. Requires review.
-
-Format: `Confidence: HIGH | MEDIUM | LOW — <one-line reason>`
-
----
+- HIGH: checks pass, diff matches the plan, no SKELETONS touched.
+- MEDIUM: checks pass but unfamiliar code or an edge not fully traceable; say what is uncertain.
+- LOW: a workaround, or a SKELETONS risk mitigated but not eliminated; needs review.
