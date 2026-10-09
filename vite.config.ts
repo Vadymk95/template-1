@@ -9,6 +9,7 @@ import compression from 'vite-plugin-compression';
 import { webfontDownload } from 'vite-plugin-webfont-dl';
 
 import pkg from './package.json' with { type: 'json' };
+import { fontPreload } from './vite-plugins/font-preload.ts';
 import { htmlOptimize } from './vite-plugins/html-optimize.ts';
 import { i18nHmr } from './vite-plugins/i18n-hmr.ts';
 import { securityHeaders } from './vite-plugins/security-headers.ts';
@@ -71,6 +72,8 @@ export default defineConfig(({ command, mode }) => ({
         // Emitted as a blocking <link>: the plugin's default inline <style> is blocked by style-src 'self',
         // and its async media="print" swap uses an inline onload handler that script-src 'self' blocks.
         webfontDownload([], { injectAsStyleTag: false, async: false }),
+        // Preloads the Latin woff2 so it is fetched in parallel with the font stylesheet, not behind it.
+        fontPreload(),
         // Bundle analyzer: only runs when ANALYZE=true env variable is set
         // Usage: ANALYZE=true npm run build
         ...((process.env.ANALYZE === 'true'
