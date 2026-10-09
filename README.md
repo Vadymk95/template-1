@@ -449,7 +449,7 @@ npm run build
 ### Deployment
 
 - Output in `dist/` — works with Vercel, Netlify, AWS S3, or any static host
-- Configure security headers on your CDN/server (see [Security & Production](#-security--production))
+- Security headers ship in `dist/_headers`; carry them to your host (see [Security & Production](#-security--production))
 
 ### Brotli Precompression
 
@@ -465,24 +465,9 @@ If none of the above applies, remove `vite-plugin-compression` from `vite.config
 
 ## 🔒 Security & Production
 
-Security headers (CSP, X-Frame-Options, etc.) must be configured on your production server/CDN. See [`SECURITY_REQUIREMENTS.md`](./SECURITY_REQUIREMENTS.md) for the complete deployment checklist. To report a vulnerability in the template itself, follow [`SECURITY.md`](./SECURITY.md).
+The template ships default security headers: a deny-by-default Content-Security-Policy, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options` and `Cross-Origin-Opener-Policy`, defined once in `vite-plugins/security-headers.ts`. `vite build` writes them to `dist/_headers` (read by Netlify and Cloudflare Pages), `vite preview` sends them so the production-mode e2e run fails on a CSP violation, and a unit test pins the set. Other hosts copy the values from `dist/_headers`; nginx and Vercel recipes, how to adapt the CSP to your API origin, and the pre-deployment checklist are in [`SECURITY_REQUIREMENTS.md`](./SECURITY_REQUIREMENTS.md). To report a vulnerability in the template itself, follow [`SECURITY.md`](./SECURITY.md).
 
-**⚠️ IMPORTANT:** `'unsafe-inline'` in CSP is NOT acceptable for production. Use CSP nonces or hashes.
-
-**Reference nginx snippet (production):**
-
-```nginx
-add_header X-Frame-Options "SAMEORIGIN" always;
-add_header X-Content-Type-Options "nosniff" always;
-add_header X-XSS-Protection "1; mode=block" always;
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-# Generate nonce per request and inject into index.html
-add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'nonce-$request_id'; style-src 'self' 'nonce-$request_id';" always;
-```
-
-**Template CSP Nonce Support:**
-
-This template does not ship automatic CSP nonce injection. If your production environment requires nonce-based CSP, your hosting or delivery layer must generate and inject the nonce into the delivered HTML and matching CSP header, and keep the nonce strategy in sync.
+**⚠️ IMPORTANT:** `'unsafe-inline'` in CSP is NOT acceptable for production. The shipped policy has none; if a library needs one, use a nonce or hash delivered by your host.
 
 ### Error Monitoring
 
@@ -496,7 +481,7 @@ This template does not ship automatic CSP nonce injection. If your production en
 - **Payments:** Stripe or Paddle for subscriptions
 - **SEO:** Open Graph / Twitter meta tags in `index.html` or `react-helmet-async`
 - **PWA:** `manifest.json` and service worker
-- **Deployment:** `vercel.json` or `netlify.toml` for security headers
+- **Deployment:** `vercel.json` or an nginx config for the security headers (Netlify and Cloudflare Pages read the shipped `dist/_headers`)
 - **CSS-in-JS:** Emotion or Styled-Components for advanced runtime styling (Tailwind covers the majority of cases)
 - **File-based Routing:** TanStack Router for 100+ routes or micro-frontend architectures
 - **Wiring a real product** (first real API, auth, monitoring, analytics, flags, languages, deployment hardening; each with a config and a guard): [`.cursor/brain/EXTENSIONS.md`](.cursor/brain/EXTENSIONS.md)

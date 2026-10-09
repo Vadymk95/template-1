@@ -799,6 +799,13 @@ A `testMatch` that matches nothing collects ZERO tests and reports success, so
 `scripts/check-cross-browser-selection.mjs` asks Playwright whether every configured project actually has
 work, and fails closed on a report it cannot read.
 
+**2026-10-08: the Firefox test browser runs with `browser.tabs.remote.useCrossOriginOpenerPolicy` off.**
+`vite preview` now sends `Cross-Origin-Opener-Policy: same-origin`, and Firefox then swaps processes on the first
+navigation of a test and Playwright intermittently loses it (`page.goto` times out with every request finished).
+Measured, geometry spec x6 on 3 engines, `--workers=4`, same machine load: 12 of 210 Firefox tests failed with
+COOP and 0 of 210 on master; with the pref off, 0 of 90 failed where the same tree failed 5 of 90. The header stays
+sent, Chromium and WebKit enforce it, the smoke spec asserts it, and a dropped `font-src` still turns Firefox red.
+
 ## Complexity ratchet: thresholds above the measured ceiling, production code only
 
 Five ESLint core rules (`complexity` 10, `max-depth` 3, `max-params` 4, `max-lines-per-function` 120,

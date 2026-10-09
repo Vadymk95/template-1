@@ -1,6 +1,11 @@
 import { createEnv } from '@t3-oss/env-core';
 import { z } from 'zod';
 
+// The shipped CSP has no 'unsafe-eval' (SECURITY_REQUIREMENTS.md), so zod's JIT probe (`new Function`) is
+// blocked and browsers report it as a violation even though zod catches it; jitless skips the probe.
+// Zod reads the switch when an object schema is built, so this must run before the first `z.object`.
+z.config({ jitless: true });
+
 // Validated at build time — missing required vars throw before the app starts.
 // Add new VITE_* vars here and document defaults in README/.env.
 // Docs: https://env.t3.gg/docs/core
