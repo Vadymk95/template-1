@@ -189,7 +189,7 @@ Key optimizations configured in `vite.config.ts`:
 - **Chunking:** vendor splitting via `build.rolldownOptions.output.codeSplitting.groups` (`react-vendor`, `ui-vendor`, `state-vendor`, `i18n-vendor`)
 - **Compression:** Brotli (`.br`) files generated at build time
 - **Source Maps:** disabled in production output (`sourcemap: false`)
-- **Fonts:** auto-downloaded and self-hosted via `vite-plugin-webfont-dl`
+- **Fonts:** auto-downloaded and self-hosted via `vite-plugin-webfont-dl`; the Latin woff2 is preloaded by the `fontPreload` plugin (`vite-plugins/font-preload.ts`) so it loads in parallel with the font stylesheet
 - **FOUC Prevention:** custom `htmlOptimize` plugin (`vite-plugins/html-optimize.ts`)
 - **Bundle Analysis:** `ANALYZE=true npm run build` → `dist/bundle-analysis.html`
 
@@ -242,7 +242,7 @@ VITE_ENABLE_MSW=false
 | `npm run bench:verify`             | The gate step by step with timings                                                         |
 | `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job                                   |
 | `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                                           |
-| `npm run verify:web-vitals-chunks` | Assert standard vs attribution web-vitals chunks                                           |
+| `npm run verify:web-vitals-chunks` | Post-build `dist` checks: the standard web-vitals chunk split and the Latin font preload   |
 | `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                                                         |
 
 ### The gate
