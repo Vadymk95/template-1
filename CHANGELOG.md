@@ -1,5 +1,35 @@
 # Changelog
 
+## [3.3.1](https://github.com/Vadymk95/template-1/compare/v3.3.0...v3.3.1) (2026-10-10)
+
+
+### Bug fixes
+
+* **api:** stop retrying 4xx through safeFetch; refuse agent-memory imports in docs ([#94](https://github.com/Vadymk95/template-1/issues/94)) ([f895803](https://github.com/Vadymk95/template-1/commit/f895803526da84ed0c6f23c76871417679c2d7a7))
+* **ci:** audit workflows with zizmor, fail CI on flaky tests, scan pages with axe ([#92](https://github.com/Vadymk95/template-1/issues/92)) ([dd6c487](https://github.com/Vadymk95/template-1/commit/dd6c487448a8ea4a46880605bfcb34be5150fb3d))
+* **ci:** pin actions by SHA, read-only tokens, SECURITY.md, prod error-boundary test ([#91](https://github.com/Vadymk95/template-1/issues/91)) ([717fce9](https://github.com/Vadymk95/template-1/commit/717fce93e07c9036a8ca44e90b1bc313c59dafec))
+* **gate:** close audit holes - CI steps, ruleset, size, boundary, safeFetch, shim ([#89](https://github.com/Vadymk95/template-1/issues/89)) ([cb92490](https://github.com/Vadymk95/template-1/commit/cb92490397b79fc5140f79d219a350af8c2de9b8))
+* **gate:** enable no-empty and run docs:check when the checker or scripts change ([#90](https://github.com/Vadymk95/template-1/issues/90)) ([ce22788](https://github.com/Vadymk95/template-1/commit/ce227880c1295bc0185a864ced3f45f02c5b171d))
+* **harness:** lock-age and Node-floor guards, quiet green gate, fork-path fixes ([#99](https://github.com/Vadymk95/template-1/issues/99)) ([a074807](https://github.com/Vadymk95/template-1/commit/a0748077cb2e8011f78467c3402d3fb8a1e85cd1))
+* **security:** ship default CSP and headers; suppressions need a reason ([#96](https://github.com/Vadymk95/template-1/issues/96)) ([7785f43](https://github.com/Vadymk95/template-1/commit/7785f435c3d5a98b00d658c6aa1128f462c62893))
+
+
+### Performance
+
+* **fonts:** preload the Latin Inter woff2 so first paint stops waiting on it ([#98](https://github.com/Vadymk95/template-1/issues/98)) ([c98dc25](https://github.com/Vadymk95/template-1/commit/c98dc2528adb9e4ce8d92df8ca4df847488eb53b))
+
+
+### Maintenance
+
+* **deps:** newest compatible versions; holds and the cooldown bypass recorded ([#95](https://github.com/Vadymk95/template-1/issues/95)) ([bad0820](https://github.com/Vadymk95/template-1/commit/bad0820f26d202bbdda7a996f02d215da9b72d6c))
+
+
+### Documentation
+
+* **brain:** integration recipes for the first real API, auth, monitoring and hosting ([#93](https://github.com/Vadymk95/template-1/issues/93)) ([f9a5ce5](https://github.com/Vadymk95/template-1/commit/f9a5ce5b155a455ceddd6df97b3929cdce006151))
+* **decisions:** date the next check of the vitest hold lift trigger ([#87](https://github.com/Vadymk95/template-1/issues/87)) ([036ed57](https://github.com/Vadymk95/template-1/commit/036ed57c8d97a1968849014fa13070376b17e28b))
+* **harness:** slim agent docs, enforce version holds, resolve section pointers ([#97](https://github.com/Vadymk95/template-1/issues/97)) ([7a82d8c](https://github.com/Vadymk95/template-1/commit/7a82d8ca40641e0c732feb0ccdb9b8af80c0bab1))
+
 ## [3.3.0](https://github.com/Vadymk95/template-1/compare/v3.2.3...v3.3.0) (2026-10-02)
 
 
