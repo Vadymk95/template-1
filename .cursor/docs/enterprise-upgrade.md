@@ -206,7 +206,7 @@ npm install date-fns
 
 ## 11. CI/CD Enhancements
 
-Current CI covers: the full `verify:ci` chain (audit gate, oxlint + ESLint, format, type-check, coverage, build, web-vitals chunks, size-limit, Playwright e2e) plus the `dev-smoke`, `cross-browser`, security and weekly mutation jobs.
+Current CI covers: the full `verify:ci` chain (audit gate, lock-age check, oxlint + ESLint, format, type-check, coverage, build, web-vitals chunks, size-limit, Playwright e2e) plus the `dev-smoke`, `cross-browser`, security and weekly mutation jobs.
 
 **Add for production:**
 

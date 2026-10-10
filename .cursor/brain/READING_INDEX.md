@@ -20,7 +20,8 @@ Why it exists: `AGENTS.md` § Start here.
 - `.cursor/brain/MAP.md` "Adding a shadcn Component" / "CSS / Theming" — WINS: where primitives live
   and which tokens govern them.
 - `npm run probe -- <route>` — LOOK at the result at three widths before reasoning about it; one
-  measurement replaces a round of inference.
+  measurement replaces a round of inference. It keeps classic scrollbars (Playwright's headless
+  default hides them) and prints their width as `scrollbar Npx`; a Mac shows overlay ones.
 - `.cursor/brain/SKELETONS.md` "Tailwind v4 — NO tailwind.config.ts" — the theme lives in CSS; a JS
   config is the wrong instinct here.
 

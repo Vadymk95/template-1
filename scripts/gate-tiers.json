@@ -1,7 +1,7 @@
 {
     "_description": "The gate discipline as data. scripts/trace-report.mjs reads this instead of hardcoding stage names; scripts/verify-push.mjs reads `phase`. Editing THIS file is how the discipline changes; the analyser names no stage. Docs: .cursor/brain/VERIFICATION.md (phases + triggers).",
     "phase": 0,
-    "_phaseMeaning": "0 = scaffold (pre-deploy): the push gate runs audit + hooks + version holds + oxlint + format + types + lint + coverage and SKIPS build/web-vitals-chunks/size/e2e \u2014 there is no prod boundary to guard before the first deploy. 1 = deployed: the push gate runs the full verify:ci chain. Flip with a one-line commit at the FIRST DEPLOY; GATE_PHASE=full overrides per run (template maintainers push gate machinery with it).",
+    "_phaseMeaning": "0 = scaffold (pre-deploy): the push gate runs audit + lock:age + hooks + version holds + node floor + oxlint + format + types + lint + coverage and SKIPS build/web-vitals-chunks/size/e2e \u2014 there is no prod boundary to guard before the first deploy. 1 = deployed: the push gate runs the full verify:ci chain. Flip with a one-line commit at the FIRST DEPLOY; GATE_PHASE=full overrides per run (template maintainers push gate machinery with it).",
     "checks": {
         "verify:iter": {
             "class": "code",
@@ -9,11 +9,11 @@
         },
         "verify": {
             "class": "code",
-            "description": "hooks -> version holds -> gate env -> oxlint -> format -> tsc -> lint -> coverage -> build -> chunks -> size -> e2e:prod"
+            "description": "hooks -> version holds -> node floor -> gate env -> oxlint -> format -> tsc -> lint -> coverage -> build -> chunks -> size -> e2e:prod"
         },
         "verify:ci": {
             "class": "code",
-            "description": "audit:gate -> verify"
+            "description": "audit:gate -> lock:age -> verify"
         },
         "verify:full": {
             "class": "code",
@@ -21,11 +21,11 @@
         },
         "verify:push": {
             "class": "code",
-            "description": "phase-aware push gate: phase 0 -> audit + verify:scaffold, phase 1 -> verify:ci"
+            "description": "phase-aware push gate: phase 0 -> audit + lock:age + verify:scaffold, phase 1 -> verify:ci"
         },
         "verify:scaffold": {
             "class": "code",
-            "description": "phase-0 offline gate: hooks -> version holds -> oxlint -> format -> tsc -> lint -> coverage (no build/size/e2e)"
+            "description": "phase-0 offline gate: hooks -> version holds -> node floor -> oxlint -> format -> tsc -> lint -> coverage (no build/size/e2e)"
         },
         "verify:measure": {
             "class": "measure",

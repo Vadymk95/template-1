@@ -11,7 +11,7 @@ always runs the full chain — the phase gates only the LOCAL hook.
 
 | Check | Runs at phase 0 (scaffold) | Added when (the trigger) |
 | --- | --- | --- |
-| audit, hooks-check, oxlint, format, tsc, lint, coverage | yes — every push, seconds | day one |
+| audit, lock-age, hooks-check, version holds, node floor, oxlint, format, tsc, lint, coverage | yes — every push, seconds | day one |
 | production build in the gate | no | the FIRST DEPLOY: flip `"phase": 1` in its own commit |
 | web-vitals chunks, `size:check` | no | same flip — they measure a built artefact |
 | prod-mode e2e (`vite preview`) | no | same flip — a prod boundary now exists |
@@ -46,8 +46,8 @@ The push gate's preflight takes `--kill-port` (SIGTERM, re-probe, refuse if it w
   the import graph only, so cross-cutting suites surface at the full-gate run, not during iteration.
 - **`npm run verify`** — every **offline** check. Stage order: the `verify:inner` script; the superset
   rule and the push/CI split: `AGENTS.md` § the gate; why: `DECISIONS.md` § The gate is `verify`.
-- **`npm run verify:ci`** — `audit:gate && verify`. The audit gate needs the network, which is why it
-  is not inside `verify`: an offline implementer can still run the complete offline gate.
+- **`npm run verify:ci`** — `audit:gate && lock:age && verify`. Both need the network, which is why they
+  are not inside `verify`: an offline implementer can still run the complete offline gate.
 - **`npm run verify:full`** — `verify:ci && smoke:dev`. `smoke:dev` measures the content-variance
   fixture, which is mounted only under `import.meta.env.DEV` and therefore unreachable from the
   `vite preview` run inside `verify`. It needs a second server on its own port, so it is not in
@@ -98,7 +98,8 @@ Targeted checks are for the iteration loop. The gate is what says "done".
 - **Touches `src/env.ts`, `vite.config.ts`, `src/lib/vitals.ts`, `src/lib/webVitals/`** — above, plus
   `npm run build && npm run verify:web-vitals-chunks`
 - **Added or bumped a dependency** — `npm run audit:gate` (fails closed on high/critical, on an expired
-  or stale allowance, and on its own inability to run) plus `npm run build && npm run size:check`
+  or stale allowance, and on its own inability to run), `npm run lock:age` (the new version must be older
+  than `min-release-age` or carry an allowance) plus `npm run build && npm run size:check`
 - **MSW** (`src/mocks/**`, `src/test/handlers.ts`, MSW wiring in `main.tsx`) — `npm run verify:iter`
 - **Touched `eslint.config.js`** — `npm run lint`, then confirm the run is not silently a no-op:
   `npx eslint --print-config <a real source file>` should report a plausible active-rule count. A config

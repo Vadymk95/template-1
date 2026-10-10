@@ -58,6 +58,9 @@ export const measureInPage = () => {
     return {
         documentScrollWidth: doc.scrollWidth,
         documentClientWidth: doc.clientWidth,
+        // Viewport minus the layout width: 15 where a classic scrollbar takes its gutter, 0 where the
+        // scrollbar is hidden or an overlay. A probe that prints 0 here saw no scrollbar at all.
+        scrollbarPx: Math.max(0, window.innerWidth - doc.clientWidth),
         horizontalOverflowPx: Math.max(0, doc.scrollWidth - doc.clientWidth),
         controls: controls.length,
         smallestControl: smallest
@@ -107,6 +110,16 @@ export const waitForContent = async (readMeasurement, { attempts = 20, delayMs =
     return { measurement, rendered: hasRenderedContent(measurement) };
 };
 
+/**
+ * Playwright starts headless Chromium with `--hide-scrollbars`, so the default launch measures every
+ * page as if scrollbars did not exist. A desktop visitor on Windows or Linux has a 15 px classic one,
+ * and `scrollbar-gutter: stable` (see `src/index.css`) reserves it on every route, so a layout that
+ * needs those 15 px passes a default-launch probe and breaks on the visitor's screen. Dropping the
+ * flag shows the page the way that visitor sees it; a Mac with overlay scrollbars sees the default.
+ */
+export const launchProbeBrowser = (chromium) =>
+    chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] });
+
 const run = async () => {
     const { path, widths, useDev } = parseProbeArgs(process.argv.slice(2));
 
@@ -141,7 +154,7 @@ const run = async () => {
     );
 
     const baseUrl = `http://localhost:${String(port)}`;
-    const browser = await chromium.launch();
+    const browser = await launchProbeBrowser(chromium);
     const rows = [];
     try {
         await waitForServer(async () => {
@@ -176,7 +189,7 @@ const run = async () => {
     for (const row of rows) {
         console.log(`  ${String(row.width)}px  →  ${row.file}`);
         console.log(
-            `      overflow ${String(row.horizontalOverflowPx)}px · controls ${String(row.controls)} · smallest ${row.smallestControl} · headings ${String(row.headings)}`
+            `      overflow ${String(row.horizontalOverflowPx)}px · scrollbar ${String(row.scrollbarPx)}px · controls ${String(row.controls)} · smallest ${row.smallestControl} · headings ${String(row.headings)}`
         );
     }
     console.log(`\n  title: ${rows[0]?.title ?? '(none)'}\n`);

@@ -8,13 +8,13 @@ This document contains **mandatory security configurations** that must be in pla
 
 One module, `vite-plugins/security-headers.ts`, is the single source of truth for the response headers. Everything else reads it, so the copies cannot drift:
 
-| Consumer                   | What it does                                                                                                                                                                                    |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `vite build`               | Emits `dist/_headers`, the file Netlify and Cloudflare Pages read from the publish directory                                                                                                    |
-| `vite preview`             | Sends the same headers on every response, so the production-mode e2e suite runs under the policy                                                                                                |
-| `e2e/support/test.ts`      | The `test` every spec that runs against the built app imports: it fails the test on a Content-Security-Policy violation, from the console or the `securitypolicyviolation` event (every engine) |
-| `security-headers.test.ts` | Pins the header set and the CSP directives: removing a header or loosening a directive turns it red                                                                                             |
-| `e2e/smoke.spec.ts`        | Asserts the preview response carries every header                                                                                                                                               |
+| Consumer                   | What it does                                                                                                                                                                                                            |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vite build`               | Emits `dist/_headers`, the file Netlify and Cloudflare Pages read from the publish directory                                                                                                                            |
+| `vite preview`             | Sends the same headers on every response, so the production-mode e2e suite runs under the policy                                                                                                                        |
+| `e2e/support/test.ts`      | The `test` every spec that runs against the built app imports: it fails the test on a Content-Security-Policy violation, from the console or the `securitypolicyviolation` event (every engine)                         |
+| `security-headers.test.ts` | Pins the header set and the CSP directives: removing a header or loosening a directive turns it red                                                                                                                     |
+| `e2e/smoke.spec.ts`        | Asserts the preview response carries every header, and that each route loads with no console error, no stylesheet behind a `<script src>` (`nosniff` refuses it) and no `preconnect` / `dns-prefetch` to another origin |
 
 `vite dev` is left out on purpose: HMR needs an inline preamble script and a websocket, and the dev-only MSW worker (`src/mocks/`, never part of `dist`) runs there, so the production policy needs no hole for either.
 

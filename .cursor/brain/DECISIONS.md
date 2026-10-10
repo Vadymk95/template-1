@@ -161,9 +161,9 @@ absent from `verify`, and `size:check` ran in no pipeline at all, so a green loc
 predict a green CI.
 
 **Decision:** every check lives in `package.json`, never only in a workflow file. `verify` holds the
-offline checks; `verify:ci` is `audit:gate && verify` and is the only thing CI runs besides what CI
-alone can do (install, browser cache, artifact upload). `audit:gate` stays out of `verify` because
-it needs the network. `.husky/pre-push` runs the phase-aware `verify:push`.
+offline checks; `verify:ci` is `audit:gate && lock:age && verify` and is the only thing CI runs besides what CI
+alone can do (install, browser cache, artifact upload). `audit:gate` and `lock:age` stay out of `verify` because
+they need the network. `.husky/pre-push` runs the phase-aware `verify:push`.
 
 **Consequences:** `verify` is slower and can go red on a dependency bump rather than on your own
 code; that is the cost of a gate that does not lie. If a check becomes intolerable it leaves BOTH

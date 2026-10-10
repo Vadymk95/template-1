@@ -20,7 +20,7 @@ Production-ready React 19 + Vite 8 + TypeScript 6 template with routing, Zustand
 
 ## 📋 Prerequisites
 
-- **Node.js v24+** (use `nvm` for version management)
+- **Node.js v24.15+** (use `nvm` for version management; `npm run verify` fails if `engines.node` drops below what the lockfile needs)
 - **npm** (comes with Node.js)
 - **Git**
 
@@ -33,7 +33,7 @@ Strict version pinning via `.nvmrc` and `package.json` engines.
 git clone <your-repo-url>
 cd <your-project-folder>
 
-# Activate Node.js v24+ (from .nvmrc)
+# Activate Node.js v24.15+ (from .nvmrc)
 nvm use
 
 # Install dependencies, install git hooks once (lifecycle scripts are
@@ -172,7 +172,7 @@ src/
 | `tsconfig.json`    | TypeScript project references and path aliases  |
 | `eslint.config.js` | Linting rules (Flat Config) including jsx-a11y  |
 | `.oxlintrc.json`   | Oxlint rules for the fast pre-pass              |
-| `.nvmrc`           | Node.js version (v24)                           |
+| `.nvmrc`           | Node.js version (v24.15)                        |
 | `.env`             | Optional local environment variables            |
 
 ### TypeScript Configuration
@@ -227,7 +227,7 @@ VITE_ENABLE_MSW=false
 | `npm run test:e2e:ui`              | Playwright UI mode                                                                         |
 | `npm run fix`                      | The remedy: oxlint `--fix` → eslint `--fix` → prettier, repo-wide                          |
 | `npm run verify`                   | **The gate** — every offline check (see below)                                             |
-| `npm run verify:ci`                | `audit:gate && verify` — the CI chain; the push runs it in phase 1                         |
+| `npm run verify:ci`                | `audit:gate && lock:age && verify` — the CI chain; the push runs it in phase 1             |
 | `npm run ci:local`                 | Alias of `verify:ci`                                                                       |
 | `npm run verify:iter`              | Iteration tier: oxlint → tsc → vitest --changed; run per change                            |
 | `npm run verify:measure`           | MEASURE moment: build + look (`-- e2e/<f>.spec.ts` for one spec)                           |
@@ -239,6 +239,7 @@ VITE_ENABLE_MSW=false
 | `npm run trace:report`             | Findings from `.gate-trace.log`: moments, budgets, worktrees                               |
 | `npm run docs:check`               | Mechanical doc drift: paths, scripts, sentinels, versions, dead docs, agent-memory imports |
 | `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist                                |
+| `npm run lock:age`                 | Fails a lockfile version younger than `min-release-age` unless allowed (reason + expiry)   |
 | `npm run bench:verify`             | The gate step by step with timings                                                         |
 | `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job                                   |
 | `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                                           |
@@ -247,7 +248,7 @@ VITE_ENABLE_MSW=false
 
 ### The gate
 
-`npm run verify` is every offline check; `npm run verify:ci` adds the network-bound `audit:gate` and is
+`npm run verify` is every offline check; `npm run verify:ci` adds the network-bound `audit:gate` and `lock:age` and is
 what CI runs. The gate is tiered by moment (iterate, measure, commit, push, CI), and the ONLY definition of
 which script belongs to which moment, what the push runs in each phase and what is never run by hand is
 `AGENTS.md` § Commands / the gate. Stage timings: `.cursor/brain/VERIFICATION.md`. The exact stage order:
@@ -275,8 +276,8 @@ hook prints the remedy: `npm run fix && git add -u`.
 
 **Commit message** (Commitlint): `type(scope): subject`, max 96 chars.
 
-**Pre-push:** `npm run verify:push` — phase-aware (`scripts/gate-tiers.json`): phase 0 runs the offline
-checks and loudly skips build, size and e2e until the first deploy; phase 1 runs the full `verify:ci`.
+**Pre-push:** `npm run verify:push` — phase-aware (`scripts/gate-tiers.json`): phase 0 runs the audit gate, the
+lock-age check and the offline checks, and loudly skips build, size and e2e until the first deploy; phase 1 runs the full `verify:ci`.
 
 ### CI (GitHub Actions)
 
@@ -306,7 +307,10 @@ a `@vN` tag is a movable pointer and has been retargeted in supply-chain attacks
 
 `gitleaks` and `zizmor` run anywhere — each executes its scanner itself and fails the job on a finding,
 independent of any GitHub feature or plan. The action only asks for a `GITLEAKS_LICENSE` when the repository is owned by
-an **organisation**; a personal account needs nothing.
+an **organisation**; a personal account needs nothing. On a pull request the gitleaks action also lists the PR's
+commits through the API, which a private repository answers only to a token with `pull-requests: read`; the job
+declares it, and `npm run docs:check` (with its unit test, which runs in the push gate) fails if a job that runs
+gitleaks loses it.
 
 `codeql` needs GitHub **code scanning**, which is free on **public** repositories and a paid add-on on
 private ones. This template is public, so it works as shipped. In a **private fork** the analyze step
@@ -532,7 +536,7 @@ Files travel with a fork. Settings do not. Everything the gate needs is in the f
 
 Not inherited, and each one is a switch in your own repository's settings:
 
-- **Rulesets and branch protection**, including every required status check. Until you add one, your default branch accepts any push, and the pull-request discipline this repository documents is a habit rather than a rule.
+- **Rulesets and branch protection**, including every required status check. Until you add one, your default branch accepts any push, and the pull-request discipline this repository documents is a habit rather than a rule. Rulesets also need a **public** repository or a paid plan: in a private fork on GitHub Free the required CI check is only a convention, whatever this file says. A private fork also removes the `codeql` job (code scanning is a paid add-on there) AND its entry in `.github/ruleset.json` in the same commit, or the ruleset waits forever for a check that never reports.
 - **Actions permissions.** A fork starts with workflows disabled; GitHub asks you to enable them once, in the Actions tab. Until you do, the CI described here never runs, and a green screen means nobody looked.
 - **Secret scanning and push protection**, **CodeQL**, and **Dependabot alerts.** The Dependabot CONFIG file travels; the alerts it feeds are a setting.
 

@@ -29,6 +29,9 @@ jobs:
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
+                  # Depth 2: lock:age (inside verify:ci) compares the lockfile with HEAD~1, and a
+                  # private fork's persist-credentials: false means it cannot fetch the parent itself.
+                  fetch-depth: 2
                   persist-credentials: false
 
             - name: Use Node.js ${{ matrix.node-version }}
@@ -37,16 +40,24 @@ jobs:
                   node-version: ${{ matrix.node-version }}
                   cache: 'npm'
 
-            # Node 24.15.0 (current LTS) bundles npm 11.12.1, which regressed
-            # peerOptional handling (npm/cli#9249, 2026-04-17) — peerOptional deps
-            # marked extraneous and removed. Combined with the long-standing
+            # `24.x` names no single release: with the default `check-latest: false`
+            # setup-node takes the 24.x cached on the runner image, else the newest
+            # one from actions/node-versions. On 2026-10-10 that is 24.21.0, which
+            # bundles npm 11.19.0 (runner image tool cache and nodejs.org/dist/index.json).
+            # The bundled npm depends on the release: 24.15.0 has npm 11.12.1,
+            # 24.16.0 and 24.17.0 have 11.13.0, and 24.18.0 (npm 11.16.0) is the
+            # first 24.x with npm >= 11.14.0. npm 11.12.1 regressed peerOptional
+            # handling (npm/cli#9249, 2026-04-17) — peerOptional deps marked
+            # extraneous and removed. Combined with the long-standing
             # cross-platform optional-binaries bug (npm/cli#4828) this means lock
             # files generated on macOS arm64 fail Linux CI with EUSAGE
             # "Missing: <pkg>-linux-x64-gnu from lock file" for native bindings
             # (lightningcss, @unrs/resolver-binding). Both issues are fully
-            # restored in npm 11.14.0 (2026-05-06) via arborist 9.5.0. Pin to
-            # ^11.14.0 explicitly — npm@latest would track future majors that
-            # may regress again.
+            # restored in npm 11.14.0 (2026-05-06) via arborist 9.5.0. The step
+            # is a floor for a runner that resolves `24.x` to an older release;
+            # it can be deleted once every setup-node range in this file starts
+            # at 24.18.0. Pin to ^11.14.0 explicitly — npm@latest would track
+            # future majors that may regress again.
             - name: Upgrade npm to ^11.14 (cross-platform optional binaries fix)
               run: npm install -g npm@^11.14.0
 
@@ -67,7 +78,7 @@ jobs:
             # this job used to list separately. Adding a check HERE instead of to
             # the script is exactly what makes a green local gate stop predicting a
             # green CI — if it belongs in CI, it belongs in the script.
-            - name: Verify (audit gate, types, lint, format, coverage, build, size, e2e)
+            - name: Verify (audit gate, lock age, types, lint, format, coverage, build, size, e2e)
               run: npm run verify:ci
 
             - name: Upload coverage report

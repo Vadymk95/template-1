@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { connect, createServer } from 'node:net';
 import { resolve } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Resolved from the repo root, not from `import.meta.url`: vitest serves this module over its own
 // transform URL, so the file-URL form throws ERR_INVALID_URL_SCHEME rather than finding the script.
@@ -10,11 +10,14 @@ const SCRIPT = resolve(process.cwd(), 'scripts/check-gate-env.mjs');
 
 /* Every case runs the preflight against an EPHEMERAL port (GATE_PREFLIGHT_PORT), never the real
    4173: vitest workers, verify-measure's own preview and a gate running in another lane all share
-   that port, and a suite that binds it was flaky 1 run in 3 for exactly that reason. */
+   that port, and a suite that binds it was flaky 1 run in 3 for exactly that reason.
+   `stdio` pipes stderr: without it execFileSync echoes the child's stderr into the parent, so a green
+   run printed "Gate preflight failed" blocks from the cases that expect a refusal. */
 const runPreflight = (port, extraArgs = []) => {
     try {
         const output = execFileSync('node', [SCRIPT, ...extraArgs], {
             encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
             env: { ...process.env, GATE_PREFLIGHT_PORT: String(port) }
         });
         return { code: 0, output };
@@ -145,5 +148,26 @@ describe('gate preflight', () => {
         const verdict = runPreflight(await freePort(), ['--kill-port']);
         expect(verdict.code).toBe(0);
         expect(verdict.output).not.toContain('Cleared');
+    });
+
+    /* A refusal is a PASSING case here. Node's execFileSync copies the child's stderr onto its own
+       process.stderr unless `stdio` is given, which once printed "Gate preflight failed" blocks
+       inside green runs and taught readers to filter the gate's output. */
+    it('keeps the stderr of an expected refusal off this process', async () => {
+        const port = await freePort();
+        held = await listenOn(port);
+        const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+        let verdict;
+        let echoed;
+        try {
+            verdict = runPreflight(port);
+            // Read before the restore: restoring a spy also clears what it recorded.
+            echoed = [...spy.mock.calls];
+        } finally {
+            spy.mockRestore();
+        }
+        expect(verdict.code).toBe(1);
+        expect(verdict.output).toContain(`Port ${String(port)} is busy`);
+        expect(echoed).toEqual([]);
     });
 });

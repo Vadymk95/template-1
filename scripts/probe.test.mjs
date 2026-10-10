@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
     hasRenderedContent,
+    launchProbeBrowser,
     measureInPage,
     parseProbeArgs,
     slugForPath,
@@ -174,6 +175,18 @@ describe('measureInPage', () => {
         expect(measurement.smallestControl).toBe('none');
     });
 
+    it('reports the width a classic scrollbar takes, so a hidden one is visible as zero', () => {
+        // `withDocument` restores every global on exit, so the viewport width is stubbed inside it.
+        const scrollbarPx = (clientWidth) =>
+            withDocument(stubDocument({ scrollWidth: clientWidth, clientWidth }), () => {
+                vi.stubGlobal('innerWidth', 390);
+                return measureInPage().scrollbarPx;
+            });
+
+        expect(scrollbarPx(375)).toBe(15);
+        expect(scrollbarPx(390)).toBe(0);
+    });
+
     it('counts the controls it found, so a probe of an empty page is visibly empty', () => {
         const measurement = withDocument(
             stubDocument({ scrollWidth: 390, clientWidth: 390, controls: [], headings: 2 }),
@@ -181,5 +194,22 @@ describe('measureInPage', () => {
         );
         expect(measurement.controls).toBe(0);
         expect(measurement.headings).toBe(2);
+    });
+});
+
+describe('launchProbeBrowser', () => {
+    /* Playwright's headless Chromium starts with `--hide-scrollbars`, so a page measured under the
+       default launch never has the gutter a desktop visitor sees: a layout that needs the 15 px
+       passes the probe and fails everywhere else. Measured on this repository's Chromium: 0 px with
+       the default launch, 15 px once the flag is dropped. */
+    it('launches Chromium without the flag that hides classic scrollbars', async () => {
+        const launch = vi.fn(async () => 'browser');
+        const browser = await launchProbeBrowser({ launch });
+
+        expect(browser).toBe('browser');
+        expect(launch).toHaveBeenCalledTimes(1);
+        expect(launch.mock.calls[0][0]).toMatchObject({
+            ignoreDefaultArgs: ['--hide-scrollbars']
+        });
     });
 });
