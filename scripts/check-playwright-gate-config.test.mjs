@@ -17,7 +17,7 @@
 // which stalls this file for the full XHR timeout.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const ENV_KEYS = ['CI', 'PLAYWRIGHT_USE_PREVIEW'];
+const ENV_KEYS = ['CI', 'PLAYWRIGHT_USE_PREVIEW', 'PORT', 'PLAYWRIGHT_BASE_URL'];
 const originalEnv = {};
 
 beforeEach(() => {
@@ -62,6 +62,35 @@ describe('playwright.config.ts maxFailures', () => {
     it('stays uncapped on the desk run against the dev server (neither flag set)', async () => {
         const config = await importGateConfig();
         expect(config.maxFailures).toBeUndefined();
+    });
+});
+
+describe('playwright.config.ts port', () => {
+    // `PORT` alone must move the whole run: a lane that sets only `PORT=3100` and finds the tests
+    // still talking to 3000 measures another lane's server while reporting green.
+    it('points the tests at PORT when PLAYWRIGHT_BASE_URL is unset, in both modes', async () => {
+        process.env.PORT = '3100';
+        for (const preview of [undefined, '1']) {
+            if (preview) process.env.PLAYWRIGHT_USE_PREVIEW = preview;
+            else delete process.env.PLAYWRIGHT_USE_PREVIEW;
+            const config = await importGateConfig();
+            expect(config.use.baseURL).toBe('http://127.0.0.1:3100');
+            expect(config.webServer.command).toContain('--port 3100 --strictPort');
+            expect(config.webServer.url).toBe('http://127.0.0.1:3100');
+        }
+    });
+
+    it('lets an explicit PLAYWRIGHT_BASE_URL win over PORT for the tests', async () => {
+        process.env.PORT = '3100';
+        process.env.PLAYWRIGHT_BASE_URL = 'http://localhost:3105';
+        const config = await importGateConfig();
+        expect(config.use.baseURL).toBe('http://localhost:3105');
+    });
+
+    it('keeps the previous literals when neither is set: 3000 for dev, 4173 for preview', async () => {
+        expect((await importGateConfig()).use.baseURL).toBe('http://127.0.0.1:3000');
+        process.env.PLAYWRIGHT_USE_PREVIEW = '1';
+        expect((await importGateConfig()).use.baseURL).toBe('http://127.0.0.1:4173');
     });
 });
 

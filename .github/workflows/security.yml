@@ -3,9 +3,11 @@ name: Security
 # WHERE THIS WORKS — read before forking into a private repo.
 #
 # `gitleaks` works anywhere: it runs the scanner itself and fails the job on a
-# finding, independent of any GitHub feature or plan. (One caveat: the action asks
-# for a GITLEAKS_LICENSE when the repo is owned by an ORGANISATION; a personal
-# account needs nothing.)
+# finding, independent of any GitHub feature or plan. On a pull request the action
+# also lists the PR's commits through the API (`GET /pulls/{n}/commits`), which a
+# private repo answers only to a token with `pull-requests: read`; the job below
+# grants it. (One caveat: the action asks for a GITLEAKS_LICENSE when the repo is
+# owned by an ORGANISATION; a personal account needs nothing.)
 #
 # `codeql` needs GitHub **code scanning** enabled, which is free on PUBLIC repos
 # and a paid add-on on private ones. This repository is public, so it works as
@@ -40,6 +42,8 @@ jobs:
         timeout-minutes: 10
         permissions:
             contents: read
+            # The action lists a pull request's commits; without this a private repo answers 403.
+            pull-requests: read
         steps:
             - name: Checkout (full history)
               uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

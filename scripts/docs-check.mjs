@@ -28,6 +28,9 @@
  *   dead       every doc file has an inbound reference (platform-discovered files exempt)
  *   ciSteps    every `run:` step in a PR-triggered workflow is declared in gate-tiers.json §
  *              ci.allowedRunSteps (a check running only in CI, not in `verify`), with a reason
+ *   prPermission  a job that runs gitleaks-action in a PR-triggered workflow is granted
+ *              `pull-requests: read` (on the job when it has its own `permissions:`, else on the
+ *              workflow); a private fork's token does not carry it and the job fails 403
  *   rulesetContexts  every required status check in .github/ruleset.json is produced by a workflow
  *              job (its `name:` or id, plus matrix values) or listed in ci.rulesetContextAllowlist
  *   pointers   a section pointer, `file` § Heading, in any tracked .md/.mdc file (DECISIONS.md
@@ -668,8 +671,8 @@ export const extractRunSteps = (text) => {
 };
 
 /**
- * F1 — "the gate lied" (2026-07-28, fb36cde): a check that runs only in CI stops a green `verify`
- * from predicting a green pipeline. Every `run:` step (single-line or inside a block scalar) in a
+ * A check that runs only in CI stops a green `verify` from predicting a green pipeline (the gate
+ * lied, 2026-07-28, fb36cde). Every `run:` step (single-line or inside a block scalar) in a
  * PR-triggered workflow must be declared in gate-tiers.json § ci.allowedRunSteps (install/tooling
  * steps, and the CI-only lanes the tier law names on purpose), each with a reason; anything else
  * is a check that bypassed the gate.
@@ -687,6 +690,91 @@ export const checkCiRunSteps = ({ workflows, allowedRunSteps }) => {
                 `${file}:${line}: CI runs "${command}" outside the gate. Put it into verify, or list it in scripts/gate-tiers.json ci.allowedRunSteps with a reason.`
             );
         }
+    }
+    return findings;
+};
+
+const indentOf = (line) => line.length - line.trimStart().length;
+
+/**
+ * Whether the `permissions:` key at `index` grants `pull-requests` read or write: the block form
+ * (`pull-requests: read|write` one level down) or the blanket `read-all` / `write-all`.
+ */
+const grantsPullRequestRead = (lines, index) => {
+    const value = lines[index]
+        .split(':')
+        .slice(1)
+        .join(':')
+        .replace(/\s#.*$/, '')
+        .trim();
+    if (value === 'read-all' || value === 'write-all') return true;
+    for (let cursor = index + 1; cursor < lines.length; cursor++) {
+        if (lines[cursor].trim() === '') continue;
+        if (indentOf(lines[cursor]) <= indentOf(lines[index])) break;
+        if (/^\s*pull-requests:\s*(read|write)\b/.test(lines[cursor])) return true;
+    }
+    return false;
+};
+
+/** The index of a `permissions:` key at exactly `indent` in lines[from, to), or -1. */
+const findPermissions = (lines, from, to, indent) => {
+    for (let cursor = from; cursor < to; cursor++) {
+        if (indentOf(lines[cursor]) === indent && /^\s*permissions:/.test(lines[cursor])) {
+            return cursor;
+        }
+    }
+    return -1;
+};
+
+const GITLEAKS_ACTION = /^\s*(?:-\s*)?uses:\s*gitleaks\/gitleaks-action@/;
+
+/**
+ * On a pull request, gitleaks lists the PR's commits through the GitHub API (`pulls/<n>/commits`),
+ * which needs `pull-requests: read`. A public repository answers that call without the scope; a
+ * private fork does not, so a job can be green in the public template and fail 403 on a fork's
+ * first pull request. Every job that runs the action in a PR-triggered workflow must be granted
+ * the scope: on the job when it has a `permissions:` block (which replaces the workflow-level one
+ * entirely, as GitHub reads it), else on the workflow.
+ */
+export const checkPullRequestReadPermission = ({ workflows }) => {
+    const findings = [];
+    for (const [file, text] of workflows) {
+        if (!isPullRequestTriggered(text)) continue;
+        const lines = text.split('\n');
+        const jobsIndex = lines.findIndex((line) => /^jobs:\s*$/.test(line));
+        if (jobsIndex === -1) continue;
+        const workflowGrant = findPermissions(lines, 0, jobsIndex, 0);
+        const workflowGrants = workflowGrant !== -1 && grantsPullRequestRead(lines, workflowGrant);
+
+        let cursor = jobsIndex + 1;
+        while (cursor < lines.length && lines[cursor].trim() === '') cursor++;
+        const firstJob = /^(\s+)[A-Za-z0-9_-]+:\s*$/.exec(lines[cursor] ?? '');
+        if (!firstJob) continue;
+        const jobId = new RegExp(`^ {${String(firstJob[1].length)}}([A-Za-z0-9_-]+):\\s*$`);
+
+        const starts = [];
+        for (let index = jobsIndex + 1; index < lines.length; index++) {
+            const match = jobId.exec(lines[index]);
+            if (match) starts.push({ id: match[1], index });
+        }
+        starts.forEach(({ id, index }, position) => {
+            const end = starts[position + 1]?.index ?? lines.length;
+            const uses = lines.findIndex(
+                (line, at) => at > index && at < end && GITLEAKS_ACTION.test(line)
+            );
+            if (uses === -1) return;
+            /* The job's own keys sit at the indent of its first content line, whatever the file's
+               indent width is. */
+            const first = lines.findIndex(
+                (line, at) => at > index && line.trim() !== '' && !line.trim().startsWith('#')
+            );
+            const own = findPermissions(lines, index + 1, end, indentOf(lines[first]));
+            const granted = own === -1 ? workflowGrants : grantsPullRequestRead(lines, own);
+            if (granted) return;
+            findings.push(
+                `${file}:${uses + 1}: job "${id}" runs gitleaks-action on a pull_request trigger without \`pull-requests: read\`; the action lists the pull request's commits through the API and fails 403 in a private fork. Add the scope to that job's permissions.`
+            );
+        });
     }
     return findings;
 };
@@ -798,7 +886,7 @@ export const deriveWorkflowContexts = (text) => {
 };
 
 /**
- * F2 — a required status check no workflow produces is Pending forever (6e47f3d, #70: a fork that
+ * A required status check no workflow produces is Pending forever (6e47f3d, #70: a fork that
  * deletes the CodeQL job, or renames any CI job, gets every pull request blocked with no error).
  * Every `required_status_checks[].context` in .github/ruleset.json must equal a context a workflow
  * job actually produces, or be named in gate-tiers.json § ci.rulesetContextAllowlist with a reason
@@ -1184,6 +1272,7 @@ export const run = ({ root, today }) => {
             ])
         }),
         ...checkCiRunSteps({ workflows, allowedRunSteps: ciConfig.allowedRunSteps ?? [] }),
+        ...checkPullRequestReadPermission({ workflows }),
         ...rulesetCheck.findings
     ];
     const tests = listTestFiles(root).map((file) => [

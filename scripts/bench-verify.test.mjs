@@ -50,6 +50,17 @@ describe('parseVerifySteps', () => {
         expect(labels).toContain('check-version-holds');
     });
 
+    it('keeps the node-floor check in verify and verify:scaffold, so a stale engines floor turns the push red', () => {
+        const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+
+        for (const name of ['verify:inner', 'verify:scaffold']) {
+            const labels = parseVerifySteps(resolveScript(manifest.scripts, name)).map(
+                (step) => step.label
+            );
+            expect(labels, name).toContain('check-node-floor');
+        }
+    });
+
     it('labels an npm step by its script name and a node step by its file', () => {
         expect(parseVerifySteps('npm run typecheck && node scripts/check-hooks.mjs')).toEqual([
             { label: 'typecheck', command: 'npm', args: ['run', 'typecheck'] },

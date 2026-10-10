@@ -38,9 +38,9 @@ npm run e2e:one -- <spec>  # one Playwright spec, free port, through the tracer
 npm run test:one -- <file> # one unit test file, through the tracer
 npm run probe -- <route> [widths] # LOOK: render, screenshot per width, print measured quantities
 npm run verify:push        # what pre-push runs; phase-aware (gate-tiers.json)
-npm run verify             # THE gate: hooks → version holds → preflight → oxlint → format → typecheck → eslint
+npm run verify             # THE gate: hooks → version holds → node floor → preflight → oxlint → format → typecheck → eslint
                            # → coverage → build → web-vitals chunks → size-limit → playwright browsers → e2e
-npm run verify:ci          # verify + audit:gate, the CI chain (alias: ci:local)
+npm run verify:ci          # verify + audit:gate + lock:age, the CI chain (alias: ci:local)
 npm run verify:full        # verify:ci + smoke:dev; before a PR touching a shared UI primitive, the shell or index.css
 npm run smoke:dev          # the content-stress fixture alone, against `vite dev`
 npm run test:e2e:prod      # Playwright against `vite preview` (same mode as the gate)
@@ -70,14 +70,15 @@ that file disagree, the file wins and the prose is fixed in the same commit.
   look) or the probe, where the repo has them. Legal at any time, in any lane, never a violation.
   Measuring is not verifying: it runs no lint, no types, no tests.
 - **Commit** - the pre-commit hook owns it: staged autofix, the TDD sibling gate, then the repo-wide cheap
-  checks. Nothing to run by hand; on refusal the hook prints the remedy.
+  checks. Nothing to run by hand; on refusal the hook prints the remedy. The commit-msg hook (commitlint)
+  also rejects any body or footer line over 100 characters (the header cap is 96): wrap the body.
 - **Push** - the pre-push hook runs the gate ONCE, never shortened by what the diff touched. Where the
   repo has heavy stages (build, size, e2e), the push script is phase-aware: phase 0 (scaffold, before the
   first deploy) runs the offline checks and loudly SKIPS the heavy stages; phase 1 (from the first deploy)
   runs the full `verify:ci`. A skipped stage is printed, never silent; flip the phase in one commit at the
   first deploy. A repo whose gate has no heavy stage runs the full `verify:ci` at push and records in
   `gate-tiers.json` that a phase switch would gate nothing.
-- **CI** - phase-blind: always the full `verify:ci` (`audit:gate` + `verify`), plus what only CI can do
+- **CI** - phase-blind: always the full `verify:ci` (`audit:gate` + `lock:age` + `verify`), plus what only CI can do
   (the security workflow, the scheduled mutation job, a mandatory dev-smoke job where the repo has one).
 
 **Prohibitions, stated as such.** An implementer or a reviewer NEVER runs `verify`, `verify:ci`,
@@ -107,7 +108,7 @@ that outgrew it, so that number moves on a measurement and a `DECISIONS.md` line
 
 **`verify` is a strict superset of the offline checks CI runs**, so a green `verify` predicts a green CI.
 Keeping that true is a rule: a new check goes into the script, never only into the workflow file.
-`audit:gate` sits in `verify:ci` rather than `verify` because it needs the network, so an offline agent can
+`audit:gate` and `lock:age` sit in `verify:ci` rather than `verify` because they need the network, so an offline agent can
 still run the whole offline gate. `bench:verify` derives its step list from the `verify` script; a
 hand-written second list has already drifted once.
 
@@ -168,7 +169,7 @@ that lives only in a conversation is not a plan.
 
 ## Working agreements
 
-- **Bootstrap after clone**: `npm run prepare` once (`.npmrc` disables lifecycle scripts, so husky does not self-install; `verify` fails loudly without hooks). `.npmrc` `min-release-age=3` (days): a brand-new package or an urgent patch needs `npm install <pkg> --min-release-age=0`.
+- **Bootstrap after clone**: `npm run prepare` once (`.npmrc` disables lifecycle scripts, so husky does not self-install; `verify` fails loudly without hooks). `.npmrc` `min-release-age=3` (days): a brand-new package or an urgent patch needs `npm install <pkg> --min-release-age=0`. The lockfile obeys the same cooldown: `npm run lock:age` (in `verify:ci`) fails a changed `name@version` younger than `min-release-age`; a deliberate bypass bump is listed with a reason and an expiry in `scripts/lock-age-allowlist.json`.
 - **Zero warnings** (`eslint --max-warnings 0`, `oxlint --deny-warnings`): fix the cause, never downgrade a rule or sprinkle `eslint-disable`. A directive that must stay names its rule and carries its reason (`-- why`). A rule wrong for a class of files gets a documented file-scoped override in `eslint.config.js`.
 - **Complexity ratchet**: `complexity` 10 / `max-depth` 3 / `max-params` 4 / `max-lines-per-function` 120 / `max-lines` 200 over `src/**`, tests exempt. A hit means new drift: split the function. Raising a number needs a fresh measurement (`DECISIONS.md`).
 - **Mutation score** shows whether tests would CATCH a wrong implementation; coverage only shows they RUN it. `thresholds.break` in `stryker.config.json` is a measured floor: raise it after a good run, never lower it to go green.
@@ -179,7 +180,7 @@ that lives only in a conversation is not a plan.
 `scripts/version-holds.json` is the list (range, reason, lift condition, evidence). `scripts/check-version-holds.mjs`, inside `verify`, fails a manifest or lockfile outside a range and a missing Dependabot `ignore`. Why: `DECISIONS.md`.
 
 - **`vitest` + `@vitest/coverage-v8` stay 4.x** (vitest 5 collapses the Stryker gate). **`msw` stays 2.x**: no `overrides` entry to paper over msw 3.
-- **TypeScript stays `~6.0.x`** (typescript-eslint peer). **`@types/node` stays 24.x** (matches `engines.node`).
+- **TypeScript stays `~6.0.x`** (typescript-eslint peer). **`@types/node` stays 24.x** (matches `engines.node`, whose floor `scripts/check-node-floor.mjs` keeps at what the lockfile needs).
 - **ESLint + `@eslint/js` stay 10.x**: keep the `$eslint` `overrides` for `eslint-plugin-react` and `eslint-plugin-jsx-a11y`, never `--legacy-peer-deps`; `settings.react.version` stays a literal, never `'detect'`.
 - **`oxlint` tilde-tracks `eslint-plugin-oxlint`** (lockstep releases).
 
