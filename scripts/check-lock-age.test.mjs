@@ -396,6 +396,40 @@ describe('checkLockAge', () => {
         assert.deepEqual(registry.calls, ['@types/node']);
     });
 
+    it('asks the registry for @scope%2Fname, with every slash of the name encoded', async () => {
+        const registry = 'https://registry.example.test';
+        const urls = [];
+        const fetchImpl = async (url) => {
+            urls.push(url);
+            return {
+                ok: true,
+                status: 200,
+                json: async () => ({ time: { '1.0.0': daysAgo(30) } })
+            };
+        };
+        const changed = [
+            { name: '@scope/name', version: '1.0.0' },
+            { name: '@scope/deep/er/name', version: '1.0.0' }
+        ];
+        const { findings } = await checkLockAge({
+            changed,
+            minDays: 3,
+            allowances: [],
+            now: NOW,
+            fetchImpl,
+            registry,
+            sleep: noSleep
+        });
+        assert.deepEqual(findings, []);
+        assert.deepEqual(urls.sort(), [
+            `${registry}/@scope%2Fdeep%2Fer%2Fname`,
+            `${registry}/@scope%2Fname`
+        ]);
+        for (const url of urls) {
+            assert.ok(!url.slice(registry.length + 1).includes('/'), `a raw slash in ${url}`);
+        }
+    });
+
     it('keeps the number of concurrent lookups bounded', async () => {
         const names = Array.from({ length: 12 }, (_, index) => `pkg-${String(index)}`);
         const { findings, registry } = await check({

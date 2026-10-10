@@ -168,7 +168,7 @@ const describeError = (error) => {
 const createLookup = ({ fetchImpl, registry, retries, sleep }) => {
     const origin = registry.replace(/\/$/, '');
     return async (name) => {
-        const url = `${origin}/${name.replace('/', '%2F')}`;
+        const url = `${origin}/${name.replaceAll('/', '%2F')}`;
         let lastError = 'no attempt was made';
         for (let attempt = 0; attempt <= retries; attempt += 1) {
             if (attempt > 0) await sleep(RETRY_DELAY_MS * attempt);
