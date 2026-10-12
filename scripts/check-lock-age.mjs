@@ -26,9 +26,10 @@
  * nothing allowed). One entry per deliberate young version, one date per entry:
  *   { "package": "next", "version": "16.4.0",
  *     "reason": "...",           why the cooldown was skipped, in one or two sentences
- *     "expires": "2026-10-20" }  ISO date; the allowance holds until the start of that day (UTC),
- *                                after which a still-young entry fails again. Set it no later than
- *                                the day the version turns old enough on its own.
+ *     "expires": "2026-10-20" }  ISO date, and the first RED day (UTC): the allowance holds through
+ *                                the day before it and a still-young entry fails again from the
+ *                                date itself, so it never lives a day longer than written. Set it
+ *                                no later than the day the version turns old enough on its own.
  * A live allowance is printed only while its version is in the lockfile diff. An unchanged
  * lockfile prints no allowance and does not validate the entries (a missing or unparseable file
  * still fails every run), so once the bump has merged, a fork finds the date by reading
@@ -114,7 +115,7 @@ export const changedVersions = (current, base) => {
 
 export const isExpired = (expires, now) => {
     const expiry = new Date(`${expires}T00:00:00.000Z`);
-    return Number.isNaN(expiry.valueOf()) || expiry < now;
+    return Number.isNaN(expiry.valueOf()) || expiry <= now;
 };
 
 const isText = (value) => typeof value === 'string' && value.trim() !== '';
@@ -270,7 +271,7 @@ export const checkLockAge = async ({
         } else if (isExpired(allowance.expires, now)) {
             tooYoung = true;
             findings.push(
-                `${young}; its allowance expired ${allowance.expires}. Move to an older version, or renew the allowance with a new reason and date`
+                `${young}; its allowance expired ${allowance.expires} (red from that date on, UTC). Move to an older version, or renew the allowance in ${ALLOWANCE_FILE} with a new reason and date`
             );
         } else {
             notes.push(

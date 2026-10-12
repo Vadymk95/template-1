@@ -33,7 +33,8 @@
                     { "context": "cross-browser" },
                     { "context": "dev-smoke" },
                     { "context": "CodeQL (JavaScript / TypeScript) (javascript-typescript)" },
-                    { "context": "Workflow audit (zizmor)" }
+                    { "context": "Workflow audit (zizmor)" },
+                    { "context": "gate-integrity" }
                 ]
             }
         }

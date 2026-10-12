@@ -19,6 +19,27 @@ const occupyPort = (host) =>
         else server.listen(0, host, ready);
     });
 
+/* A bindable IPv6 loopback is a capability, not a given: Docker's default network namespace sets
+   `disable_ipv6=1` on `lo`, and binding `::1` there throws EADDRNOTAVAIL. Probed ONCE per file; the
+   case that needs it is skipped with the reason printed, never run into a crash or skipped silently. */
+const ipv6LoopbackProblem = await new Promise((resolveProbe) => {
+    const probe = createServer();
+    probe.once('error', (error) => {
+        resolveProbe(String(error.code ?? error.message));
+    });
+    probe.listen(0, '::1', () => {
+        probe.close(() => {
+            resolveProbe(null);
+        });
+    });
+});
+if (ipv6LoopbackProblem !== null) {
+    console.warn(
+        `run-on-free-port.test: SKIPPING the IPv6-loopback case, this host cannot bind ::1 (${ipv6LoopbackProblem}).`
+    );
+}
+const itWithIpv6Loopback = it.skipIf(ipv6LoopbackProblem !== null);
+
 let heldServer = null;
 
 afterEach(async () => {
@@ -51,11 +72,14 @@ describe('findFreePort', () => {
      * called the port free — while Playwright, which fetches `http://localhost:<port>` and reaches
      * ::1 first, refused with "already used".
      */
-    it('sees a listener bound to the IPv6 loopback alone, which a bind probe does not', async () => {
-        heldServer = await occupyPort('::1');
-        const base = heldServer.address().port;
-        expect(await findFreePort(base)).toBeGreaterThan(base);
-    });
+    itWithIpv6Loopback(
+        'sees an IPv6-loopback-only listener, which a bind probe does not',
+        async () => {
+            heldServer = await occupyPort('::1');
+            const base = heldServer.address().port;
+            expect(await findFreePort(base)).toBeGreaterThan(base);
+        }
+    );
 
     it('throws with a diagnostic when nothing in range is free, instead of hanging', async () => {
         const neverFree = () => Promise.resolve(false);
@@ -111,6 +135,25 @@ describe('run-on-free-port CLI', () => {
         // PORT=0 probes from 0, which the OS treats as "assign one" and always grants — the
         // child still runs and its own exit code must be the verdict.
         expect(code).toBe(3);
+    });
+
+    it('says why when the command never starts, and still fails', () => {
+        let verdict = { status: 0, output: '' };
+        try {
+            execFileSync(process.execPath, [SCRIPT, 'no-such-binary-on-this-host'], {
+                encoding: 'utf8',
+                stdio: ['ignore', 'pipe', 'pipe'],
+                env: { ...process.env, PORT: '0' }
+            });
+        } catch (error) {
+            verdict = {
+                status: error.status,
+                output: `${error.stdout ?? ''}${error.stderr ?? ''}`
+            };
+        }
+        expect(verdict.status).toBe(1);
+        expect(verdict.output).toContain('Could not start `no-such-binary-on-this-host`');
+        expect(verdict.output).toContain('ENOENT');
     });
 
     it('rejects a call with no command instead of spinning on nothing', () => {

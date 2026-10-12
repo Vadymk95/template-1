@@ -38,15 +38,15 @@ npm run e2e:one -- <spec>  # one Playwright spec, free port, through the tracer
 npm run test:one -- <file> # one unit test file, through the tracer
 npm run probe -- <route> [widths] # LOOK: render, screenshot per width, print measured quantities
 npm run verify:push        # what pre-push runs; phase-aware (gate-tiers.json)
-npm run verify             # THE gate: hooks → version holds → node floor → preflight → oxlint → format → typecheck → eslint
+npm run verify             # THE gate: hooks → version holds → node floor → sibling-test range → docs → preflight → oxlint → format → typecheck → eslint
                            # → coverage → build → web-vitals chunks → size-limit → playwright browsers → e2e
-npm run verify:ci          # verify + audit:gate + lock:age, the CI chain (alias: ci:local)
+npm run verify:ci          # audit:gate + lock:age + verify, the CI chain (alias: ci:local)
 npm run verify:full        # verify:ci + smoke:dev; before a PR touching a shared UI primitive, the shell or index.css
 npm run smoke:dev          # the content-stress fixture alone, against `vite dev`
 npm run test:e2e:prod      # Playwright against `vite preview` (same mode as the gate)
 npm run bench:verify       # the gate step by step with timings
 npm run trace:report       # findings from .gate-trace.log
-npm run docs:check         # docs drift (paths, scripts, versions, command table, dead docs); weekly CI adds --weekly
+npm run docs:check         # docs drift (paths, scripts, versions, command table, dead docs); inside verify, weekly CI adds --weekly
 npm run test:mutation      # StrykerJS strength gate: weekly mutation.yml, NOT in verify
 ```
 
@@ -122,8 +122,7 @@ scripts take the next free port. Only the push gate clears its own port.
 
 ### Lanes - who runs what
 
-- **Main agent, inline.** Iterate and measure while working; the push runs the chain. Never the full gate
-  by hand.
+- **Main agent, inline.** Iterate and measure while working; the push runs the chain, never a hand-run.
 - **Implementer subagent.** Works in a hand-made `git worktree` OUTSIDE the repo directory, on its own
   port, with `node_modules` symlinked from the main checkout. Iterate and measure only; the gate never
   runs from a worktree (the tracer records it as a finding). The lead removes the worktree, checks the
@@ -137,7 +136,8 @@ scripts take the next free port. Only the push gate clears its own port.
   `.github/copilot-instructions.md`, which points here for the gate.
 - **Review, any lane.** The diff plus `verify:iter`, never a re-run of the gate. Findings are correctness,
   test strength, security, readability; style belongs to the linters. A non-author human approves; an
-  agent's own green is not an approval.
+  agent's own green is not an approval. A gate or suppression change stays red until a reviewer adds the
+  `gate-change` label, never the author (`scripts/check-gate-integrity.mjs` lists the change).
 - **Two tools, one file.** Claude Code reads `CLAUDE.md` -> `AGENTS.md` -> the brain files this guide
   points at (read on demand; nothing beyond `AGENTS.md` is `@`-imported); Cursor reads `AGENTS.md` plus
   every `alwaysApply: true` rule; Copilot reads `.github/copilot-instructions.md`. `AGENTS.md` is the only

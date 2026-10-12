@@ -16,8 +16,9 @@
  *     "lift": "...",                    the event that lifts it (an upstream release, a peer range)
  *     "evidence": "<url or file:line>", the PR / issue / measurement; a file:line must exist
  *     "reviewBy": "2026-11-02" }        OPTIONAL, ISO date, only for a hold that protects security;
- *                                       the check fails after that day. One date per item, in this
- *                                       structured file, never in prose.
+ *                                       the check is red ON that date (the date is the first red
+ *                                       day, UTC; the day before is green). One date per item, in
+ *                                       this structured file, never in prose.
  *
  * Findings (each printed as `<package>: message`; exit 1 when any exists):
  *   manifest    every range package.json declares for the package (dependencies, devDependencies,
@@ -31,7 +32,8 @@
  *   absent      the package is in neither package.json nor package-lock.json: a hold on nothing is
  *               dead weight, delete the entry
  *   shape       the entry has all five fields, a readable `held`, a unique package, a valid evidence
- *               and (when present) a valid `reviewBy`; `reviewBy` is not past
+ *               and (when present) a valid `reviewBy` that is still in the future: the date is
+ *               the first red day, so a hold never outlives the date it carries
  *
  * Ranges: comparators (`<5`, `>=4.1.11`), `^`, `~`, x-ranges (`4.x`), partial versions and `||`.
  * Versions compare by major.minor.patch; a prerelease tag is ignored, so 5.0.0-rc.1 counts as 5.0.0
@@ -556,9 +558,9 @@ export const checkHolds = ({
             }
         }
         if (ignores !== null) findings.push(...dependabotFindings({ pkg, entry, held, ignores }));
-        if (entry.reviewBy !== undefined && isIsoDate(entry.reviewBy) && today > entry.reviewBy) {
+        if (entry.reviewBy !== undefined && isIsoDate(entry.reviewBy) && today >= entry.reviewBy) {
             findings.push(
-                `${pkg}: reviewBy ${entry.reviewBy} has passed; re-check "${entry.lift}", then lift the hold or move reviewBy forward with new evidence`
+                `${pkg}: reviewBy ${entry.reviewBy} is due (red from that date on, UTC); re-check "${entry.lift}", then lift the hold or move reviewBy forward with new evidence`
             );
         }
     }

@@ -1,0 +1,41 @@
+name: Gate integrity
+
+# A change to the gate (a check script, a hook, a workflow, a lint, type or test config, a rule file, the
+# package.json scripts) or an added suppression has to be a visible human decision, never a side effect.
+# This job lists such a change and fails until a reviewer who has read the list adds the label gate-change.
+# CI runs the pull request's own code, so the check cannot make a weakening impossible: the boundary is this
+# required status check plus a human read of the listed paths (a team fork also puts CODEOWNERS on them, see
+# the README section on what a fork does not inherit). The labels reach the script through env from the
+# event payload and are never interpolated into the command line. A re-run of an old run reuses the labels
+# that run started with: after adding or removing the label, let the labeled event run the job.
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
+jobs:
+    gate-integrity:
+        name: gate-integrity
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  # The script needs the merge base of the two shas, which a shallow clone does not have.
+                  fetch-depth: 0
+                  persist-credentials: false
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version-file: .nvmrc
+            - run: node scripts/check-gate-integrity.mjs --base "$BASE_SHA" --head "$HEAD_SHA" --labels "$PR_LABELS"
+              env:
+                  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+                  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+                  PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
