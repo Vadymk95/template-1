@@ -21,8 +21,13 @@
  *              session (a `~/` path, or one naming an existing file), except `@AGENTS.md` in CLAUDE.md
  *   suites     the browser suite has not outgrown the ceiling in gate-tiers.json, and that
  *              ceiling is not more than twice the measurement
- *   tests      no focused test (`.only`) lands; an unconditional `.skip`/`.fixme` carries
- *              `quarantine until YYYY-MM-DD` and a reason, and that date is not past
+ *   tests      no focused test (`.only`, `fit`, `only: true`) lands; a test switched off for good
+ *              (a skip, todo, fixme, expected failure or annotation, in the spellings of vitest,
+ *              Jest, Playwright and node:test; the list sits above findSwitchedOff) carries
+ *              `quarantine until YYYY-MM-DD` and a reason, while a switch an environment decides
+ *              (`skipIf(c)`, `test.skip(cond, ...)`, `{ skip: cond }`) needs none. The date is the
+ *              first RED day (UTC, not a day later) and may be at most 30 days after today
+ *              (QUARANTINE_MAX_DAYS): a quarantine is a short loan, so `until 2099-12-31` is red too
  *   versions   "Vitest 5" / "React 19.3" in a doc matches the installed version (package-lock.json)
  *   table      every non-internal package.json script is documented in AGENTS.md or README.md
  *   dead       every doc file has an inbound reference (platform-discovered files exempt)
@@ -46,7 +51,8 @@
  * No check reads a date out of prose: a revisit line carrying a date was read as a deadline and was
  * gamed by rewording. Dates are checked only where they are structured data: `quarantine until` on
  * a skipped test (above), `expires` in scripts/audit-allowlist.json (scripts/audit-gate.mjs) and
- * `reviewBy` in scripts/version-holds.json (scripts/check-version-holds.mjs).
+ * `reviewBy` in scripts/version-holds.json (scripts/check-version-holds.mjs). Every one of these
+ * dates is the first red day (UTC): the day before is green, the day itself is red.
  *
  * Usage: node scripts/docs-check.mjs [--weekly] [--root <dir>]
  *   --weekly  the flag the scheduled Docs workflow passes; it runs the same checks, so a quarantine
@@ -628,7 +634,7 @@ export const isPullRequestTriggered = (text) => {
     return /^\s*pull_request:/m.test(head);
 };
 
-const RUN_LINE = /^(\s*)run:\s*(.+?)\s*$/;
+const RUN_LINE = /^(\s*(?:-\s+)?)run:\s*(.+?)\s*$/;
 /** A block-scalar header: `run: |`, `run: >`, with an optional chomping/indent indicator. */
 const BLOCK_SCALAR = /^[|>][+-]?\d*$/;
 const unquote = (value) => value.replace(/^(['"])(.*)\1$/, '$2');
@@ -979,44 +985,338 @@ export const listTestFiles = (root) => {
     return found.sort();
 };
 
-const FOCUS_PATTERN = /\b(test|it|describe)\.only\(/;
-const SKIP_PATTERN = /\b(test|it|describe)\.(skip|fixme)\((.*)$/;
+/*
+ * What a test file switches off. A test is turned off, or turned into one that passes only while it
+ * fails, by a modifier on the call that declares it, by a key of its options object, or by a call
+ * inside its body. The spellings listed here are read, so none of them is a way round the quarantine
+ * rule; what is not read is named after them, and a spelling in neither place is a gap to close:
+ *   vitest      .skip .todo .fails .skipIf(c) .runIf(c); { skip, todo, fails, only } in the options
+ *   Jest        .skip .todo .failing xit xtest xdescribe, and a table (.each) of each; fit fdescribe
+ *   Playwright  .skip .fixme .fail with a title, with no argument or with a constant condition;
+ *               test.step.skip; testInfo.skip, fixme and fail; { annotation: { type: 'skip' } } (also
+ *               'fixme' and 'fail') in the details of a test or of a describe
+ *   node:test   .skip .todo .expectFailure; { skip, todo, expectFailure, only }; t.skip, t.todo
+ * A `.todo` with a title alone is a placeholder for a test nobody wrote and hides no body, so it is
+ * not a switch; with a body, on the test context or as an option it is one. In `skip(a, b)` a second
+ * argument that is not a string says `a` is a title and `b` its body, whatever `a` looks like.
+ * Not read, because no text tells them from ordinary code: a modifier reached through an alias, an
+ * options object held in a variable, the skip taken from the test context (a bare `skip()` or
+ * `skip(cond, 'note')`, and the `({ skip })` it comes from: whether it switches a test off for good
+ * depends on the code around the call, so this check asks for no quarantine date for it), a subtest
+ * declared through the test context (node:test's `t.test(name, { skip: true }, fn)`, and the same
+ * with `todo` or `expectFailure`: the receiver is a parameter its author named, and `.test(` is also
+ * the RegExp method, so only a `test`, `it`, `describe` or `suite` that is not a member of another
+ * object declares a test), and the configs (`exclude`, `grep`, `testIgnore`,
+ * `--test-skip-pattern`), which are gate files that scripts/check-gate-integrity.mjs lists.
+ * That script's label rule is wider than this check: in a test path it lists the context skip too
+ * (a bare call, a `{ skip }` binding), so there it reaches a pull request as a labelled decision.
+ */
+
+/**
+ * Receivers that are surely a test declaration, so `.only`, `.fails`, `.failing` and `.expectFailure`
+ * mean what they mean in a runner. A `.todo` on one of them declares a test; on any other receiver
+ * (`t`, `ctx`) it marks the test that is running.
+ */
+const TEST_RECEIVERS = new Set(['test', 'it', 'describe', 'suite']);
+/** `.fail` is Playwright's alone: on any other receiver it is an assertion that throws. */
+const FAIL_RECEIVERS = new Set(['test', 'testInfo']);
+/**
+ * The modifiers read, and the receivers each is read on (null: any receiver, because the name means
+ * nothing else in a test file).
+ */
+const MODIFIERS = {
+    skip: null,
+    todo: null,
+    fixme: null,
+    skipIf: null,
+    runIf: null,
+    fail: FAIL_RECEIVERS,
+    fails: TEST_RECEIVERS,
+    failing: TEST_RECEIVERS,
+    expectFailure: TEST_RECEIVERS,
+    only: TEST_RECEIVERS
+};
+/** These never take a condition, so they switch the test off whatever they are given. */
+const ALWAYS_OFF = new Set(['fails', 'failing', 'expectFailure']);
+
+const MODIFIER_CALL = new RegExp(String.raw`\.\s*(${Object.keys(MODIFIERS).join('|')})\b`, 'g');
+/**
+ * What may stand between a modifier and the parenthesis that opens its call: `.each`, `.concurrent`,
+ * a second modifier. A backtick opens the call only after `.each` or `.for` (a table written as a
+ * template); anywhere else it closes a code span in a comment.
+ */
+const CHAIN_TAIL = /((?:\.[A-Za-z_$][\w$]*)*)\s*([(`])/y;
+const TABLE_CHAIN = /(?:^|\.)(?:each|for)$/;
+/** The Jest names that carry the modifier themselves: `xit`, `fdescribe` and a table of either. */
+const PREFIXED_CALL = /(?<![\w$.])(xit|xtest|xdescribe|fit|fdescribe)(?=\(|\.(?:each|failing)\b)/g;
+/** A call that declares a test or a suite, with the modifiers written before its parenthesis. */
+const DECLARATION = /(?<![\w$.])(?:test|it|describe|suite)((?:\.[A-Za-z_$][\w$]*)*)\s*\(/g;
+const OPTION_KEY = /(?<![\w$.])(skip|todo|fails|expectFailure|only)\s*:([^,}]*)/g;
+const ANNOTATION_KEY = /(?<![\w$.])annotation\s*:\s*/g;
+const ANNOTATION_TYPE = /\btype\s*:\s*(['"`])(skip|fixme|fail)\1/;
 const QUARANTINE_PATTERN = /quarantined? until (20\d\d-\d\d-\d\d)/i;
-/** A skip is conditional when its first argument is an expression rather than a string or nothing. */
-const isConditionalSkip = (firstArgument) =>
-    firstArgument.length > 0 && !/^['"`)]/.test(firstArgument);
+
+const CLOSERS = { '(': ')', '[': ']', '{': '}' };
+const COMMENT = /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
+const TRUTHY_CONSTANT = /^(?:true|1)$/;
+const FALSY_CONSTANT = /^(?:false|0|null|undefined)$/;
+const STARTS_QUOTED = /^['"`]/;
+
+/**
+ * The index just past the token that starts at `start`: a string, a comment, a bracket group with
+ * everything nested in it (strings, template literals with their `${}`, comments), or one character.
+ */
+const endOfToken = (text, start) => {
+    const expected = [];
+    let index = start;
+    while (index < text.length) {
+        const char = text[index];
+        if (expected.at(-1) === '`') {
+            if (char === '\\') index += 1;
+            else if (char === '`') expected.pop();
+            else if (char === '$' && text[index + 1] === '{') {
+                expected.push('}');
+                index += 1;
+            }
+        } else if (char === "'" || char === '"') {
+            index += 1;
+            while (index < text.length && text[index] !== char && text[index] !== '\n') {
+                index += text[index] === '\\' ? 2 : 1;
+            }
+        } else if (char === '/' && (text[index + 1] === '/' || text[index + 1] === '*')) {
+            const line = text[index + 1] === '/';
+            const found = text.indexOf(line ? '\n' : '*/', index + 2);
+            index = found === -1 ? text.length : found + (line ? 0 : 1);
+        } else if (char === '`') {
+            expected.push('`');
+        } else if (char in CLOSERS) {
+            expected.push(CLOSERS[char]);
+        } else if (char === expected.at(-1)) {
+            expected.pop();
+        }
+        index += 1;
+        if (expected.length === 0) break;
+    }
+    return Math.min(index, text.length);
+};
+
+/** The index past any whitespace and comments that start at `from`. */
+const skipTrivia = (text, from) => {
+    let index = from;
+    while (index < text.length) {
+        const comment = text[index] === '/' && (text[index + 1] === '/' || text[index + 1] === '*');
+        if (!comment && !/\s/.test(text[index])) break;
+        index = comment ? endOfToken(text, index) : index + 1;
+    }
+    return index;
+};
+
+/** The index of the `,` or `)` that ends the argument starting at `from`. */
+const endOfArgument = (text, from) => {
+    let index = from;
+    while (index < text.length && text[index] !== ',' && text[index] !== ')') {
+        index = endOfToken(text, index);
+    }
+    return index;
+};
+
+/** The first argument of the call whose parenthesis is at `open`, as source with its comments removed. */
+const firstArgument = (text, open) =>
+    text
+        .slice(open + 1, endOfArgument(text, open + 1))
+        .replaceAll(COMMENT, ' ')
+        .trim();
+
+/**
+ * Whether the call whose parenthesis is at `open` passes, after its first argument, anything but a
+ * note. `skip(condition, note)` takes a string; `skip(title, body)` takes a function or a reference
+ * to one, so a second argument that is not a string says the first is a title.
+ */
+const hasBodySecond = (text, open) => {
+    const comma = endOfArgument(text, open + 1);
+    if (text[comma] !== ',') return false;
+    const start = skipTrivia(text, comma + 1);
+    const second = text.slice(start, endOfArgument(text, start)).trim();
+    return second !== '' && !STARTS_QUOTED.test(second) && second !== 'undefined';
+};
+
+/** The identifiers, joined by dots, that stand right before the dot at `dot` (`test.describe`). */
+const receiverBefore = (text, dot) => {
+    let end = dot;
+    while (end > 0 && /\s/.test(text[end - 1])) end -= 1;
+    if (text[end - 1] === '?') end -= 1;
+    if (text.slice(Math.max(0, end - 11), end) === 'test.info()') return 'test.info';
+    let start = end;
+    while (start > 0 && /[\w$.]/.test(text[start - 1])) start -= 1;
+    return text.slice(start, end).replace(/^\.+/, '');
+};
+
+/** Whether `name(argument)` switches the test off for good, rather than when an environment says so. */
+const isUnconditional = ({ name, chain, receiver }, text, open) => {
+    if (ALWAYS_OFF.has(name)) return true;
+    // A chain behind the name (`.each`, `.concurrent`) declares a switched-off test.
+    if (chain !== '') return true;
+    if (name === 'todo') {
+        // A declaration with a title alone is a placeholder for a test nobody wrote and hides no body;
+        // with a body, or called on the test context, it lets a failure through.
+        return !TEST_RECEIVERS.has(receiver.split('.')[0]) || hasBodySecond(text, open);
+    }
+    const argument = firstArgument(text, open);
+    if (name === 'skipIf') return TRUTHY_CONSTANT.test(argument);
+    if (name === 'runIf') return FALSY_CONSTANT.test(argument);
+    // A title, no argument or a constant true switches this test off outright; so does any first
+    // argument followed by a body, because that is a title.
+    return (
+        argument === '' ||
+        STARTS_QUOTED.test(argument) ||
+        TRUTHY_CONSTANT.test(argument) ||
+        hasBodySecond(text, open)
+    );
+};
+
+/** The hit for one `.modifier`, or null when it is a property read, an alias or another object's method. */
+const modifierHit = (text, match) => {
+    const [dotted, name] = match;
+    const receiver = receiverBefore(text, match.index);
+    const allowed = MODIFIERS[name];
+    if (receiver === '' || (allowed !== null && !allowed.has(receiver.split('.')[0]))) return null;
+    CHAIN_TAIL.lastIndex = match.index + dotted.length;
+    const tail = CHAIN_TAIL.exec(text);
+    if (tail === null || (tail[2] === '`' && !TABLE_CHAIN.test(tail[1]))) return null;
+    const label = `.${name}${tail[1]}`;
+    if (name === 'only') return { index: match.index, label, focused: true };
+    const open = CHAIN_TAIL.lastIndex - 1;
+    const unconditional = isUnconditional({ name, chain: tail[1], receiver }, text, open);
+    return { index: match.index, label, unconditional };
+};
+
+/** An option value that switches the test: a constant true, a reason, a regular expression or an object. */
+const optionIsOn = (value) => {
+    const clean = value.replaceAll(COMMENT, ' ').trim();
+    return TRUTHY_CONSTANT.test(clean) || STARTS_QUOTED.test(clean) || /^[/{]/.test(clean);
+};
+
+/** The hits inside one options object: a switching key, and a Playwright annotation of that kind. */
+const optionHits = (text, { start, end }) => {
+    const source = text.slice(start, end);
+    const hits = [];
+    for (const match of source.matchAll(OPTION_KEY)) {
+        const [, key, value] = match;
+        if (!optionIsOn(value)) continue;
+        const hit = { index: start + match.index, label: `${key} option` };
+        hits.push(key === 'only' ? { ...hit, focused: true } : { ...hit, unconditional: true });
+    }
+    for (const match of source.matchAll(ANNOTATION_KEY)) {
+        const from = match.index + match[0].length;
+        if (source[from] !== '{' && source[from] !== '[') continue;
+        const type = ANNOTATION_TYPE.exec(source.slice(from, endOfToken(source, from)));
+        if (type !== null) {
+            hits.push({
+                index: start + from + type.index,
+                label: `annotation type ${type[2]}`,
+                unconditional: true
+            });
+        }
+    }
+    return hits;
+};
+
+/** The object literals among the first two arguments of the declaring call whose parenthesis is at `open`. */
+const optionObjects = (text, open) => {
+    const objects = [];
+    let index = skipTrivia(text, open + 1);
+    for (let position = 0; position < 2; position += 1) {
+        if (text[index] === '{') {
+            const end = endOfToken(text, index);
+            objects.push({ start: index, end });
+            index = end;
+        } else if (position === 0) {
+            index = endOfArgument(text, index);
+        } else {
+            break;
+        }
+        index = skipTrivia(text, index);
+        if (text[index] !== ',') break;
+        index = skipTrivia(text, index + 1);
+    }
+    return objects;
+};
+
+/**
+ * Every place a test file switches a test off or focuses one, in source order: `{ index, label,
+ * unconditional }` for a switch (unconditional unless an environment decides), `{ index, label,
+ * focused: true }` for a focus.
+ */
+export const findSwitchedOff = (text) => {
+    const hits = [];
+    for (const match of text.matchAll(MODIFIER_CALL)) {
+        const hit = modifierHit(text, match);
+        if (hit !== null) hits.push(hit);
+    }
+    for (const match of text.matchAll(PREFIXED_CALL)) {
+        const hit = { index: match.index, label: match[1] };
+        hits.push(
+            match[1].startsWith('f') ? { ...hit, focused: true } : { ...hit, unconditional: true }
+        );
+    }
+    for (const match of text.matchAll(DECLARATION)) {
+        let open = match.index + match[0].length - 1;
+        if (TABLE_CHAIN.test(match[1])) {
+            // A table: the cases come first, and the options belong to the call that follows them.
+            const next = endOfToken(text, open);
+            if (text[next] === '(') open = next;
+        }
+        for (const object of optionObjects(text, open)) hits.push(...optionHits(text, object));
+    }
+    return hits.sort((first, second) => first.index - second.index);
+};
+
+/** The furthest a quarantine date may sit from today: a quarantine is a short loan, not a parking spot. */
+export const QUARANTINE_MAX_DAYS = 30;
+const DAY_MS = 86_400_000;
+const addDays = (isoDate, days) =>
+    new Date(Date.parse(`${isoDate}T00:00:00.000Z`) + days * DAY_MS).toISOString().slice(0, 10);
 
 /**
  * Flaky tests are fixed or quarantined, never silently skipped: an unconditional skip names its
  * reason and an expiry (`quarantine until YYYY-MM-DD`) on the line or the two above; a focused test
  * never lands, because `.only` shrinks the suite for every later run.
+ *
+ * The date is the first RED day (UTC): the day before is green, the day itself is red. It is also
+ * capped: a date more than QUARANTINE_MAX_DAYS (30) days after `today` is red, so a quarantine
+ * cannot be parked far out of sight (`until 2099-12-31` passed every layer before the cap).
  */
 export const checkQuarantine = ({ tests, today }) => {
     const findings = [];
+    const latest = addDays(today, QUARANTINE_MAX_DAYS);
     for (const [file, text] of tests) {
         const lines = text.split('\n');
-        lines.forEach((line, index) => {
-            if (FOCUS_PATTERN.test(line)) {
+        for (const hit of findSwitchedOff(text)) {
+            const index = text.slice(0, hit.index).split('\n').length - 1;
+            const where = `${file}:${index + 1}`;
+            if (hit.focused) {
                 findings.push(
-                    `${file}:${index + 1}: a focused test (\`.only\`) shrinks the suite for everyone — remove it`
+                    `${where}: a focused test (\`${hit.label}\`) shrinks the suite for everyone — remove it`
                 );
+                continue;
             }
-            const skip = line.match(SKIP_PATTERN);
-            if (!skip) return;
-            const firstArgument = skip[3].trim() || (lines[index + 1] ?? '').trim();
-            if (isConditionalSkip(firstArgument)) return;
+            if (!hit.unconditional) continue;
             const window = lines.slice(Math.max(0, index - 2), index + 1).join('\n');
             const quarantine = window.match(QUARANTINE_PATTERN);
             if (!quarantine) {
                 findings.push(
-                    `${file}:${index + 1}: an unconditional \`.${skip[2]}\` needs "quarantine until YYYY-MM-DD" plus the reason (flaky tests are fixed or quarantined, never silently skipped)`
+                    `${where}: an unconditional \`${hit.label}\` needs "quarantine until YYYY-MM-DD" plus the reason (flaky tests are fixed or quarantined, never silently skipped)`
                 );
-            } else if (quarantine[1] < today) {
+            } else if (quarantine[1] <= today) {
                 findings.push(
-                    `${file}:${index + 1}: quarantine until ${quarantine[1]} has expired — fix the test or re-date it with the reason`
+                    `${where}: quarantine until ${quarantine[1]} has expired (a quarantine date is red ON the date, UTC) — fix the test or re-date it with the reason, at most ${String(QUARANTINE_MAX_DAYS)} days out`
+                );
+            } else if (quarantine[1] > latest) {
+                findings.push(
+                    `${where}: quarantine until ${quarantine[1]} is more than ${String(QUARANTINE_MAX_DAYS)} days away (the cap is ${String(QUARANTINE_MAX_DAYS)} days from today, so ${latest} at the latest) — fix the test, or pick an earlier date and re-date it when it falls due`
                 );
             }
-        });
+        }
     }
     return findings;
 };

@@ -18,6 +18,8 @@
  *   nvmrc    `.nvmrc` resolves below the floor (`24` means 24.0.0 here: name major.minor at least)
  *   reach    a locked package admits no Node of that major at or above the declared floor
  *   syntax   an `engines.node` this check cannot read (it refuses to guess, like version-holds)
+ *   lockroot the lockfile's root entry (`packages[""].engines`) differs from `package.json` `engines`:
+ *            npm rewrites it on the next install and leaves a dirty lockfile that `npm ci` never shows
  *
  * Fix a `floor` finding by raising `engines.node` and `.nvmrc` to the floor the message prints, never
  * by loosening the check. A lower floor returns only by a lockfile change that lowers it.
@@ -141,14 +143,51 @@ export const checkNodeFloor = ({ pkg, lock, nvmrc }) => {
     return findings;
 };
 
+/** `engines` as key-sorted JSON, so two objects holding the same pairs print and compare alike. */
+const enginesText = (engines) => {
+    const source = engines ?? {};
+    return JSON.stringify(
+        Object.fromEntries(
+            Object.keys(source)
+                .sort()
+                .map((key) => [key, source[key]])
+        )
+    );
+};
+
+/**
+ * The lockfile's root entry (`packages[""]`) mirrors the `engines` of package.json. When they differ,
+ * the first `npm install` rewrites the lockfile and leaves it dirty, while `npm ci` still passes, so
+ * nothing else notices. Pure: the caller reads the files.
+ */
+export const checkLockRootEngines = ({ pkg, lock }) => {
+    const root = lock?.packages?.[''];
+    if (typeof root !== 'object' || root === null) {
+        return [
+            'lockroot: package-lock.json has no root entry (packages[""]), so its engines cannot be compared with package.json'
+        ];
+    }
+    const declared = enginesText(pkg?.engines);
+    const locked = enginesText(root.engines);
+    if (declared === locked) return [];
+    return [
+        `lockroot: package-lock.json packages[""].engines is ${locked} but package.json engines is ${declared}; npm rewrites the lockfile root on the next install and leaves it dirty. Copy the package.json engines into packages[""]`
+    ];
+};
+
 export const run = ({ root }) => {
     const readJson = (file) => JSON.parse(readFileSync(path.join(root, file), 'utf8'));
     const nvmrcFile = path.join(root, '.nvmrc');
-    return checkNodeFloor({
-        pkg: readJson('package.json'),
-        lock: readJson('package-lock.json'),
-        nvmrc: existsSync(nvmrcFile) ? readFileSync(nvmrcFile, 'utf8') : null
-    });
+    const pkg = readJson('package.json');
+    const lock = readJson('package-lock.json');
+    return [
+        ...checkNodeFloor({
+            pkg,
+            lock,
+            nvmrc: existsSync(nvmrcFile) ? readFileSync(nvmrcFile, 'utf8') : null
+        }),
+        ...checkLockRootEngines({ pkg, lock })
+    ];
 };
 
 const main = () => {
@@ -160,7 +199,9 @@ const main = () => {
     console.log('node-floor');
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {
-        console.log('  ✔ engines.node and .nvmrc are at or above the floor the lockfile needs');
+        console.log(
+            '  ✔ engines.node and .nvmrc are at or above the floor the lockfile needs, and the lockfile root matches'
+        );
         process.exit(0);
     }
     console.log(

@@ -6,7 +6,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { checkNodeFloor, lowestAtOrAbove, nvmrcFloor } from './check-node-floor.mjs';
+import {
+    checkLockRootEngines,
+    checkNodeFloor,
+    lowestAtOrAbove,
+    nvmrcFloor
+} from './check-node-floor.mjs';
 import { parseRange } from './check-version-holds.mjs';
 
 const { describe, it } = globalThis.describe ? globalThis : await import('node:test');
@@ -16,9 +21,9 @@ const { describe, it } = globalThis.describe ? globalThis : await import('node:t
 const SCRIPT = path.resolve(process.cwd(), 'scripts/check-node-floor.mjs');
 
 const manifest = (node = '>=24.15.0') => ({ name: 'fixture', engines: { node } });
-const lockOf = (engines) => ({
+const lockOf = (engines, rootEngines = { node: '>=24.0.0' }) => ({
     packages: {
-        '': { name: 'fixture', engines: { node: '>=24.0.0' } },
+        '': { name: 'fixture', engines: rootEngines },
         ...Object.fromEntries(
             Object.entries(engines).map(([key, node]) => [
                 key.startsWith('node_modules/') ? key : `node_modules/${key}`,
@@ -155,12 +160,74 @@ describe('checkNodeFloor', () => {
     });
 });
 
+describe('checkLockRootEngines', () => {
+    const withEngines = (engines) => ({ name: 'fixture', engines });
+    const lockRoot = (engines) => ({ packages: { '': withEngines(engines) } });
+
+    it('passes when the lockfile root carries the same engines as package.json', () => {
+        const pkg = withEngines({ node: '>=24.15.0', npm: '>=11.10.0' });
+        const lock = lockRoot({ node: '>=24.15.0', npm: '>=11.10.0' });
+        assert.deepEqual(checkLockRootEngines({ pkg, lock }), []);
+    });
+
+    it('does not care in which order the keys are written', () => {
+        const pkg = withEngines({ node: '>=24.15.0', npm: '>=11.10.0' });
+        const lock = lockRoot({ npm: '>=11.10.0', node: '>=24.15.0' });
+        assert.deepEqual(checkLockRootEngines({ pkg, lock }), []);
+    });
+
+    it('fails a lockfile root whose node range differs, and prints both sides', () => {
+        const pkg = withEngines({ node: '>=24.15.0' });
+        const lock = lockRoot({ node: '>=24.0.0' });
+        const findings = checkLockRootEngines({ pkg, lock });
+        assert.equal(findings.length, 1);
+        assert.match(findings[0], /^lockroot: /);
+        assert.match(findings[0], /packages\[""\]\.engines is \{"node":">=24\.0\.0"\}/);
+        assert.match(findings[0], /package\.json engines is \{"node":">=24\.15\.0"\}/);
+    });
+
+    it('fails a lockfile root that lacks an engine package.json declares', () => {
+        const pkg = withEngines({ node: '>=24.15.0', npm: '>=11.10.0' });
+        const lock = lockRoot({ node: '>=24.15.0' });
+        const findings = checkLockRootEngines({ pkg, lock });
+        assert.equal(findings.length, 1);
+        assert.match(findings[0], /"npm":">=11\.10\.0"/);
+    });
+
+    it('fails a lockfile root that holds an engine package.json no longer declares', () => {
+        const pkg = withEngines({ node: '>=24.15.0' });
+        const lock = lockRoot({ node: '>=24.15.0', npm: '>=10.0.0' });
+        assert.equal(checkLockRootEngines({ pkg, lock }).length, 1);
+    });
+
+    it('treats a lockfile root with no engines like an empty object', () => {
+        assert.deepEqual(
+            checkLockRootEngines({ pkg: { name: 'fixture' }, lock: { packages: { '': {} } } }),
+            []
+        );
+        assert.equal(
+            checkLockRootEngines({ pkg: manifest(), lock: { packages: { '': {} } } }).length,
+            1
+        );
+    });
+
+    it('fails a lockfile with no root entry, because there is nothing to compare', () => {
+        const findings = checkLockRootEngines({ pkg: manifest(), lock: { packages: {} } });
+        assert.equal(findings.length, 1);
+        assert.match(findings[0], /^lockroot: .*no root entry/);
+        assert.equal(checkLockRootEngines({ pkg: manifest(), lock: {} }).length, 1);
+    });
+});
+
 describe('the command line', () => {
-    const cli = ({ node, nvmrc, engines }) => {
+    const cli = ({ node, nvmrc, engines, rootNode }) => {
         const root = mkdtempSync(path.join(tmpdir(), 'node-floor-'));
         try {
             writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest(node)));
-            writeFileSync(path.join(root, 'package-lock.json'), JSON.stringify(lockOf(engines)));
+            writeFileSync(
+                path.join(root, 'package-lock.json'),
+                JSON.stringify(lockOf(engines, manifest(rootNode ?? node).engines))
+            );
             if (nvmrc !== undefined) writeFileSync(path.join(root, '.nvmrc'), nvmrc);
             return spawnSync(process.execPath, [SCRIPT, '--root', root], { encoding: 'utf8' });
         } finally {
@@ -173,6 +240,17 @@ describe('the command line', () => {
         assert.equal(result.status, 1);
         assert.match(result.stdout, /✖ floor: .*">=24\.15\.0"/);
         assert.match(result.stdout, /✖ nvmrc: /);
+    });
+
+    it('exits 1 when the lockfile root engines differ from package.json', () => {
+        const result = cli({
+            node: '>=24.15.0',
+            rootNode: '>=24.0.0',
+            nvmrc: '24.15\n',
+            engines: { jsdom: '^24.15.0' }
+        });
+        assert.equal(result.status, 1);
+        assert.match(result.stdout, /✖ lockroot: .*packages\[""\]\.engines/);
     });
 
     it('exits 0 when the manifest and .nvmrc agree with the lockfile', () => {

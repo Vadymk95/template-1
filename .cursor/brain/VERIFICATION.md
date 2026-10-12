@@ -11,7 +11,7 @@ always runs the full chain — the phase gates only the LOCAL hook.
 
 | Check | Runs at phase 0 (scaffold) | Added when (the trigger) |
 | --- | --- | --- |
-| audit, lock-age, hooks-check, version holds, node floor, oxlint, format, tsc, lint, coverage | yes — every push, seconds | day one |
+| audit, lock-age, hooks-check, version holds, node floor, sibling-test range, docs-check, oxlint, format, tsc, lint, coverage | yes — every push, seconds | day one |
 | production build in the gate | no | the FIRST DEPLOY: flip `"phase": 1` in its own commit |
 | web-vitals chunks, `size:check` | no | same flip — they measure a built artefact |
 | prod-mode e2e (`vite preview`) | no | same flip — a prod boundary now exists |
@@ -46,8 +46,8 @@ The push gate's preflight takes `--kill-port` (SIGTERM, re-probe, refuse if it w
   the import graph only, so cross-cutting suites surface at the full-gate run, not during iteration.
 - **`npm run verify`** — every **offline** check. Stage order: the `verify:inner` script; the superset
   rule and the push/CI split: `AGENTS.md` § the gate; why: `DECISIONS.md` § The gate is `verify`.
-- **`npm run verify:ci`** — `audit:gate && lock:age && verify`. Both need the network, which is why they
-  are not inside `verify`: an offline implementer can still run the complete offline gate.
+- **`npm run verify:ci`** — `audit:gate && lock:age && verify`. The first two need
+  the network, which is why they are not inside `verify`: an offline implementer can still run the complete offline gate.
 - **`npm run verify:full`** — `verify:ci && smoke:dev`. `smoke:dev` measures the content-variance
   fixture, which is mounted only under `import.meta.env.DEV` and therefore unreachable from the
   `vite preview` run inside `verify`. It needs a second server on its own port, so it is not in
@@ -85,7 +85,7 @@ Targeted checks are for the iteration loop. The gate is what says "done".
 - **i18n copy only** (value edits in `public/locales/**/*.json`) — `npm run format:check`; wrapping and
   overflow for new copy lengths belong to the content-variance tier, not to a per-edit run
 - **TS/TSX / tests** (logic, components, hooks, stores) — `npm run verify:iter`
-- **Docs, rules, commands, brain, tier data** (`*.md`, `*.mdc`, `scripts/gate-tiers.json`) — `npm run docs:check` (the pre-commit hook runs it when such files are staged; `--weekly`, the scheduled Docs workflow's flag, runs the same checks so a quarantine that expires while nobody pushes still turns it red; it also refuses a focused test, an unconditional skip without `quarantine until YYYY-MM-DD` + reason, and an agent-memory import: an `@` pointer in `CLAUDE.md` or `AGENTS.md` that names a file, which Claude Code would load into every session; write it as a backticked path instead)
+- **Docs, rules, commands, brain, tier data** (`*.md`, `*.mdc`, `scripts/gate-tiers.json`) — `npm run docs:check` (the pre-commit hook runs it when such files are staged, and `verify` and `verify:scaffold` run it on every push; `--weekly`, the scheduled Docs workflow's flag, runs the same checks so a quarantine that expires while nobody pushes still turns it red; it also refuses a focused test, an unconditional way to switch a test off (`.skip`, `.fixme`, an expected failure such as `.fails` or `.failing`, a constant `.skipIf(true)`) without `quarantine until YYYY-MM-DD` + reason, a quarantine date more than 30 days out, a quarantine whose date has arrived (red ON the date, UTC, not the day after), and an agent-memory import: an `@` pointer in `CLAUDE.md` or `AGENTS.md` that names a file, which Claude Code would load into every session; write it as a backticked path instead)
 - **Proposing a new browser spec** — the suite is counted in invariants, not screens (`AGENTS.md` § the gate); `npm run docs:check` reports the suite against the ceiling in `scripts/gate-tiers.json` § suites
 - **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing) — `npm run e2e:one -- <spec>`. Locally a failure is a failure (no retries). In CI a test gets two retries so one flake cannot block a merge, but a test that only passed on a retry still fails the run (`failOnFlakyTests`): fix it or quarantine it (`docs:check` tracks quarantines), never let it pass quietly. Specs that run against the built app import `test` from `e2e/support/test.ts`: it fails a test on a Content-Security-Policy violation, read from the console and from the `securitypolicyviolation` event so every engine reports it, because `vite preview` sends the shipped headers (`vite-plugins/security-headers.ts`, whose unit test pins the set). A spec that visits a route also runs the axe scan (`e2e/support/a11y.ts`); a serious or critical violation, or a control under the WCAG 2.2 target-size minimum, fails it, and the failure prints the rule id and the selectors.
 - **A shared UI primitive, the layout shell, or `src/index.css`** — the MEASURE moment:
@@ -146,7 +146,10 @@ refusal: `npm run fix && git add -u`.
 
 The same hook blocks a staged `src` logic file with no co-located `*.test.*`
 (`scripts/check-test-siblings.mjs`). It inspects only staged files, so it ratchets forward rather than
-demanding a retroactive sweep. It proves a test EXISTS, never that it is any good — that is what the
+demanding a retroactive sweep. A sibling counts only when it is in the index, never when it merely sits on disk. The
+same check runs over the whole branch inside `verify` and `verify:scaffold`, so CI and the push in either phase reach it
+(`--range`: `base...HEAD` against HEAD's tree; base = `HEAD~1` in CI, else the merge base with `origin/master`), so a
+`--no-verify` commit is caught at the push. It proves a test EXISTS, never that it is any good — that is what the
 mutation check in `.cursor/rules/agent-pipeline.mdc` §4.1a is for.
 
 Its barrel exemption is spelled `index.ts`, never `index.tsx`, and the difference is load-bearing: in

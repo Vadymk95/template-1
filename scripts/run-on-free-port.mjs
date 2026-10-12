@@ -18,7 +18,11 @@ const PROBE_LIMIT = 20;
 
 const CONNECT_TIMEOUT_MS = 300;
 
-/** Something answers here: the port is taken for anyone who dials it by name. */
+/**
+ * Something answers here: the port is taken for anyone who dials it by name. Any connect error
+ * (ECONNREFUSED, or EADDRNOTAVAIL on a host with no `::1`, such as a container whose loopback has
+ * IPv6 disabled) means nobody answers on that family; it is never thrown.
+ */
 const someoneAnswers = async (host, port) =>
     new Promise((resolveAnswer) => {
         const socket = connect({ host, port });
@@ -101,6 +105,10 @@ const main = async () => {
         shell: false,
         env: buildChildEnv(process.env, port)
     });
+    if (result.error) {
+        // A command that never started has no exit code of its own; say why instead of a bare 1.
+        console.error(`Could not start \`${command}\`: ${result.error.message}`);
+    }
     process.exit(result.status ?? 1);
 };
 

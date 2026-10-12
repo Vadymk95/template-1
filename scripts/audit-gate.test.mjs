@@ -7,7 +7,7 @@
 // which trains people to edit the test instead of the policy.
 import { describe, expect, it } from 'vitest';
 
-import { evaluateAudit } from './audit-gate.mjs';
+import { evaluateAudit, formatFailures } from './audit-gate.mjs';
 
 const NOW = new Date('2026-01-15T00:00:00.000Z');
 const ID = 'GHSA-test-aaaa-bbbb';
@@ -84,6 +84,52 @@ describe('evaluateAudit', () => {
 
         expect(result.expired).toEqual([expect.objectContaining({ id: ID })]);
         expect(result.ok).toBe(false);
+    });
+
+    describe('the date an allowance carries is its first red day', () => {
+        const onDate = [allowance({ expires: '2026-01-15' })];
+
+        it('is still valid the instant before that day begins', () => {
+            const result = evaluateAudit(rootOnly(), onDate, new Date('2026-01-14T23:59:59.999Z'));
+
+            expect(result.expired).toEqual([]);
+            expect(result.ok).toBe(true);
+        });
+
+        it('is red the instant that day begins', () => {
+            const result = evaluateAudit(rootOnly(), onDate, new Date('2026-01-15T00:00:00.000Z'));
+
+            expect(result.expired).toEqual([expect.objectContaining({ id: ID })]);
+            expect(result.ok).toBe(false);
+        });
+
+        it('is red the day after as well', () => {
+            const result = evaluateAudit(rootOnly(), onDate, new Date('2026-01-16T00:00:00.000Z'));
+
+            expect(result.expired).toEqual([expect.objectContaining({ id: ID })]);
+            expect(result.ok).toBe(false);
+        });
+    });
+
+    describe('the red line for an expired allowance', () => {
+        const expired = () =>
+            formatFailures(evaluateAudit(rootOnly(), [allowance({ expires: '2026-01-14' })], NOW));
+
+        it('names the file to edit and the action to take', () => {
+            const [line] = expired();
+
+            expect(line).toContain('scripts/audit-allowlist.json');
+            expect(line).toContain('re-check upstream');
+            expect(line).toContain('re-date with a fresh reading or remove the entry');
+        });
+
+        it('names the entry and the date it carries, and says the date itself is red', () => {
+            const [line] = expired();
+
+            expect(line).toContain(ID);
+            expect(line).toContain('2026-01-14');
+            expect(line).toContain('red from that date on');
+        });
     });
 
     it('fails an unparseable expiry date rather than treating it as far future', () => {

@@ -21,8 +21,9 @@ Production-ready React 19 + Vite 8 + TypeScript 6 template with routing, Zustand
 ## 📋 Prerequisites
 
 - **Node.js v24.15+** (use `nvm` for version management; `npm run verify` fails if `engines.node` drops below what the lockfile needs)
-- **npm** (comes with Node.js)
+- **npm 11.10+** (Node 24.15 bundles 11.12). `.npmrc` sets `min-release-age`, which older npm ignores with only an `Unknown project config` warning; `engines.npm` plus `engine-strict` make the install refuse instead
 - **Git**
+- **lsof** (macOS ships it; Debian/Ubuntu: `apt-get install lsof`). The push gate uses it to free the e2e port; without it that step stops with the install line instead of continuing blind
 
 Strict version pinning via `.nvmrc` and `package.json` engines.
 
@@ -227,7 +228,7 @@ VITE_ENABLE_MSW=false
 | `npm run test:e2e:ui`              | Playwright UI mode                                                                         |
 | `npm run fix`                      | The remedy: oxlint `--fix` → eslint `--fix` → prettier, repo-wide                          |
 | `npm run verify`                   | **The gate** — every offline check (see below)                                             |
-| `npm run verify:ci`                | `audit:gate && lock:age && verify` — the CI chain; the push runs it in phase 1             |
+| `npm run verify:ci`                | `audit:gate && lock:age && verify` — the CI chain; push phase 1                            |
 | `npm run ci:local`                 | Alias of `verify:ci`                                                                       |
 | `npm run verify:iter`              | Iteration tier: oxlint → tsc → vitest --changed; run per change                            |
 | `npm run verify:measure`           | MEASURE moment: build + look (`-- e2e/<f>.spec.ts` for one spec)                           |
@@ -240,6 +241,7 @@ VITE_ENABLE_MSW=false
 | `npm run docs:check`               | Mechanical doc drift: paths, scripts, sentinels, versions, dead docs, agent-memory imports |
 | `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist                                |
 | `npm run lock:age`                 | Fails a lockfile version younger than `min-release-age` unless allowed (reason + expiry)   |
+| `npm run gate:integrity`           | Lists the gate files and suppressions this branch changes vs `origin/master` (CI: PR base) |
 | `npm run bench:verify`             | The gate step by step with timings                                                         |
 | `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job                                   |
 | `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                                           |
@@ -248,8 +250,8 @@ VITE_ENABLE_MSW=false
 
 ### The gate
 
-`npm run verify` is every offline check; `npm run verify:ci` adds the network-bound `audit:gate` and `lock:age` and is
-what CI runs. The gate is tiered by moment (iterate, measure, commit, push, CI), and the ONLY definition of
+`npm run verify` is every offline check, the sibling-test check over the whole branch
+(`check-test-siblings.mjs --range`) included; `npm run verify:ci` adds the network-bound `audit:gate` and `lock:age` and is what CI runs. The gate is tiered by moment (iterate, measure, commit, push, CI), and the ONLY definition of
 which script belongs to which moment, what the push runs in each phase and what is never run by hand is
 `AGENTS.md` § Commands / the gate. Stage timings: `.cursor/brain/VERIFICATION.md`. The exact stage order:
 the `verify:inner` script in `package.json` — it is not repeated here on purpose.
@@ -268,7 +270,7 @@ Five commands in `.claude/commands/` (`/onboard`, `/feat`, `/test`, `/review`, `
 **Pre-commit** (Husky):
 
 1. `lint-staged` — oxlint `--fix` → ESLint `--fix` → Prettier on the **staged** files
-2. TDD gate — a staged `src` logic file with no co-located `*.test.*` blocks the commit
+2. TDD gate — a staged `src` logic file with no co-located `*.test.*` in the index (staged or already committed) blocks the commit; a test that exists only on disk does not count
 3. **Repo-wide** `lint:oxlint`, `format:check` and `typecheck`
 
 Why step 3 exists: `.cursor/brain/DECISIONS.md` › "The gate is `verify`", paragraph "Pre-commit is repo-scoped". On failure the
@@ -277,7 +279,7 @@ hook prints the remedy: `npm run fix && git add -u`.
 **Commit message** (Commitlint): `type(scope): subject`, max 96 chars.
 
 **Pre-push:** `npm run verify:push` — phase-aware (`scripts/gate-tiers.json`): phase 0 runs the audit gate, the
-lock-age check and the offline checks, and loudly skips build, size and e2e until the first deploy; phase 1 runs the full `verify:ci`.
+lock-age check and the offline checks (the sibling-test range check among them), and loudly skips build, size and e2e until the first deploy; phase 1 runs the full `verify:ci`.
 
 ### CI (GitHub Actions)
 
@@ -296,6 +298,20 @@ with `uvx zizmor@1.30.1 .github/workflows`: the version is the one the job pins 
 `.github/zizmor.yml`, so it reproduces the gate online or offline. zizmor audits only this repository's
 workflow files; its online audits also ask the GitHub API about the actions those files reference, with the
 job's read-only token.
+
+**`gate-integrity.yml`** — on pull requests (also when a label is added or removed): lists every changed gate
+file (the globs in `scripts/gate-files.json`: the check scripts and their tests, hooks, workflows, lint, type, test
+and coverage configs, the agent rules, `.npmrc`), every changed `package.json` entry under `scripts`, `engines`,
+`lint-staged` or `overrides`, and every added suppression (`eslint-disable`, `@ts-expect-error`,
+`quarantine until`, a coverage ignore pragma, or a test switch: a line with `.skip`, `.fixme`, `.fails`, `.failing`,
+`.fail`, `.skipIf`, `.runIf`, `expectFailure`, `xit`, `xtest` or `xdescribe`, and in a test, setup, fixture or e2e
+file also `.todo`, a `skip`, `todo` or `fails` option, and the skip vitest hands to a test: a bare `skip()` call or a
+`({ skip })` binding). In those files a changed line within three lines under such a word is listed too, which is how
+an edit to the condition or the reason of a `test.skip(` written over several lines reaches the list. Anything listed
+fails the job until a reviewer who has read the list adds the label `gate-change`. It is a required check in
+`.github/ruleset.json`; run it before pushing with
+`npm run gate:integrity`. A gate config that imports a helper (a setup or fixtures file) needs that helper listed too:
+`scripts/gate-config-coverage.test.mjs` fails until the manifest names it.
 
 Every action in every workflow is pinned to a full commit SHA, with its version as a trailing comment:
 a `@vN` tag is a movable pointer and has been retargeted in supply-chain attacks. Dependabot's
@@ -539,6 +555,7 @@ Not inherited, and each one is a switch in your own repository's settings:
 - **Rulesets and branch protection**, including every required status check. Until you add one, your default branch accepts any push, and the pull-request discipline this repository documents is a habit rather than a rule. Rulesets also need a **public** repository or a paid plan: in a private fork on GitHub Free the required CI check is only a convention, whatever this file says. A private fork also removes the `codeql` job (code scanning is a paid add-on there) AND its entry in `.github/ruleset.json` in the same commit, or the ruleset waits forever for a check that never reports.
 - **Actions permissions.** A fork starts with workflows disabled; GitHub asks you to enable them once, in the Actions tab. Until you do, the CI described here never runs, and a green screen means nobody looked.
 - **Secret scanning and push protection**, **CodeQL**, and **Dependabot alerts.** The Dependabot CONFIG file travels; the alerts it feeds are a setting.
+- **The `gate-change` label and, in a team fork, CODEOWNERS.** Create the label `gate-change` once (the `gate-integrity` check needs it to pass a reviewed gate change). CI runs the pull request's OWN copy of the script and the workflow, so a change that edits them also decides whether they stop it: the real boundary is the required `gate-integrity` check plus a person who reads the list before labelling. In a team fork add a `CODEOWNERS` file covering the paths in `scripts/gate-files.json` and turn on required code-owner review, so that person is never the author. A label change re-runs the check; re-running an OLD run replays the labels that run started with, so after labelling let the `labeled` event run the job.
 
 `.github/ruleset.json` is the protection this repository runs, written down so you can reproduce it with one command instead of clicking through a form:
 

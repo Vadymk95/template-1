@@ -1,3 +1,12 @@
+/**
+ * audit-gate: `npm audit` fails on a high or critical advisory unless scripts/audit-allowlist.json
+ * carries a reasoned, dated allowance for it. It fails closed: an audit that cannot complete, a stale
+ * allowance (its advisory is gone) and an expired allowance are all red.
+ *
+ * Date rule, the same in every date guard of this repo: the date an entry carries is its first RED
+ * day (UTC). The day before is green, the day itself and every day after are red, so an entry never
+ * lives a day longer than written. An unreadable date is red too.
+ */
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
@@ -92,7 +101,7 @@ const collectAdvisories = (audit) => {
 
 const isExpired = (expires, now) => {
     const expiry = new Date(`${expires}T00:00:00.000Z`);
-    return Number.isNaN(expiry.valueOf()) || expiry < now;
+    return Number.isNaN(expiry.valueOf()) || expiry <= now;
 };
 
 /**
@@ -157,6 +166,25 @@ const loadAllowlist = () => {
 const formatEntries = (label, entries) =>
     entries.map(({ id, severity }) => `${label}: ${id}${severity ? ` (${severity})` : ''}`);
 
+const EXPIRED_REMEDY =
+    'Edit scripts/audit-allowlist.json: re-check upstream, then re-date with a fresh reading or remove the entry.';
+
+const formatExpired = (entries) =>
+    entries.map(
+        ({ id, expires }) =>
+            `Expired allowlist entry: ${id} expires ${expires}, red from that date on (UTC). ${EXPIRED_REMEDY}`
+    );
+
+/** The red lines for an evaluation result; empty when the audit is clean. */
+export const formatFailures = (result) =>
+    result.auditFailed
+        ? ['Audit could not be completed; failing closed.']
+        : [
+              ...formatEntries('Unexpected high/critical advisory', result.unexpected),
+              ...formatExpired(result.expired),
+              ...formatEntries('Stale allowlist entry', result.stale)
+          ];
+
 const main = () => {
     const allowlist = loadAllowlist();
     const loadedAudit = loadAudit();
@@ -177,13 +205,7 @@ const main = () => {
         );
     }
 
-    const failures = result.auditFailed
-        ? ['Audit could not be completed; failing closed.']
-        : [
-              ...formatEntries('Unexpected high/critical advisory', result.unexpected),
-              ...formatEntries('Expired allowlist entry', result.expired),
-              ...formatEntries('Stale allowlist entry', result.stale)
-          ];
+    const failures = formatFailures(result);
 
     if (failures.length > 0) {
         console.error(failures.join('\n'));

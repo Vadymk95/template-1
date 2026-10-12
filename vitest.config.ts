@@ -14,6 +14,8 @@ export default mergeConfig(
     defineConfig({
         test: {
             globals: true,
+            // Vitest defaults this to `!isCI`, which lets a stray `.only` pass every local gate.
+            allowOnly: false,
             environment: 'jsdom',
             setupFiles: ['./src/test/setup.ts'],
             coverage: {

@@ -11,6 +11,7 @@ import {
     changedVersions,
     checkLockAge,
     failureSummary,
+    isExpired,
     loadBase,
     lockedVersions,
     parseMinReleaseAge,
@@ -252,6 +253,54 @@ describe('checkLockAge', () => {
         });
         assert.equal(findings.length, 1);
         assert.match(findings[0], /allowance expired 2026-10-09/);
+    });
+
+    it('names the allowlist file and the date in the red line, and says the date itself is red', async () => {
+        const { findings } = await check({
+            changed,
+            docs: { next: { '16.4.0': daysAgo(1) } },
+            allowances: [allowance({ expires: '2026-10-09' })]
+        });
+        assert.match(findings[0], /red from that date on/);
+        assert.match(findings[0], /scripts\/lock-age-allowlist\.json/);
+    });
+
+    /* The date an allowance carries is its first red day: the day before is green, the day itself and
+       every day after are red. */
+    describe('the allowance date boundary', () => {
+        const PUBLISHED = '2026-10-09T20:00:00.000Z';
+        const onDate = (now) =>
+            check({
+                changed,
+                docs: { next: { '16.4.0': PUBLISHED } },
+                allowances: [allowance({ expires: '2026-10-10' })],
+                now: new Date(now)
+            });
+
+        it('still holds the instant before that day begins', async () => {
+            const { findings, notes } = await onDate('2026-10-09T23:59:59.999Z');
+            assert.deepEqual(findings, []);
+            assert.equal(notes.length, 1);
+        });
+
+        it('is red the instant that day begins', async () => {
+            const { findings } = await onDate('2026-10-10T00:00:00.000Z');
+            assert.equal(findings.length, 1);
+            assert.match(findings[0], /allowance expired 2026-10-10/);
+        });
+
+        it('is red the day after as well', async () => {
+            const { findings } = await onDate('2026-10-11T00:00:00.000Z');
+            assert.equal(findings.length, 1);
+            assert.match(findings[0], /allowance expired 2026-10-10/);
+        });
+
+        it('isExpired draws the same line, and reads an unreadable date as expired', () => {
+            assert.equal(isExpired('2026-10-10', new Date('2026-10-09T23:59:59.999Z')), false);
+            assert.equal(isExpired('2026-10-10', new Date('2026-10-10T00:00:00.000Z')), true);
+            assert.equal(isExpired('2026-10-10', new Date('2026-10-11T00:00:00.000Z')), true);
+            assert.equal(isExpired('next week', new Date('2026-10-09T00:00:00.000Z')), true);
+        });
     });
 
     it('does not let an allowance for another version cover this one', async () => {

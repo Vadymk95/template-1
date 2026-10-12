@@ -430,16 +430,25 @@ describe('checkHolds: an absent package', () => {
 });
 
 describe('checkHolds: an expired reviewBy', () => {
-    it('fails the day after reviewBy, naming the lift condition', () => {
-        const findings = check({ holds: [hold({ reviewBy: '2026-10-08' })] });
+    /* The date a hold carries is its first red day: the day before is green, the day itself and
+       every day after are red. */
+    it('passes the day before reviewBy', () => {
+        assert.deepEqual(check({ holds: [hold({ reviewBy: '2026-10-10' })] }), []);
+        assert.deepEqual(check({ holds: [hold({ reviewBy: '2026-11-02' })] }), []);
+    });
+
+    it('fails ON reviewBy, naming the lift condition and saying the date itself is red', () => {
+        const findings = check({ holds: [hold({ reviewBy: TODAY })] });
         assert.equal(findings.length, 1);
-        assert.match(findings[0], /^vitest: reviewBy 2026-10-08 has passed/);
+        assert.match(findings[0], /^vitest: reviewBy 2026-10-09 is due/);
+        assert.match(findings[0], /red from that date on/);
         assert.match(findings[0], /A runner release that passes the one-file probe/);
     });
 
-    it('passes on reviewBy itself and before it', () => {
-        assert.deepEqual(check({ holds: [hold({ reviewBy: TODAY })] }), []);
-        assert.deepEqual(check({ holds: [hold({ reviewBy: '2026-11-02' })] }), []);
+    it('fails the day after reviewBy as well', () => {
+        const findings = check({ holds: [hold({ reviewBy: '2026-10-08' })] });
+        assert.equal(findings.length, 1);
+        assert.match(findings[0], /^vitest: reviewBy 2026-10-08 is due/);
     });
 
     it('fails a reviewBy that is not a real ISO date', () => {
