@@ -62,4 +62,4 @@ All four scaffolded namespaces are eager (`src/lib/i18n/constants.ts`: `DEFAULT_
 
 - **The gate, its moments and scripts**: `AGENTS.md` § Commands / the gate is the only definition; stage timings and what was deliberately not added: `VERIFICATION.md`; the full script list: `package.json`.
 - `npm run dev` serves on port 3000 (`vite.config.ts`). ESLint runs through the IDE extension (`.vscode/extensions.json`) and `lint-staged`, not inside Vite.
-- **E2E**: Playwright (`e2e/`, `playwright.config.ts`). Local `npm run test:e2e` starts `vite` dev on 3000; CI, `test:e2e:prod` and `PLAYWRIGHT_USE_PREVIEW=1` use `vite preview` on 4173 after `build`. Browsers install on demand through `scripts/ensure-playwright.mjs`.
+- **E2E**: Playwright (`e2e/`, `playwright.config.ts`). Local `npm run test:e2e` starts `vite` dev on 3000; CI, `test:e2e:prod` and `PLAYWRIGHT_USE_PREVIEW=1` use `vite preview` on 4173, which serves the production bundle. Browsers install on demand through `scripts/ensure-playwright.mjs`.

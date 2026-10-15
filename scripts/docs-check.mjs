@@ -40,6 +40,25 @@
  *              job (its `name:` or id, plus matrix values) or listed in ci.rulesetContextAllowlist
  *   pointers   a section pointer, `file` § Heading, in any tracked .md/.mdc file (DECISIONS.md
  *              included) must resolve to a heading of that file (rules above checkSectionPointers)
+ *   chains     `checks.<name>.chain` in gate-tiers.json, the one readable view of what a gate script
+ *              runs, equals the chain derived from that script in package.json (the tracer wrapper
+ *              unwrapped, `&&` split); a multi-step script without a chain, or a chain for a script
+ *              that is not one, is a finding too
+ *   stageWords every key of `docs.stageWords` is a stage of the `verify*` chains
+ *   retelling  no line outside that view retells the gate chain. A line does when it names
+ *              RETELLING_MIN_STAGES or more distinct stages (the stage names derived from
+ *              package.json plus the words listed in `docs.stageWords`), or when, inside one
+ *              sentence, it puts two parts of one script within COMPOSITION_PAIR_GAP_WORDS words of
+ *              each other ("a then b", "a + b", "a -> b"), or a script within
+ *              COMPOSITION_PART_GAP_WORDS words of one of its own steps ("x = a && b", "x runs a").
+ *              The scripts are all multi-step ones in package.json, the parts their steps and
+ *              those of the traced entry points among them. It reads every doc line (fenced blocks
+ *              and table rows included, DECISIONS.md too), the name and comment lines of the
+ *              workflows, the comment lines of `.husky/*` and the prose keys of gate-tiers.json
+ *              (`description`, `reason`, `_*`; a JSON escape read as a space), and joins the lines
+ *              of a chain wrapped at an arrow. It does not read script comments, issue templates or code, a composition
+ *              spread over more words than those windows or over several sentences, or a list
+ *              whose lines name fewer stages than the threshold one by one
  *   budget     (report only) the push budget vs the p90 of traced pushes IN THE SAME PHASE; a
  *              missing log or too few rows prints a loud skip, never a silent pass
  *
@@ -1475,6 +1494,459 @@ export const budgetReport = ({
     };
 };
 
+/*
+ * The gate chain lives in ONE readable place, `checks.<name>.chain` in scripts/gate-tiers.json, and
+ * package.json stays the only definition of what runs. The chain is derived from the script, never
+ * typed from memory, and compared; every other file names a script and points at that view. The same
+ * steps give the retelling check its stage vocabulary, so the docs are policed against the very
+ * chain the gate runs.
+ */
+const TIERS_FILE = 'scripts/gate-tiers.json';
+const GATE_TRACER = /^node scripts\/gate-trace\.mjs\s+\S+\s+--\s+(.+)$/;
+const NPM_ALIAS = /^npm run (\S+)$/;
+const NPM_STEP = /^npm run (\S+)(?:\s+(.+))?$/;
+const NODE_STEP = /^node (?:\S*\/)?([^\s/]+?)\.[cm]?js(?:\s+(.+))?$/;
+const ENV_ASSIGNMENTS = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/;
+const MAX_ALIAS_HOPS = 8;
+const CHAIN_ARROW = ' -> ';
+/** Fewer stages than this on one line is a mention; this many is a retelling (measured: DECISIONS.md, "The gate chain has one readable home"). */
+export const RETELLING_MIN_STAGES = 3;
+/** Words that may sit between two parts of one script and still read as "a then b", "a + b", "a behind the b" (measured: DECISIONS.md, "The gate chain has one readable home"). */
+export const COMPOSITION_PAIR_GAP_WORDS = 2;
+/** Words that may sit between a script and one of its own steps and still read as "x = a && b", "x runs a first" (measured: same entry). */
+export const COMPOSITION_PART_GAP_WORDS = 4;
+
+/**
+ * The commands a package.json script runs, in order. The tracer wrapper is unwrapped, an
+ * `npm run <inner>` hop is followed unless <inner> has an entry of its own in gate-tiers.json (a
+ * script that only aliases a registered check stays one step: the target has the chain), and `&&`
+ * splits. A script that does not exist has no steps.
+ */
+export const scriptSteps = ({ scripts, name, registered = new Set() }) => {
+    let command = scripts[name];
+    for (let hop = 0; typeof command === 'string' && hop < MAX_ALIAS_HOPS; hop += 1) {
+        const traced = GATE_TRACER.exec(command);
+        const alias = NPM_ALIAS.exec(command);
+        if (traced) {
+            command = traced[1];
+        } else if (alias && !registered.has(alias[1]) && typeof scripts[alias[1]] === 'string') {
+            command = scripts[alias[1]];
+        } else {
+            break;
+        }
+    }
+    return typeof command === 'string'
+        ? command
+              .split(/\s+&&\s+/)
+              .map((step) => step.trim())
+              .filter((step) => step.length > 0)
+        : [];
+};
+
+/** A step as the chain view writes it: a script by its name, a node script by its file stem, else as typed. */
+export const stepLabel = (command) => {
+    const node = NODE_STEP.exec(command);
+    if (node) return node[2] ? `${node[1]} ${node[2]}` : node[1];
+    const npm = NPM_STEP.exec(command);
+    if (npm) return npm[2] ? `${npm[1]} ${npm[2]}` : npm[1];
+    return command;
+};
+
+/** The stage a step is: its script, its node script's file stem, or the tool a raw command starts with. */
+export const stageName = (command) => {
+    const node = NODE_STEP.exec(command);
+    if (node) return node[1];
+    const npm = NPM_STEP.exec(command);
+    if (npm) return npm[1];
+    return command.replace(ENV_ASSIGNMENTS, '').split(/\s+/)[0];
+};
+
+/** The chain of a script, `a -> b -> c`, or null when it runs fewer than two steps. */
+export const deriveChain = (args) => {
+    const steps = scriptSteps(args);
+    return steps.length >= 2 ? steps.map(stepLabel).join(CHAIN_ARROW) : null;
+};
+
+/** `checks.<name>.chain` must equal what package.json runs; a chain script without one, or a chain for a script that is not one, is a finding. */
+export const checkGateChains = ({ checks, scripts }) => {
+    const registered = new Set(Object.keys(checks));
+    const findings = [];
+    for (const [name, entry] of Object.entries(checks)) {
+        const derived = deriveChain({ scripts, name, registered });
+        const written = isRecord(entry) ? entry.chain : undefined;
+        if (derived === null && written !== undefined) {
+            findings.push(
+                `${TIERS_FILE}: checks.${name}.chain is written, but "${name}" in package.json is not a chain of two or more steps — drop it`
+            );
+        } else if (derived !== null && written === undefined) {
+            findings.push(
+                `${TIERS_FILE}: checks.${name} runs a chain in package.json but has no chain — add "chain": "${derived}"`
+            );
+        } else if (derived !== null && written !== derived) {
+            findings.push(
+                `${TIERS_FILE}: checks.${name}.chain differs from package.json — expected "${derived}"`
+            );
+        }
+    }
+    return findings;
+};
+
+/** The traced script a name leads to through `npm run` aliases (`verify` where it only aliases `verify:enterprise` is that one), else null. */
+const tracedScript = (scripts, name) => {
+    let current = name;
+    for (let hop = 0; hop < MAX_ALIAS_HOPS; hop += 1) {
+        const command = scripts[current];
+        if (typeof command !== 'string') return null;
+        if (GATE_TRACER.test(command)) return current;
+        const alias = NPM_ALIAS.exec(command);
+        if (!alias) return null;
+        current = alias[1];
+    }
+    return null;
+};
+
+/** A traced script is a moment's entry point (`verify`, `verify:ci`), not a stage of the gate. */
+const isEntryPoint = (scripts, name) => tracedScript(scripts, name) !== null;
+
+/** The stages of the gate: the steps of every `verify*` chain, less the entry points those chains call. */
+export const gateStages = ({ checks, scripts }) => {
+    const registered = new Set(Object.keys(checks));
+    const stages = new Set();
+    for (const name of registered) {
+        if (!name.startsWith('verify')) continue;
+        const steps = scriptSteps({ scripts, name, registered });
+        if (steps.length < 2) continue;
+        for (const step of steps) {
+            const stage = stageName(step);
+            if (!isEntryPoint(scripts, stage)) stages.add(stage);
+        }
+    }
+    return stages;
+};
+
+/** Words listed under a name that is not a stage would rot silently, so they are findings. */
+export const checkStageWords = ({ stages, stageWords }) =>
+    Object.keys(stageWords)
+        .filter((stage) => !stages.has(stage))
+        .map(
+            (stage) =>
+                `${TIERS_FILE}: docs.stageWords.${stage} names no stage of the verify chains in package.json — rename or drop it`
+        );
+
+const normalizePhrase = (text) =>
+    text
+        .toLowerCase()
+        .split(/[\s_:-]+/)
+        .filter((word) => word.length > 0)
+        .join(' ');
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** The phrase as a line spells it: its words joined by any separator, not inside a longer word, a hyphenated compound, another script name, a member (`scripts.build`) or a file name (`smoke.spec.ts`). */
+const phrasePattern = (phrase, flags = 'i') =>
+    new RegExp(
+        `(?<![\\w-]|\\w[:.])${phrase.split(' ').map(escapeRegExp).join('[\\s_:-]+')}(?![\\w-]|:\\w|\\.\\w)`,
+        flags
+    );
+
+/**
+ * What the docs call a stage: each stage's own name (derived from package.json) and the words
+ * `docs.stageWords` files under it. The stage names come first, so a listed word never shadows one.
+ */
+export const gateVocabulary = ({ stages, stageWords = {} }) => {
+    const entries = new Map();
+    const add = (word, stage) => {
+        const phrase = normalizePhrase(word);
+        if (phrase.length > 0 && !entries.has(phrase)) {
+            entries.set(phrase, { phrase, stage, pattern: phrasePattern(phrase) });
+        }
+    };
+    for (const stage of stages) add(stage, stage);
+    for (const [stage, words] of Object.entries(stageWords)) {
+        if (!stages.has(stage) || !Array.isArray(words)) continue;
+        for (const word of words) add(word, stage);
+    }
+    return [...entries.values()];
+};
+
+/** The distinct stages a text names, however many of their spellings it uses. */
+export const stagesNamed = (text, vocabulary) => {
+    const named = new Set();
+    for (const { stage, pattern } of vocabulary) {
+        if (pattern.test(text)) named.add(stage);
+    }
+    return named;
+};
+
+/*
+ * Two parts of one script close together are its chain retold, whatever the count: "a then b",
+ * "a + b", "a -> b", "x = a && b", "x runs a first". The names are every multi-step script of
+ * package.json and each of its steps (build and lint included, not only the stages), plus the
+ * words `docs.stageWords` files under a stage. A script's parts are its steps and, for a step that
+ * is a traced entry point, that entry's own steps: `verify:ci` brings `verify` and what `verify`
+ * runs. A script that runs nothing but a registered check has no steps of its own, and a check no
+ * script contains relates to nothing, so neither needs a name of its own. A bare script or step name
+ * (`build`, `eslint`) is an ordinary word unless the doc puts it in code or chains it to its sibling
+ * with `&&` or an arrow; a word the docs file under a stage is strong only when no script or step
+ * spells it, and it never stands for a script on the script side of a script-and-part pair.
+ */
+
+/** Every multi-step script of package.json, by name, with the stage each step is: the scripts a doc can compose. */
+export const scriptChains = ({ checks, scripts }) => {
+    const registered = new Set(Object.keys(checks));
+    const chains = new Map();
+    for (const name of Object.keys(scripts)) {
+        const steps = scriptSteps({ scripts, name, registered });
+        if (steps.length >= 2) chains.set(name, steps.map(stageName));
+    }
+    return chains;
+};
+
+/** What each script in `chains` is made of: its steps, and those of every traced entry point among them, as deep as that goes. */
+export const chainParts = ({ chains, scripts }) => {
+    const reach = (name, seen) => {
+        const parts = new Set();
+        for (const stage of chains.get(name) ?? []) {
+            parts.add(stage);
+            const traced = tracedScript(scripts, stage);
+            if (traced !== null && !seen.has(traced)) {
+                seen.add(traced);
+                for (const inner of reach(traced, seen)) parts.add(inner);
+            }
+        }
+        return parts;
+    };
+    return new Map([...chains.keys()].map((name) => [name, reach(name, new Set())]));
+};
+
+/**
+ * The names a doc can compose, as `{ phrase, names, own, strong, pattern }` per spelling, and the
+ * parts of each script. `names` is every name a spelling can stand for; `own` only those it is by
+ * its own right (a script's or a step's own name), so a word the docs file under a stage is in
+ * `names` alone. A spelling is strong when it has a separator (`verify:ci`) or is a filed word no
+ * script or step spells; a bare script or step name (`build`, `eslint`) is an ordinary word until
+ * the doc puts it in code, and a listed word never changes that: the own names come first.
+ */
+export const compositionModel = ({ checks, scripts, stages, stageWords = {} }) => {
+    const chains = scriptChains({ checks, scripts });
+    const entries = new Map();
+    const add = (word, name, declared) => {
+        const phrase = normalizePhrase(word);
+        if (phrase.length === 0) return;
+        let entry = entries.get(phrase);
+        if (entry === undefined) {
+            entry = {
+                phrase,
+                names: new Set(),
+                own: new Set(),
+                strong: declared || phrase.includes(' '),
+                pattern: phrasePattern(phrase, 'gi')
+            };
+            entries.set(phrase, entry);
+        }
+        entry.names.add(name);
+        if (!declared) entry.own.add(name);
+    };
+    for (const name of chains.keys()) add(name, name, false);
+    for (const steps of chains.values()) {
+        for (const stage of steps) add(stage, stage, false);
+    }
+    for (const [stage, words] of Object.entries(stageWords)) {
+        if (!stages.has(stage) || !Array.isArray(words)) continue;
+        for (const word of words) add(word, stage, true);
+    }
+    return { parts: chainParts({ chains, scripts }), vocabulary: [...entries.values()] };
+};
+
+const WORD = /[\p{L}\p{N}]+/gu;
+const SENTENCE_BREAK = /[.;?!]\s/g;
+const NPM_RUN_BEFORE = /npm run\s+$/i;
+/** What a doc writes between two parts to chain them: the `&&` package.json composes with, and an arrow like the chain view's. */
+const COMPOSING_OPERATOR = /&&|->|→/;
+const wordsIn = (text) => (text.match(WORD) ?? []).length;
+
+/** The `[from, to)` spans between paired backticks. */
+const codeSpans = (text) => {
+    const spans = [];
+    let open = -1;
+    for (let index = 0; index < text.length; index += 1) {
+        if (text[index] !== '`') continue;
+        if (open === -1) {
+            open = index;
+        } else {
+            spans.push([open, index + 1]);
+            open = -1;
+        }
+    }
+    return spans;
+};
+const inSpans = (spans, position) => spans.some(([from, to]) => position >= from && position < to);
+
+/**
+ * The names a text mentions, left to right, the longest spelling where two overlap. Names with
+ * nothing but whitespace between them are one unit (`vite build`, `coverage audit`); a unit is
+ * strong when any of its names is, and has the own names of all.
+ */
+const compositionUnits = (text, spans, vocabulary) => {
+    const found = [];
+    for (const { pattern, names, own, strong } of vocabulary) {
+        for (const match of text.matchAll(pattern)) {
+            const start = match.index;
+            found.push({
+                start,
+                end: start + match[0].length,
+                names,
+                own,
+                strong: strong || inSpans(spans, start) || NPM_RUN_BEFORE.test(text.slice(0, start))
+            });
+        }
+    }
+    found.sort((a, b) => a.start - b.start || b.end - a.end);
+    const units = [];
+    for (const mention of found) {
+        const last = units.at(-1);
+        if (last !== undefined && mention.start < last.end) continue;
+        if (last !== undefined && text.slice(last.end, mention.start).trim() === '') {
+            last.end = mention.end;
+            last.names = new Set([...last.names, ...mention.names]);
+            last.own = new Set([...last.own, ...mention.own]);
+            last.strong = last.strong || mention.strong;
+        } else {
+            units.push({ ...mention });
+        }
+    }
+    return units;
+};
+
+/**
+ * A script (strong in the text) and one of its own parts, named by another unit. The script is read
+ * by its own name only: a word filed under it never stands for it here. A part is never the script.
+ */
+const isScriptWithPart = (script, other, parts) =>
+    script.strong &&
+    [...script.own].some(
+        (name) =>
+            parts.has(name) &&
+            [...other.names].some((part) => part !== name && parts.get(name).has(part))
+    );
+
+/** Two units with no name in common that are parts of one script. */
+const areSiblingParts = (first, second, parts) =>
+    ![...first.names].some((name) => second.names.has(name)) &&
+    [...parts.values()].some(
+        (members) =>
+            [...first.names].some((name) => members.has(name)) &&
+            [...second.names].some((name) => members.has(name))
+    );
+
+/**
+ * The first composition in a text, as the two units it names, or null: two parts of one script at
+ * most COMPOSITION_PAIR_GAP_WORDS apart (one of them strong, or chained by an operator), or a strong
+ * script and one of its own parts at most COMPOSITION_PART_GAP_WORDS apart, inside one sentence.
+ */
+export const findComposition = (text, { parts, vocabulary }) => {
+    const spans = codeSpans(text);
+    const units = compositionUnits(text, spans, vocabulary);
+    const breaks = [...text.matchAll(SENTENCE_BREAK)]
+        .map((match) => match.index)
+        .filter((position) => !inSpans(spans, position));
+    const sentenceOf = (unit) => breaks.filter((position) => position < unit.start).length;
+    for (let first = 0; first < units.length; first += 1) {
+        for (let second = first + 1; second < units.length; second += 1) {
+            const a = units[first];
+            const b = units[second];
+            if (sentenceOf(a) !== sentenceOf(b)) break;
+            const gap = wordsIn(text.slice(a.end, b.start));
+            if (gap > COMPOSITION_PART_GAP_WORDS) break;
+            const paired =
+                gap <= COMPOSITION_PAIR_GAP_WORDS &&
+                (a.strong || b.strong || COMPOSING_OPERATOR.test(text.slice(a.end, b.start))) &&
+                areSiblingParts(a, b, parts);
+            if (paired || isScriptWithPart(a, b, parts) || isScriptWithPart(b, a, parts)) {
+                return { first: text.slice(a.start, a.end), second: text.slice(b.start, b.end) };
+            }
+        }
+    }
+    return null;
+};
+
+const CONTINUES_AFTER = /(?:→|->)\s*$/;
+const CONTINUES_BEFORE = /^[\s#/*>]*(?:→|->)/;
+
+/**
+ * A line, outside the chain view, that names RETELLING_MIN_STAGES or more distinct stages is the
+ * gate chain retold by hand, and it goes stale in place; so is one that composes two parts of one
+ * script (`composition`, see findComposition). Lines of one chain wrapped at an arrow are read as
+ * one, and the finding sits on the first. `sources` is `[{ file, lines: [{ line, text }] }]`.
+ */
+export const checkChainRetelling = ({
+    sources,
+    vocabulary,
+    composition = null,
+    minStages = RETELLING_MIN_STAGES
+}) => {
+    const findings = [];
+    for (const { file, lines } of sources) {
+        let group = [];
+        const flush = () => {
+            if (group.length === 0) return;
+            const text = group.map((entry) => entry.text).join(' ');
+            const where = `${file}:${group[0].line}`;
+            if (stagesNamed(text, vocabulary).size >= minStages) {
+                findings.push(`${where}: retells the gate chain — point at ${TIERS_FILE} instead`);
+            } else {
+                const composed = composition === null ? null : findComposition(text, composition);
+                if (composed !== null) {
+                    findings.push(
+                        `${where}: composes the gate (${composed.first} with ${composed.second}) — point at ${TIERS_FILE} instead`
+                    );
+                }
+            }
+            group = [];
+        };
+        for (const entry of lines) {
+            const previous = group.at(-1);
+            const joined =
+                previous !== undefined &&
+                entry.line === previous.line + 1 &&
+                (CONTINUES_AFTER.test(previous.text) || CONTINUES_BEFORE.test(entry.text));
+            if (!joined) flush();
+            group.push(entry);
+        }
+        flush();
+    }
+    return findings;
+};
+
+const COMMENT_LINE = /^\s*#/;
+const WORKFLOW_NAME = /^\s*(?:-\s+)?name:/;
+const TIERS_PROSE = /^\s*"(?:_[^"]*|description|reason)":\s*"/;
+/** A JSON escape (`\u00b7`, `\"`) is no word of the prose it sits in: read as a space, not as a stray word. */
+const JSON_ESCAPE = /\\(?:u[0-9a-fA-F]{4}|.)/g;
+
+/** The lines the retelling check reads, per file: see the header for what is in and what is out. */
+export const retellingSources = ({ docs, workflows, hooks, tiersText }) => {
+    const numbered = (text) =>
+        text.split('\n').map((line, index) => ({ line: index + 1, text: line }));
+    const only = (text, test) => numbered(text).filter((entry) => test(entry.text));
+    return [
+        ...docs.map(([file, text]) => ({ file, lines: numbered(text) })),
+        ...workflows.map(([file, text]) => ({
+            file,
+            lines: only(text, (line) => COMMENT_LINE.test(line) || WORKFLOW_NAME.test(line))
+        })),
+        ...hooks.map(([file, text]) => ({
+            file,
+            lines: only(text, (line) => COMMENT_LINE.test(line))
+        })),
+        {
+            file: TIERS_FILE,
+            lines: only(tiersText, (line) => TIERS_PROSE.test(line)).map(({ line, text }) => ({
+                line,
+                text: text.replace(JSON_ESCAPE, ' ')
+            }))
+        }
+    ];
+};
+
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 
 const installedVersions = (root) => {
@@ -1509,7 +1981,8 @@ const trackedFiles = (root) => {
 };
 
 export const run = ({ root, today }) => {
-    const tiers = readJson(path.join(root, 'scripts/gate-tiers.json'));
+    const tiersText = readFileSync(path.join(root, TIERS_FILE), 'utf8');
+    const tiers = JSON.parse(tiersText);
     const docsConfig = isRecord(tiers.docs) ? tiers.docs : {};
     const scripts = readJson(path.join(root, 'package.json')).scripts ?? {};
     const docs = listDocFiles(root).map((file) => [
@@ -1542,6 +2015,12 @@ export const run = ({ root, today }) => {
         )
         .map((file) => readFileSync(path.join(root, file), 'utf8'))
         .join('\n');
+    const hooks = tracked
+        .filter((file) => /^\.husky\/[^/]+$/.test(file))
+        .map((file) => [file, readFileSync(path.join(root, file), 'utf8')]);
+    const checks = isRecord(tiers.checks) ? tiers.checks : {};
+    const stageWords = isRecord(docsConfig.stageWords) ? docsConfig.stageWords : {};
+    const stages = gateStages({ checks, scripts });
     const ciConfig = isRecord(tiers.ci) ? tiers.ci : {};
     const rulesetCheck = checkRulesetContexts({
         rulesetText,
@@ -1573,7 +2052,14 @@ export const run = ({ root, today }) => {
         }),
         ...checkCiRunSteps({ workflows, allowedRunSteps: ciConfig.allowedRunSteps ?? [] }),
         ...checkPullRequestReadPermission({ workflows }),
-        ...rulesetCheck.findings
+        ...rulesetCheck.findings,
+        ...checkGateChains({ checks, scripts }),
+        ...checkStageWords({ stages, stageWords }),
+        ...checkChainRetelling({
+            sources: retellingSources({ docs, workflows, hooks, tiersText }),
+            vocabulary: gateVocabulary({ stages, stageWords }),
+            composition: compositionModel({ checks, scripts, stages, stageWords })
+        })
     ];
     const tests = listTestFiles(root).map((file) => [
         file,
@@ -1646,7 +2132,7 @@ const main = () => {
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {
         console.log(
-            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, section pointers, quarantines, suite ceilings, agent-memory imports'
+            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, section pointers, quarantines, suite ceilings, agent-memory imports, gate chains'
         );
         process.exit(0);
     }

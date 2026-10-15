@@ -46,7 +46,7 @@ Gate: present the critique; gate by **risk, not LOC** (`workflow.mdc` § The App
 The tier law lives in `AGENTS.md` § Commands / the gate › _The tier law_; this file restates nothing. What an implementer runs:
 
 ```bash
-npm run verify:iter                   # per change: oxlint → tsc (incremental) → vitest --changed
+npm run verify:iter                   # per change: the seconds-long check
 npm run e2e:one -- e2e/<file>.spec.ts # only the spec the change affects — free port, traced
 npm run verify:measure                # need to LOOK at a built result? legal at any time
 ```

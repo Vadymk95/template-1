@@ -13,6 +13,7 @@ points here (README § fork checklist).
 | ESLint 10 and `settings.react.version`                             | 2026-07 | in force, held |
 | Advisories close with capped override floors                       | 2026-10 | in force       |
 | The gate is `verify`; `verify` is a superset of CI                 | 2026-07 | in force       |
+| The gate chain has one readable home                               | 2026-10 | in force       |
 | Guard audit: what each new guard watches                           | 2026-10 | in force       |
 | zizmor audits the workflow files                                   | 2026-10 | in force       |
 | Every GitHub Action is SHA-pinned; workflow tokens start read-only | 2026-10 | in force       |
@@ -141,7 +142,7 @@ includes 11 without the override.
 - Adding the override and removing the allowance are one commit: once the override lands the
   advisory disappears, the allowance goes stale, and a stale allowance fails the gate by design.
 
-**Consequences:** `audit:gate` (in `verify:ci`) fails on any high or critical advisory, an expired
+**Consequences:** `audit:gate` (a network-bound check) fails on any high or critical advisory, an expired
 or stale allowance, and its own inability to complete; lowering `--audit-level` is not available.
 `scripts/audit-gate.test.mjs` covers the fail-closed paths. The Stryker runner's dependency tree is
 inside the gate. Open and below the threshold: two moderate `qs` advisories on the dev-only chain
@@ -156,13 +157,13 @@ https://github.com/Vadymk95/template-1/commit/8b982b1
 **Status:** in force. The tier law is `AGENTS.md` § Commands / the gate; the phase table is
 `scripts/gate-tiers.json`.
 
-**Context:** CI once listed its own steps. Two checks (`npm audit`, `verify:web-vitals-chunks`) were
-absent from `verify`, and `size:check` ran in no pipeline at all, so a green local gate did not
+**Context:** CI once listed its own steps. `npm audit` was absent from the local gate. So was
+`verify:web-vitals-chunks`. And `size:check` ran in no pipeline at all, so a green local gate did not
 predict a green CI.
 
 **Decision:** every check lives in `package.json`, never only in a workflow file. `verify` holds the
-offline checks; `verify:ci` is `audit:gate && lock:age && verify` and is the only thing CI runs besides what CI
-alone can do (install, browser cache, artifact upload). `audit:gate` and `lock:age` stay out of `verify` because
+offline checks. `verify:ci` is the only thing CI runs besides what CI
+alone can do (install, browser cache, artifact upload). The network-bound checks stay out of `verify` because
 they need the network. `.husky/pre-push` runs the phase-aware `verify:push`.
 
 **Consequences:** `verify` is slower and can go red on a dependency bump rather than on your own
@@ -173,11 +174,42 @@ e2e into its own CI job and out of the pre-push hook together with the workflow,
 
 **Pre-commit is repo-scoped.** `lint-staged` restores a partially staged file's unstaged hunks after
 fixing, so formatting drift survived the commit and failed at push. The hook therefore also runs
-`lint:oxlint`, `format:check` and `typecheck` over the whole repo and names the remedy
-(`npm run fix && git add -u`). ESLint stays on pre-push (type-aware, slow). A hook that commits for
+the cheap checks over the whole repo (the list is `.husky/pre-commit`) and names the remedy
+(`npm run fix && git add -u`). The type-aware lint stays on pre-push (slow). A hook that commits for
 you is not adopted: it sweeps whatever else is dirty into the commit.
 
 **Evidence:** https://github.com/Vadymk95/template-1/commit/fb36cde
+
+## [2026-10] The gate chain has one readable home
+
+**Status:** in force. **Evidence:** `scripts/docs-check.mjs` and its test, `scripts/gate-tiers.json`.
+
+**Context:** the stage order was retold by hand in 32 places, unchecked: a comment dropped a stage.
+
+**Decision:** `checks.<name>.chain` is derived from the script and `docs:check` fails on any difference
+(deleting the view left pointers without a page). Elsewhere a file names a script and its purpose and points
+at the view. A line outside it also fails when it names 3 or more distinct stages, or composes a script
+whatever the count (a count of 3 never saw a pair): two of its parts (`a then b`, `x = a && b`) at most 2
+words apart, or the script and one part (`x runs a`) at most 4, in one sentence. Names come from the repo
+(multi-step scripts, their steps, `docs.stageWords`). The script is read by its own name, never by a word
+filed under it, and must be strong; of two parts, one must be, unless `&&` or an arrow joins them. Strong: in
+code or after `npm run`; spelled with a separator; a stage word no script or step spells (`eslint`, also a
+step, stays ordinary until it is in code); adjacent names are one unit, strong when any is. Read: docs
+(fences, tables, this file), workflow names and comments, `.husky/*` comments, `gate-tiers.json` prose.
+
+**Consequences:** a false positive costs a reword, never an allowance; the windows and `RETELLING_MIN_STAGES`
+move only on a measurement (places of the old tree caught, lines flagged on the rewritten tree):
+
+| rule                                                 | caught of 32 | flagged |
+| ---------------------------------------------------- | ------------ | ------- |
+| 3+ stages (before)                                   | 24           | 0       |
+| 2+ stages                                            | 31           | 37      |
+| two stages and a connector (`&&`, `->`, `+`, `then`) | 16           | 0       |
+| shipped                                              | 32           | 27      |
+
+Of the 27, 16 state what a script is made of; 11 are ordinary (lists, prohibitions, history). Not caught: a
+spread beyond the windows in words, lines or sentences, two bare words with no mark, script comments, code,
+issue templates, app copy, a one-name statement in a `gate-tiers.json` description (read without its key).
 
 ## [2026-10] Guard audit: what each new guard watches
 
