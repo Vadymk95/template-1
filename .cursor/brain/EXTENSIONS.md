@@ -320,7 +320,7 @@ Today `vite.config.ts` sets `build.sourcemap` to false for a production build. F
 
 - A unit test that one `logger.error` calls the sink exactly once (regression for double reporting) and that nothing is forwarded below `error`.
 - A unit test for `beforeSend`: query strings removed, no body fields kept.
-- A check after the build that fails when `dist` contains a `.map` file. `find dist -name '*.map'` alone exits 0 when it finds files; the failing form is `test -z "$(find dist -name '*.map')"`. Chain it into the `verify` script after `build`, never only into the workflow file: `verify` must stay a superset of CI's offline checks (`AGENTS.md` § Commands / the gate). Run the same check on the deploy artefact after the upload deleted the maps.
+- A check after the build that fails when `dist` contains a `.map` file. `find dist -name '*.map'` alone exits 0 when it finds files; the failing form is `test -z "$(find dist -name '*.map')"`. Add it to `package.json` beside the other checks that read `dist`, never only into the workflow file: `verify` must stay a superset of CI's offline checks (`AGENTS.md` § Commands / the gate). Run the same check on the deploy artefact after the upload deleted the maps.
 - The CSP `connect-src` lists the ingest origin or the tunnel path (Phase 6).
 
 ### 3.6 Security and what not to do

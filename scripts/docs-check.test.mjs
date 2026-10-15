@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import {
     existsSync,
     mkdirSync,
@@ -13,25 +14,37 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+    COMPOSITION_PAIR_GAP_WORDS,
+    COMPOSITION_PART_GAP_WORDS,
+    RETELLING_MIN_STAGES,
     budgetReport,
+    chainParts,
+    checkChainRetelling,
     checkCiRunSteps,
     checkCommandTable,
     checkDeadDocs,
+    checkGateChains,
     checkMemoryImports,
     checkQuarantine,
     checkPathsAndScripts,
     checkPullRequestReadPermission,
     checkRulesetContexts,
     checkSectionPointers,
+    checkStageWords,
     checkSuiteBudgets,
     checkSentinels,
     checkVersions,
     classifyToken,
     compareVersion,
+    compositionModel,
+    deriveChain,
     deriveWorkflowContexts,
     extractRunSteps,
     extractTokens,
+    findComposition,
     findSwitchedOff,
+    gateStages,
+    gateVocabulary,
     isPullRequestTriggered,
     listMarkdownFiles,
     listTestFiles,
@@ -39,8 +52,14 @@ import {
     parseTraceRows,
     pathExists,
     percentile90,
+    retellingSources,
     run,
-    scriptFamilies
+    scriptChains,
+    scriptFamilies,
+    scriptSteps,
+    stageName,
+    stagesNamed,
+    stepLabel
 } from './docs-check.mjs';
 
 const ctx = {
@@ -2368,5 +2387,1742 @@ describe('checkMemoryImports', () => {
                 `AGENTS.md:${options?.line ?? 1}: "@${target}" is a Claude Code memory import; write the pointer as a path in backticks without "@"`
             );
         }
+    });
+});
+
+describe('scriptSteps, stepLabel and stageName', () => {
+    const scripts = {
+        verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+        'verify:inner':
+            'node scripts/check-hooks.mjs && node scripts/check-test-siblings.mjs --range && npm run lint:oxlint && npm run build',
+        alias: 'npm run verify:enterprise',
+        'verify:enterprise':
+            'node scripts/gate-trace.mjs verify:enterprise -- npm run verify:enterprise:inner',
+        'verify:enterprise:inner': 'node scripts/check-hooks.mjs && npm run build',
+        one: 'node scripts/gate-trace.mjs one -- node scripts/verify-push.mjs'
+    };
+
+    it('unwraps the tracer, follows the inner script and splits on &&', () => {
+        expect(scriptSteps({ scripts, name: 'verify' })).toEqual([
+            'node scripts/check-hooks.mjs',
+            'node scripts/check-test-siblings.mjs --range',
+            'npm run lint:oxlint',
+            'npm run build'
+        ]);
+    });
+
+    it('keeps an alias of a registered check as one step and follows any other alias', () => {
+        const registered = new Set(['verify:enterprise']);
+        expect(scriptSteps({ scripts, name: 'alias', registered })).toEqual([
+            'npm run verify:enterprise'
+        ]);
+        expect(scriptSteps({ scripts, name: 'alias' })).toEqual([
+            'node scripts/check-hooks.mjs',
+            'npm run build'
+        ]);
+    });
+
+    it('has no steps for a script that does not exist', () => {
+        expect(scriptSteps({ scripts, name: 'missing' })).toEqual([]);
+    });
+
+    it('keeps an alias of a script that does not exist as one step', () => {
+        expect(scriptSteps({ scripts: { go: 'npm run nowhere' }, name: 'go' })).toEqual([
+            'npm run nowhere'
+        ]);
+    });
+
+    it('follows an alias only when nothing else is on the command', () => {
+        const withArguments = { go: 'npm run inner -- --flag', inner: 'a && b' };
+        expect(scriptSteps({ scripts: withArguments, name: 'go' })).toEqual([
+            'npm run inner -- --flag'
+        ]);
+    });
+
+    it('trims every step and drops the empty ones', () => {
+        const padded = { a: '  one && two  ', b: ' && one', c: 'one && ' };
+        expect(scriptSteps({ scripts: padded, name: 'a' })).toEqual(['one', 'two']);
+        expect(scriptSteps({ scripts: padded, name: 'b' })).toEqual(['one']);
+        expect(scriptSteps({ scripts: padded, name: 'c' })).toEqual(['one']);
+    });
+
+    it('follows a bounded number of aliases', () => {
+        const long = Object.fromEntries(
+            Array.from({ length: 12 }, (_, index) => [
+                `a${index}`,
+                index === 11 ? 'x && y' : `npm run a${index + 1}`
+            ])
+        );
+        expect(scriptSteps({ scripts: long, name: 'a0' })).toEqual(['npm run a9']);
+    });
+
+    it('labels a node script by its file stem and arguments, an npm script by name, else as written', () => {
+        expect(stepLabel('node scripts/check-test-siblings.mjs --range')).toBe(
+            'check-test-siblings --range'
+        );
+        expect(stepLabel('node scripts/docs-check.mjs')).toBe('docs-check');
+        expect(stepLabel('npm run lint:oxlint')).toBe('lint:oxlint');
+        expect(stepLabel('npm run test:one -- a.test.ts')).toBe('test:one -- a.test.ts');
+        expect(stepLabel('vitest run --changed --passWithNoTests')).toBe(
+            'vitest run --changed --passWithNoTests'
+        );
+    });
+
+    it('names the stage a step is: script, file stem or the tool of a raw command', () => {
+        expect(stageName('node scripts/check-hooks.mjs')).toBe('check-hooks');
+        expect(stageName('npm run size:check')).toBe('size:check');
+        expect(stageName('PLAYWRIGHT_USE_PREVIEW=1 playwright test')).toBe('playwright');
+        expect(stageName('vitest run --changed')).toBe('vitest');
+    });
+
+    it('reads a .js or .cjs node script like an .mjs one', () => {
+        expect(stepLabel('node scripts/a.cjs --x')).toBe('a --x');
+        expect(stepLabel('node tools/b.js')).toBe('b');
+        expect(stageName('node scripts/a.cjs')).toBe('a');
+    });
+
+    it('strips every environment assignment before the tool', () => {
+        expect(stageName('A=1 B=two vitest run')).toBe('vitest');
+    });
+
+    it('unwraps the tracer only at the start of the command', () => {
+        const wrapped = {
+            v: 'FOO=1 node scripts/gate-trace.mjs v -- npm run v:inner',
+            'v:inner': 'a && b'
+        };
+        expect(scriptSteps({ scripts: wrapped, name: 'v' })).toEqual([
+            'FOO=1 node scripts/gate-trace.mjs v -- npm run v:inner'
+        ]);
+    });
+
+    it('splits on a spaced && and on nothing else', () => {
+        const joined = {
+            a: 'one&&two',
+            b: 'one || two',
+            c: 'one ; two',
+            d: 'one && two && three'
+        };
+        expect(scriptSteps({ scripts: joined, name: 'a' })).toEqual(['one&&two']);
+        expect(scriptSteps({ scripts: joined, name: 'b' })).toEqual(['one || two']);
+        expect(scriptSteps({ scripts: joined, name: 'c' })).toEqual(['one ; two']);
+        expect(scriptSteps({ scripts: joined, name: 'd' })).toEqual(['one', 'two', 'three']);
+    });
+
+    it('strips an environment assignment of any case before the tool', () => {
+        expect(stageName('node_env=test Mixed9=x vitest run')).toBe('vitest');
+    });
+
+    it('derives a chain from two or more steps and none from fewer', () => {
+        expect(deriveChain({ scripts, name: 'verify' })).toBe(
+            'check-hooks -> check-test-siblings --range -> lint:oxlint -> build'
+        );
+        expect(deriveChain({ scripts, name: 'one' })).toBeNull();
+        expect(deriveChain({ scripts, name: 'missing' })).toBeNull();
+    });
+});
+
+describe('the gate chain view', () => {
+    const scripts = {
+        verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+        'verify:inner':
+            'node scripts/check-hooks.mjs && npm run lint:oxlint && npm run test:coverage && npm run build',
+        'verify:iter': 'node scripts/gate-trace.mjs verify:iter -- npm run verify:iter:inner',
+        'verify:iter:inner': 'npm run lint:oxlint && npm run typecheck && vitest run --changed',
+        'verify:ci': 'node scripts/gate-trace.mjs verify:ci -- npm run verify:ci:inner',
+        'verify:ci:inner': 'npm run audit:gate && npm run lock:age && npm run verify',
+        'verify:push': 'node scripts/gate-trace.mjs verify:push -- node scripts/verify-push.mjs',
+        build: 'tsc -b && vite build',
+        lint: 'eslint .'
+    };
+    const chains = {
+        verify: 'check-hooks -> lint:oxlint -> test:coverage -> build',
+        'verify:iter': 'lint:oxlint -> typecheck -> vitest run --changed',
+        'verify:ci': 'audit:gate -> lock:age -> verify',
+        build: 'tsc -b -> vite build'
+    };
+    const checks = {
+        verify: { class: 'code', chain: chains.verify },
+        'verify:iter': { class: 'code', chain: chains['verify:iter'] },
+        'verify:ci': { class: 'code', chain: chains['verify:ci'] },
+        'verify:push': { class: 'code' },
+        build: { class: 'code', chain: chains.build },
+        lint: { class: 'code' }
+    };
+
+    describe('checkGateChains', () => {
+        it('accepts every chain that equals what package.json runs', () => {
+            expect(checkGateChains({ checks, scripts })).toEqual([]);
+        });
+
+        it('names the expected chain when one differs', () => {
+            const drifted = {
+                ...checks,
+                verify: { class: 'code', chain: 'check-hooks -> test:coverage -> build' }
+            };
+            expect(checkGateChains({ checks: drifted, scripts })).toEqual([
+                `scripts/gate-tiers.json: checks.verify.chain differs from package.json — expected "${chains.verify}"`
+            ]);
+        });
+
+        it('asks for the chain of a multi-step script that carries none', () => {
+            const { chain: _chain, ...bare } = checks.build;
+            expect(checkGateChains({ checks: { ...checks, build: bare }, scripts })).toEqual([
+                'scripts/gate-tiers.json: checks.build runs a chain in package.json but has no chain — add "chain": "tsc -b -> vite build"'
+            ]);
+        });
+
+        it('rejects a chain written for a script that is not one', () => {
+            const stale = { ...checks, lint: { class: 'code', chain: 'eslint -> prettier' } };
+            expect(checkGateChains({ checks: stale, scripts })).toEqual([
+                'scripts/gate-tiers.json: checks.lint.chain is written, but "lint" in package.json is not a chain of two or more steps — drop it'
+            ]);
+            const missing = { ...checks, ghost: { chain: 'a -> b' } };
+            expect(checkGateChains({ checks: missing, scripts })).toHaveLength(1);
+        });
+
+        it('needs no chain for an alias of a registered check', () => {
+            const aliased = { ...scripts, 'verify:full': 'npm run verify:ci' };
+            const registered = { ...checks, 'verify:full': { class: 'code' } };
+            expect(checkGateChains({ checks: registered, scripts: aliased })).toEqual([]);
+        });
+
+        it('reads an entry that is not an object as one without a chain', () => {
+            expect(checkGateChains({ checks: { ...checks, build: null }, scripts })).toEqual([
+                'scripts/gate-tiers.json: checks.build runs a chain in package.json but has no chain — add "chain": "tsc -b -> vite build"'
+            ]);
+        });
+
+        it('rejects an empty chain written for a script that is not one', () => {
+            const empty = { ...checks, lint: { class: 'code', chain: '' } };
+            expect(checkGateChains({ checks: empty, scripts })).toEqual([
+                'scripts/gate-tiers.json: checks.lint.chain is written, but "lint" in package.json is not a chain of two or more steps — drop it'
+            ]);
+        });
+
+        it('compares the chain as written, whitespace included', () => {
+            const spaced = {
+                ...checks,
+                verify: { class: 'code', chain: chains.verify.replace(' -> ', '  ->  ') }
+            };
+            expect(checkGateChains({ checks: spaced, scripts })).toEqual([
+                `scripts/gate-tiers.json: checks.verify.chain differs from package.json — expected "${chains.verify}"`
+            ]);
+        });
+    });
+
+    describe('gateStages', () => {
+        it('holds the steps of the verify chains', () => {
+            expect(gateStages({ checks, scripts })).toEqual(
+                new Set([
+                    'check-hooks',
+                    'lint:oxlint',
+                    'test:coverage',
+                    'build',
+                    'typecheck',
+                    'vitest',
+                    'audit:gate',
+                    'lock:age'
+                ])
+            );
+        });
+
+        it('leaves out the traced entry points a chain calls and chains outside the verify family', () => {
+            const stages = gateStages({ checks, scripts });
+            expect(stages.has('verify')).toBe(false);
+            expect(stages.has('vite')).toBe(false);
+            expect(stages.has('tsc')).toBe(false);
+        });
+
+        it('reads an alias chain longer than the bound as a stage, not as an entry point', () => {
+            const deep = Object.fromEntries([
+                ['verify', 'node scripts/gate-trace.mjs verify -- npm run verify:inner'],
+                ['verify:inner', 'npm run lint:oxlint && npm run e0'],
+                ...Array.from({ length: 12 }, (_, index) => [
+                    `e${index}`,
+                    index === 11
+                        ? 'node scripts/gate-trace.mjs e11 -- node scripts/x.mjs'
+                        : `npm run e${index + 1}`
+                ])
+            ]);
+            expect(gateStages({ checks: { verify: {} }, scripts: deep })).toEqual(
+                new Set(['lint:oxlint', 'e0'])
+            );
+        });
+
+        it('keeps an alias of a registered check as one stage', () => {
+            const aliased = {
+                verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+                'verify:inner': 'npm run lint:oxlint && npm run verify:extra',
+                'verify:extra': 'node scripts/a.mjs && node scripts/b.mjs'
+            };
+            const registered = { verify: {}, 'verify:extra': {} };
+            expect(gateStages({ checks: registered, scripts: aliased })).toEqual(
+                new Set(['lint:oxlint', 'a', 'b', 'verify:extra'])
+            );
+        });
+
+        it('leaves out an alias of a traced script that a chain calls', () => {
+            const aliased = {
+                verify: 'npm run verify:enterprise',
+                'verify:enterprise':
+                    'node scripts/gate-trace.mjs verify:enterprise -- npm run verify:enterprise:inner',
+                'verify:enterprise:inner': 'node scripts/a.mjs && node scripts/b.mjs',
+                'verify:ci': 'node scripts/gate-trace.mjs verify:ci -- npm run verify:ci:inner',
+                'verify:ci:inner': 'npm run audit:gate && npm run verify'
+            };
+            const registered = { verify: {}, 'verify:enterprise': {}, 'verify:ci': {} };
+            expect(gateStages({ checks: registered, scripts: aliased })).toEqual(
+                new Set(['a', 'b', 'audit:gate'])
+            );
+        });
+
+        it('leaves out the steps of a verify script that is no registered check', () => {
+            const extra = {
+                ...scripts,
+                'verify:extra': 'node scripts/a.mjs && node scripts/b.mjs'
+            };
+            expect(gateStages({ checks, scripts: extra })).toEqual(gateStages({ checks, scripts }));
+        });
+
+        it('takes a script that is not a string for no script at all', () => {
+            const odd = {
+                verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+                'verify:inner': 'npm run lint:oxlint && npm run a',
+                a: ['node scripts/gate-trace.mjs a -- node scripts/x.mjs']
+            };
+            expect(gateStages({ checks: { verify: {} }, scripts: odd })).toEqual(
+                new Set(['lint:oxlint', 'a'])
+            );
+        });
+
+        it('follows as many aliases as the bound allows and no more', () => {
+            const aliases = (last) =>
+                Object.fromEntries([
+                    ['verify', 'node scripts/gate-trace.mjs verify -- npm run verify:inner'],
+                    ['verify:inner', 'npm run lint:oxlint && npm run e0'],
+                    ...Array.from({ length: 9 }, (_, index) => [
+                        `e${String(index)}`,
+                        index === last
+                            ? `node scripts/gate-trace.mjs e${String(index)} -- node scripts/x.mjs`
+                            : `npm run e${String(index + 1)}`
+                    ])
+                ]);
+            expect(gateStages({ checks: { verify: {} }, scripts: aliases(7) })).toEqual(
+                new Set(['lint:oxlint'])
+            );
+            expect(gateStages({ checks: { verify: {} }, scripts: aliases(8) })).toEqual(
+                new Set(['lint:oxlint', 'e0'])
+            );
+        });
+    });
+
+    describe('gateVocabulary and checkStageWords', () => {
+        const stages = new Set(['check-version-holds', 'lint:oxlint', 'test:coverage']);
+        const stageWords = {
+            'check-version-holds': ['version holds'],
+            'lint:oxlint': ['oxlint'],
+            ghost: ['spectre']
+        };
+
+        it('maps the stage names and the listed words to their stage, separators alike', () => {
+            const vocabulary = gateVocabulary({ stages, stageWords });
+            expect(vocabulary.map(({ phrase, stage }) => [phrase, stage])).toEqual([
+                ['check version holds', 'check-version-holds'],
+                ['lint oxlint', 'lint:oxlint'],
+                ['test coverage', 'test:coverage'],
+                ['version holds', 'check-version-holds'],
+                ['oxlint', 'lint:oxlint']
+            ]);
+        });
+
+        it('flags words filed under a name that is no stage', () => {
+            expect(checkStageWords({ stages, stageWords })).toEqual([
+                'scripts/gate-tiers.json: docs.stageWords.ghost names no stage of the verify chains in package.json — rename or drop it'
+            ]);
+            expect(checkStageWords({ stages, stageWords: { 'lint:oxlint': ['oxlint'] } })).toEqual(
+                []
+            );
+        });
+
+        it('keeps a stage name against a word another stage lists, whatever its case', () => {
+            const vocabulary = gateVocabulary({
+                stages: new Set(['lint', 'typecheck']),
+                stageWords: { typecheck: ['LINT'] }
+            });
+            expect(vocabulary.map(({ phrase, stage }) => [phrase, stage])).toEqual([
+                ['lint', 'lint'],
+                ['typecheck', 'typecheck']
+            ]);
+        });
+
+        it('ignores an empty word and a word that is only separators', () => {
+            const vocabulary = gateVocabulary({
+                stages: new Set(['lint']),
+                stageWords: { lint: ['', ' ', '--'] }
+            });
+            expect(vocabulary.map(({ phrase }) => phrase)).toEqual(['lint']);
+        });
+
+        it('trims the separators around a listed word', () => {
+            const vocabulary = gateVocabulary({
+                stages: new Set(['lint']),
+                stageWords: { lint: [' - eslint - '] }
+            });
+            expect(stagesNamed('run eslint now', vocabulary)).toEqual(new Set(['lint']));
+        });
+
+        it('ignores a listed value that is not a list of words', () => {
+            const vocabulary = gateVocabulary({
+                stages: new Set(['lint']),
+                stageWords: { lint: 'ox' }
+            });
+            expect(vocabulary.map(({ phrase }) => phrase)).toEqual(['lint']);
+        });
+
+        it('reads the characters of a listed word literally', () => {
+            const vocabulary = gateVocabulary({
+                stages: new Set(['typecheck']),
+                stageWords: { typecheck: ['tsc (strict)', 'a.b'] }
+            });
+            const named = (line) => [...stagesNamed(line, vocabulary)];
+            expect(named('the tsc (strict) pass')).toEqual(['typecheck']);
+            expect(named('the tsc strict pass')).toEqual([]);
+            expect(named('a.b')).toEqual(['typecheck']);
+            expect(named('axb')).toEqual([]);
+        });
+    });
+});
+
+describe('stagesNamed', () => {
+    const vocabulary = () =>
+        gateVocabulary({
+            stages: new Set([
+                'check-version-holds',
+                'lint:oxlint',
+                'lint',
+                'test:coverage',
+                'test:e2e:prod',
+                'size:check',
+                'build'
+            ]),
+            stageWords: {
+                'check-version-holds': ['version holds'],
+                'lint:oxlint': ['oxlint'],
+                lint: ['eslint'],
+                'test:coverage': ['coverage'],
+                'test:e2e:prod': ['e2e'],
+                'size:check': ['size', 'size-limit']
+            }
+        });
+    const named = (text) => [...stagesNamed(text, vocabulary())].sort();
+
+    it('counts a stage once however many of its spellings a line uses', () => {
+        expect(named('size, size-limit and `npm run size:check`')).toEqual(['size:check']);
+        expect(named('build, build and Build')).toEqual(['build']);
+    });
+
+    it('reads hyphen, colon, underscore and space alike inside a name', () => {
+        expect(named('version-holds, version holds, version_holds')).toEqual([
+            'check-version-holds'
+        ]);
+        expect(named('check-version-holds')).toEqual(['check-version-holds']);
+    });
+
+    it('matches in any case', () => {
+        expect(named('ESLint, OXLINT and Coverage')).toEqual([
+            'lint',
+            'lint:oxlint',
+            'test:coverage'
+        ]);
+    });
+
+    it('does not read a stage word inside a longer word or a hyphenated compound', () => {
+        expect(named('lint-staged and typescript-eslint and rebuilds')).toEqual([]);
+        expect(named('the oxlint-plugin and a pre-build step')).toEqual([]);
+    });
+
+    it('does not read a stage word that is one part of another script name', () => {
+        expect(named('npm run lint:oxlint')).toEqual(['lint:oxlint']);
+        expect(named('npm run test:e2e and build:analyze')).toEqual([]);
+        expect(named('npm run test:e2e:prod')).toEqual(['test:e2e:prod']);
+    });
+
+    it('reads a stage word inside a path or after a slash', () => {
+        expect(named('build/size/e2e')).toEqual(['build', 'size:check', 'test:e2e:prod']);
+    });
+
+    it('does not read a stage word that starts a longer word or a file name', () => {
+        expect(named('linter, builds and coverage-report')).toEqual([]);
+        expect(named('e2e.spec.ts, size.json and build.mjs')).toEqual([]);
+        expect(named('the build.')).toEqual(['build']);
+    });
+
+    it('does not read a stage word that follows a dot or a colon of another name', () => {
+        expect(named('scripts.build and src.lint')).toEqual([]);
+        expect(named('tsconfig.build, docs.size and x.e2e')).toEqual([]);
+        expect(named('the end. Build and size')).toEqual(['build', 'size:check']);
+    });
+
+    it('reads each separator alone as the gap between the words of a name', () => {
+        const spellings = [
+            'version holds',
+            'version-holds',
+            'version_holds',
+            'version:holds',
+            'version   holds',
+            'version - holds'
+        ];
+        for (const text of spellings) {
+            expect(named(text)).toEqual(['check-version-holds']);
+        }
+    });
+});
+
+describe('checkChainRetelling', () => {
+    const vocabulary = () =>
+        gateVocabulary({
+            stages: new Set(['check-hooks', 'lint:oxlint', 'typecheck', 'test:coverage', 'build']),
+            stageWords: {
+                'lint:oxlint': ['oxlint'],
+                typecheck: ['tsc'],
+                'test:coverage': ['coverage']
+            }
+        });
+    const source = (file, text) => ({
+        file,
+        lines: text.split('\n').map((line, index) => ({ line: index + 1, text: line }))
+    });
+    const finding = (file, line) =>
+        `${file}:${line}: retells the gate chain — point at scripts/gate-tiers.json instead`;
+
+    it('pins the threshold', () => {
+        expect(RETELLING_MIN_STAGES).toBe(3);
+    });
+
+    it('flags a line that names the threshold number of distinct stages, at that line', () => {
+        const text = 'fine\nrun oxlint, then tsc, then build\nfine';
+        expect(
+            checkChainRetelling({ sources: [source('README.md', text)], vocabulary: vocabulary() })
+        ).toEqual([finding('README.md', 2)]);
+    });
+
+    it('passes a line that names fewer', () => {
+        const text = 'run oxlint, then tsc\nbuild and build and build';
+        expect(
+            checkChainRetelling({ sources: [source('README.md', text)], vocabulary: vocabulary() })
+        ).toEqual([]);
+    });
+
+    it('honours the threshold it is given', () => {
+        const sources = [source('README.md', 'run oxlint, then tsc')];
+        expect(checkChainRetelling({ sources, vocabulary: vocabulary(), minStages: 2 })).toEqual([
+            finding('README.md', 1)
+        ]);
+        expect(checkChainRetelling({ sources, vocabulary: vocabulary(), minStages: 3 })).toEqual(
+            []
+        );
+    });
+
+    it('reports one finding per line, however many stages it names', () => {
+        const text = 'hooks check-hooks oxlint tsc coverage build';
+        expect(
+            checkChainRetelling({ sources: [source('A.md', text)], vocabulary: vocabulary() })
+        ).toHaveLength(1);
+    });
+
+    it('joins the lines of a chain wrapped at an arrow and reports the first line', () => {
+        const trailing = 'oxlint → tsc →\nbuild';
+        const trailingAscii = 'oxlint -> tsc ->\nbuild';
+        const leading = 'oxlint -> tsc\n-> build';
+        const leadingArrow = 'oxlint → tsc\n→ build';
+        const commented = '# oxlint → tsc\n# → build';
+        for (const text of [trailing, trailingAscii, leading, leadingArrow, commented]) {
+            expect(
+                checkChainRetelling({
+                    sources: [source('AGENTS.md', `x\n${text}`)],
+                    vocabulary: vocabulary()
+                })
+            ).toEqual([finding('AGENTS.md', 2)]);
+        }
+    });
+
+    it('does not join lines that no arrow connects', () => {
+        const text = 'oxlint, tsc,\nbuild';
+        expect(
+            checkChainRetelling({ sources: [source('README.md', text)], vocabulary: vocabulary() })
+        ).toEqual([]);
+    });
+
+    it('does not join across a gap in the line numbers', () => {
+        const sources = [
+            {
+                file: 'ci.yml',
+                lines: [
+                    { line: 3, text: '# oxlint, tsc →' },
+                    { line: 9, text: '# build' }
+                ]
+            }
+        ];
+        expect(checkChainRetelling({ sources, vocabulary: vocabulary() })).toEqual([]);
+    });
+
+    it('does not join on an arrow that is not at the end of the line', () => {
+        const text = 'oxlint → tsc are two stages\nbuild';
+        expect(
+            checkChainRetelling({ sources: [source('README.md', text)], vocabulary: vocabulary() })
+        ).toEqual([]);
+    });
+
+    it('reads nothing without a vocabulary', () => {
+        const sources = [source('README.md', 'oxlint tsc build')];
+        expect(checkChainRetelling({ sources, vocabulary: [] })).toEqual([]);
+    });
+
+    it('joins a continuation that opens with a quote, comment or list marker, and an arrow followed by blanks', () => {
+        const wrapped = [
+            'oxlint -> tsc\n> -> build',
+            'oxlint -> tsc\n// -> build',
+            'oxlint -> tsc\n * -> build',
+            'oxlint -> tsc ->  \nbuild'
+        ];
+        for (const text of wrapped) {
+            expect(
+                checkChainRetelling({
+                    sources: [source('AGENTS.md', `x\n${text}`)],
+                    vocabulary: vocabulary()
+                })
+            ).toEqual([finding('AGENTS.md', 2)]);
+        }
+    });
+});
+
+describe('the composition check', () => {
+    const scripts = {
+        verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+        'verify:inner':
+            'node scripts/check-hooks.mjs && npm run lint:oxlint && npm run typecheck && npm run lint && npm run test:coverage && npm run build',
+        'verify:ci': 'node scripts/gate-trace.mjs verify:ci -- npm run verify:ci:inner',
+        'verify:ci:inner': 'npm run audit:gate && npm run lock:age && npm run verify',
+        'verify:full': 'node scripts/gate-trace.mjs verify:full -- npm run verify:full:inner',
+        'verify:full:inner': 'npm run verify:ci && npm run smoke:dev',
+        'verify:push': 'node scripts/gate-trace.mjs verify:push -- node scripts/verify-push.mjs',
+        'ci:local': 'npm run verify:ci && npm run perf:ci',
+        build: 'tsc -b && vite build',
+        lint: 'npm run lint:oxlint && eslint . --max-warnings 0'
+    };
+    const checks = {
+        verify: {},
+        'verify:ci': {},
+        'verify:full': {},
+        'verify:push': {},
+        build: {},
+        lint: {}
+    };
+    const stageWords = {
+        'check-hooks': ['hooks'],
+        'lint:oxlint': ['oxlint'],
+        typecheck: ['tsc', 'type-check'],
+        lint: ['eslint'],
+        'test:coverage': ['coverage'],
+        'audit:gate': ['audit'],
+        'smoke:dev': ['smoke', 'dev-server smoke'],
+        build: ['production bundle']
+    };
+    const modelOf = (extra = {}) =>
+        compositionModel({
+            checks,
+            scripts,
+            stages: gateStages({ checks, scripts }),
+            stageWords,
+            ...extra
+        });
+    const model = modelOf();
+    const compose = (text) => {
+        const found = findComposition(text, model);
+        return found === null ? null : [found.first, found.second];
+    };
+    const gap = (words) =>
+        Array.from({ length: words }, (_, index) => `w${String(index)}`).join(' ');
+
+    describe('scriptChains', () => {
+        it('lists every multi-step script with the stage of each step, registered or not', () => {
+            expect([...scriptChains({ checks, scripts })]).toEqual([
+                [
+                    'verify',
+                    ['check-hooks', 'lint:oxlint', 'typecheck', 'lint', 'test:coverage', 'build']
+                ],
+                [
+                    'verify:inner',
+                    ['check-hooks', 'lint:oxlint', 'typecheck', 'lint', 'test:coverage', 'build']
+                ],
+                ['verify:ci', ['audit:gate', 'lock:age', 'verify']],
+                ['verify:ci:inner', ['audit:gate', 'lock:age', 'verify']],
+                ['verify:full', ['verify:ci', 'smoke:dev']],
+                ['verify:full:inner', ['verify:ci', 'smoke:dev']],
+                ['ci:local', ['verify:ci', 'perf:ci']],
+                ['build', ['tsc', 'vite']],
+                ['lint', ['lint:oxlint', 'eslint']]
+            ]);
+        });
+
+        it('takes a script of two steps for a chain and a script of one for none', () => {
+            const two = scriptChains({
+                checks: {},
+                scripts: { a: 'x && y', b: 'x', c: 'npm run x' }
+            });
+            expect([...two.keys()]).toEqual(['a']);
+        });
+
+        it('keeps an alias of a registered check as one step, so the alias is no chain', () => {
+            const aliased = {
+                verify: 'npm run verify:enterprise',
+                'verify:enterprise': 'node scripts/a.mjs && node scripts/b.mjs'
+            };
+            const registered = { verify: {}, 'verify:enterprise': {} };
+            expect([...scriptChains({ checks: registered, scripts: aliased }).keys()]).toEqual([
+                'verify:enterprise'
+            ]);
+            expect([...scriptChains({ checks: {}, scripts: aliased }).keys()]).toEqual([
+                'verify',
+                'verify:enterprise'
+            ]);
+        });
+    });
+
+    describe('chainParts', () => {
+        const chains = scriptChains({ checks, scripts });
+        const parts = chainParts({ chains, scripts });
+
+        it('holds the steps of a script', () => {
+            expect(parts.get('build')).toEqual(new Set(['tsc', 'vite']));
+            expect(parts.get('ci:local').has('perf:ci')).toBe(true);
+        });
+
+        it('adds the steps of a traced entry point among them, as deep as it goes', () => {
+            expect(parts.get('verify:full')).toEqual(
+                new Set([
+                    'verify:ci',
+                    'smoke:dev',
+                    'audit:gate',
+                    'lock:age',
+                    'verify',
+                    'check-hooks',
+                    'lint:oxlint',
+                    'typecheck',
+                    'lint',
+                    'test:coverage',
+                    'build'
+                ])
+            );
+        });
+
+        it('does not look inside a step that is no entry point', () => {
+            expect(parts.get('verify').has('build')).toBe(true);
+            expect(parts.get('verify').has('tsc')).toBe(false);
+            expect(parts.get('lint').has('lint')).toBe(false);
+        });
+
+        it('follows an alias to the traced script it stands for', () => {
+            const aliased = {
+                verify: 'npm run verify:enterprise',
+                'verify:enterprise':
+                    'node scripts/gate-trace.mjs verify:enterprise -- npm run verify:enterprise:inner',
+                'verify:enterprise:inner': 'node scripts/a.mjs && node scripts/b.mjs',
+                'verify:ci': 'node scripts/gate-trace.mjs verify:ci -- npm run verify:ci:inner',
+                'verify:ci:inner': 'npm run lock:age && npm run verify'
+            };
+            const registered = { verify: {}, 'verify:enterprise': {}, 'verify:ci': {} };
+            const aliasedChains = scriptChains({ checks: registered, scripts: aliased });
+            expect(
+                chainParts({ chains: aliasedChains, scripts: aliased }).get('verify:ci')
+            ).toEqual(new Set(['lock:age', 'verify', 'a', 'b']));
+        });
+
+        it('takes a traced step that runs one command for a part with none of its own', () => {
+            const single = {
+                top: 'node scripts/x.mjs && npm run one',
+                one: 'node scripts/gate-trace.mjs one -- node scripts/y.mjs'
+            };
+            const singleChains = scriptChains({ checks: { one: {} }, scripts: single });
+            expect(chainParts({ chains: singleChains, scripts: single }).get('top')).toEqual(
+                new Set(['x', 'one'])
+            );
+        });
+
+        it('stops at entry points that call each other', () => {
+            const loop = {
+                a: 'node scripts/gate-trace.mjs a -- npm run a:inner',
+                'a:inner': 'npm run b && node scripts/x.mjs',
+                b: 'node scripts/gate-trace.mjs b -- npm run b:inner',
+                'b:inner': 'npm run a && node scripts/y.mjs'
+            };
+            const loopChains = scriptChains({ checks: { a: {}, b: {} }, scripts: loop });
+            expect(chainParts({ chains: loopChains, scripts: loop }).get('a')).toEqual(
+                new Set(['b', 'x', 'a', 'y'])
+            );
+        });
+    });
+
+    describe('compositionModel', () => {
+        const entry = (phrase) => model.vocabulary.find((candidate) => candidate.phrase === phrase);
+
+        it('names each script and each step once per spelling, the words filed under their stage', () => {
+            const phrases = model.vocabulary.map((candidate) => candidate.phrase);
+            expect(new Set(phrases).size).toBe(phrases.length);
+            expect(phrases).toContain('verify ci');
+            expect(phrases).toContain('perf ci');
+            expect(phrases).toContain('vite');
+            expect(phrases).toContain('production bundle');
+            expect([...entry('production bundle').names]).toEqual(['build']);
+            expect([...entry('type check').names]).toEqual(['typecheck']);
+        });
+
+        it('merges the names of one spelling', () => {
+            expect([...entry('tsc').names]).toEqual(['tsc', 'typecheck']);
+            expect([...entry('eslint').names]).toEqual(['eslint', 'lint']);
+        });
+
+        it('calls a spelling strong when it has a separator or a doc lists it, not a bare script name', () => {
+            expect(entry('verify ci').strong).toBe(true);
+            expect(entry('test coverage').strong).toBe(true);
+            expect(entry('coverage').strong).toBe(true);
+            expect(entry('hooks').strong).toBe(true);
+            expect(entry('verify').strong).toBe(false);
+            expect(entry('build').strong).toBe(false);
+            expect(entry('vite').strong).toBe(false);
+        });
+
+        it('lets a listed word never make a script name strong', () => {
+            expect(entry('tsc').strong).toBe(false);
+            expect(entry('eslint').strong).toBe(false);
+            expect(entry('lint').strong).toBe(false);
+        });
+
+        it('ignores words filed under a name that is no stage, a value that is no list and an empty word', () => {
+            const odd = modelOf({
+                stageWords: { ghost: ['spectre'], build: 'bundle', lint: ['', ' - ', 'linting'] }
+            });
+            const phrases = odd.vocabulary.map((candidate) => candidate.phrase);
+            expect(phrases).not.toContain('spectre');
+            expect(phrases).not.toContain('bundle');
+            expect(phrases.filter((phrase) => phrase.length < 2)).toEqual([]);
+            expect(phrases).toContain('linting');
+        });
+
+        it('holds the parts of every script', () => {
+            expect(model.parts.get('build')).toEqual(new Set(['tsc', 'vite']));
+        });
+    });
+
+    describe('findComposition', () => {
+        it('pins the windows', () => {
+            expect(COMPOSITION_PAIR_GAP_WORDS).toBe(2);
+            expect(COMPOSITION_PART_GAP_WORDS).toBe(4);
+        });
+
+        it('finds two parts of one script, however the line joins them', () => {
+            const joined = [
+                '`audit:gate` + `lock:age`',
+                'audit:gate -> lock:age',
+                'audit:gate → lock:age',
+                'audit:gate && lock:age',
+                'audit:gate, then lock:age',
+                'audit:gate runs before lock:age',
+                'lock:age behind audit:gate',
+                'AUDIT:GATE then LOCK:AGE'
+            ];
+            for (const text of joined) {
+                expect(compose(text)).not.toBeNull();
+            }
+            expect(compose('`audit:gate` + `lock:age`')).toEqual(['audit:gate', 'lock:age']);
+            expect(compose('lock:age behind audit:gate')).toEqual(['lock:age', 'audit:gate']);
+        });
+
+        it('names the two spellings as the line wrote them', () => {
+            expect(compose('verify:ci plus the dev-server smoke')).toEqual([
+                'verify:ci',
+                'dev-server smoke'
+            ]);
+            expect(compose('type-check, then the production bundle')).toEqual([
+                'type-check',
+                'production bundle'
+            ]);
+            expect(compose('`tsc -b` + Vite production build')).toEqual(['tsc', 'Vite']);
+        });
+
+        it('lets two parts sit at most the pair window apart', () => {
+            const near = `audit:gate ${gap(COMPOSITION_PAIR_GAP_WORDS)} lock:age`;
+            const far = `audit:gate ${gap(COMPOSITION_PAIR_GAP_WORDS + 1)} lock:age`;
+            expect(compose(near)).toEqual(['audit:gate', 'lock:age']);
+            expect(compose(far)).toBeNull();
+            expect(compose('audit:gate comes right before lock:age')).toBeNull();
+            expect(compose('audit:gate comes before lock:age')).not.toBeNull();
+        });
+
+        it('counts the words of any script and the digits, not the punctuation, in the gap', () => {
+            expect(compose('audit:gate ünïcödé lock:age')).not.toBeNull();
+            expect(compose('audit:gate 1 2 3 lock:age')).toBeNull();
+            expect(compose('audit:gate (-- -> / ) lock:age')).not.toBeNull();
+        });
+
+        it('wants one of the two names strong', () => {
+            expect(compose('typecheck then build')).toBeNull();
+            expect(compose('`typecheck` then build')).not.toBeNull();
+            expect(compose('typecheck then `build`')).not.toBeNull();
+            expect(compose('type-check then build')).not.toBeNull();
+            expect(compose('typecheck then production bundle')).not.toBeNull();
+            expect(compose('lint:oxlint then typecheck')).not.toBeNull();
+            expect(compose('typecheck then lint:oxlint')).not.toBeNull();
+        });
+
+        it('reads an operator between two parts as a command line, whatever the words', () => {
+            expect(compose('typecheck && build')).toEqual(['typecheck', 'build']);
+            expect(compose('typecheck -> build')).toEqual(['typecheck', 'build']);
+            expect(compose('typecheck → build')).toEqual(['typecheck', 'build']);
+            expect(compose('typecheck&&build')).toEqual(['typecheck', 'build']);
+            expect(compose('typecheck then build')).toBeNull();
+            expect(compose('typecheck + build')).toBeNull();
+            expect(compose('typecheck & build')).toBeNull();
+            expect(compose('typecheck | build')).toBeNull();
+            expect(compose('typecheck - build')).toBeNull();
+            expect(compose('typecheck > build')).toBeNull();
+            expect(compose('typecheck => build')).toBeNull();
+        });
+
+        it('wants the operator between the two names, inside the pair window and between sibling parts', () => {
+            expect(compose('&& typecheck, build')).toBeNull();
+            expect(compose('typecheck, build &&')).toBeNull();
+            expect(compose('-> typecheck, build ->')).toBeNull();
+            expect(compose(`typecheck && ${gap(COMPOSITION_PAIR_GAP_WORDS)} build`)).not.toBeNull();
+            expect(compose(`typecheck && ${gap(COMPOSITION_PAIR_GAP_WORDS + 1)} build`)).toBeNull();
+            expect(compose('vite && typecheck')).toBeNull();
+            expect(compose('lint && lint')).toBeNull();
+        });
+
+        it('takes a name after npm run for a name in code, in any case', () => {
+            expect(compose('npm run typecheck then build')).not.toBeNull();
+            expect(compose('NPM RUN   typecheck then build')).not.toBeNull();
+            expect(compose('npm run, typecheck then build')).toBeNull();
+            expect(compose('npm run now typecheck then build')).toBeNull();
+        });
+
+        it('takes a name inside backticks for a name in code, and one right after them for prose', () => {
+            expect(compose('`typecheck` and build')).not.toBeNull();
+            expect(compose('`x`typecheck then build')).toBeNull();
+            expect(compose('`x` `typecheck` then build')).not.toBeNull();
+        });
+
+        it('wants the two names to differ', () => {
+            expect(compose('`lint:oxlint` (oxlint)')).toBeNull();
+            expect(compose('`lint:oxlint` then oxlint')).toBeNull();
+        });
+
+        it('wants the two names to be parts of one script', () => {
+            expect(compose('`smoke:dev` and `perf:ci`')).toBeNull();
+            expect(compose('`check-hooks` and `lint:oxlint`')).not.toBeNull();
+        });
+
+        it('reads the steps of an entry point as parts of the script that calls it, at any depth', () => {
+            expect(compose('verify and `smoke:dev`')).toEqual(['verify', 'smoke:dev']);
+            expect(compose('lint and `smoke:dev`')).toEqual(['lint', 'smoke:dev']);
+            expect(compose('build and `smoke:dev`')).not.toBeNull();
+            expect(compose('vite and `smoke:dev`')).toBeNull();
+        });
+
+        it('reads a script and one of its own steps, up to the part window', () => {
+            const near = `\`ci:local\` ${gap(COMPOSITION_PART_GAP_WORDS)} perf:ci`;
+            const far = `\`ci:local\` ${gap(COMPOSITION_PART_GAP_WORDS + 1)} perf:ci`;
+            expect(compose(near)).toEqual(['ci:local', 'perf:ci']);
+            expect(compose(far)).toBeNull();
+            expect(compose(`perf:ci ${gap(COMPOSITION_PART_GAP_WORDS)} \`ci:local\``)).toEqual([
+                'perf:ci',
+                'ci:local'
+            ]);
+            expect(
+                compose(`perf:ci ${gap(COMPOSITION_PART_GAP_WORDS + 1)} \`ci:local\``)
+            ).toBeNull();
+        });
+
+        it('reads a word filed under a stage as that stage, the part of a script, up to the part window', () => {
+            const far = gap(COMPOSITION_PAIR_GAP_WORDS + 1);
+            expect(compose(`\`verify\` ${far} type check`)).toEqual(['verify', 'type check']);
+            expect(compose(`type check ${far} \`verify\``)).toEqual(['type check', 'verify']);
+            expect(compose(`\`verify:full\` ${far} dev-server smoke`)).toEqual([
+                'verify:full',
+                'dev-server smoke'
+            ]);
+            expect(
+                compose(`\`verify\` ${gap(COMPOSITION_PART_GAP_WORDS + 1)} type check`)
+            ).toBeNull();
+        });
+
+        it('pairs two names with other names between them', () => {
+            expect(compose('audit:gate, vite, lock:age')).toEqual(['audit:gate', 'lock:age']);
+            expect(compose('`audit:gate`, `vite` and `lock:age`')).toEqual([
+                'audit:gate',
+                'lock:age'
+            ]);
+        });
+
+        it('wants the step to be a part of the script', () => {
+            expect(compose('`lint` then vite')).toBeNull();
+            expect(compose('`lint` is the step running vite')).toBeNull();
+        });
+
+        it('takes any one name of the step and any one name of the script', () => {
+            expect(compose('`build` is the step running tsc')).toEqual(['build', 'tsc']);
+            expect(compose('`vite build` is the step running tsc')).toEqual(['vite build', 'tsc']);
+        });
+
+        it('wants the script strong, not the step', () => {
+            expect(compose('the build runs vite')).toBeNull();
+            expect(compose('the `build` runs vite')).toEqual(['build', 'vite']);
+            expect(compose('vite is run by the `build`')).toEqual(['vite', 'build']);
+            expect(compose('vite is run by the build')).toBeNull();
+            expect(compose('`ci:local` adds perf:ci')).not.toBeNull();
+        });
+
+        it('reads names with only whitespace between them as one', () => {
+            expect(compose('`vite build`')).toBeNull();
+            expect(compose('`vite` + `build`')).toEqual(['vite', 'build']);
+            expect(compose('lint oxlint then eslint')).toEqual(['lint oxlint', 'eslint']);
+        });
+
+        it('takes the longest spelling where two overlap, not the names of the shorter ones with it', () => {
+            const far = gap(COMPOSITION_PAIR_GAP_WORDS + 1);
+            expect(compose(`lint oxlint ${far} eslint`)).toBeNull();
+            expect(compose(`eslint ${far} lint oxlint`)).toBeNull();
+            expect(compose(`\`lint\` ${far} eslint`)).toEqual(['lint', 'eslint']);
+        });
+
+        it('lets a joined name be strong when any part of it is, and carry the names of all', () => {
+            expect(compose('tsc then vite smoke')).toEqual(['tsc', 'vite smoke']);
+            expect(compose('tsc then smoke vite')).toEqual(['tsc', 'smoke vite']);
+            expect(compose('vite smoke then tsc')).toEqual(['vite smoke', 'tsc']);
+            expect(compose('smoke vite then tsc')).toEqual(['smoke vite', 'tsc']);
+            expect(compose('tsc then vite build')).toBeNull();
+            expect(compose('vite then smoke tsc')).toEqual(['vite', 'smoke tsc']);
+            expect(compose('vite then tsc smoke')).toEqual(['vite', 'tsc smoke']);
+        });
+
+        it('stops at the end of a sentence', () => {
+            expect(compose('`audit:gate`. `lock:age`')).toBeNull();
+            expect(compose('`audit:gate`; `lock:age`')).toBeNull();
+            expect(compose('`audit:gate`? `lock:age`')).toBeNull();
+            expect(compose('`audit:gate`! `lock:age`')).toBeNull();
+            expect(compose('`audit:gate`.\n`lock:age`')).toBeNull();
+            expect(compose('`audit:gate`, `lock:age`')).not.toBeNull();
+        });
+
+        it('does not take a full stop inside code or inside a word for the end of a sentence', () => {
+            expect(compose('`audit:gate` + `a. b` + `lock:age`')).not.toBeNull();
+            expect(compose('`audit:gate` + v1.2 + `lock:age`')).not.toBeNull();
+        });
+
+        it('reads the first composition of a text', () => {
+            expect(compose('`lock:age` after `audit:gate`. `ci:local` adds perf:ci')).toEqual([
+                'lock:age',
+                'audit:gate'
+            ]);
+        });
+
+        it('finds nothing in a text with no name or one', () => {
+            expect(compose('')).toBeNull();
+            expect(compose('plain words only')).toBeNull();
+            expect(compose('`audit:gate` alone')).toBeNull();
+        });
+
+        it('does not read a name inside a longer word, a compound, a file name or another script', () => {
+            expect(compose('builds then `smoke:dev`')).toBeNull();
+            expect(compose('rebuild then `smoke:dev`')).toBeNull();
+            expect(compose('pre-build then `smoke:dev`')).toBeNull();
+            expect(compose('build-time then `smoke:dev`')).toBeNull();
+            expect(compose('x:build then `smoke:dev`')).toBeNull();
+            expect(compose('build:analyze then `smoke:dev`')).toBeNull();
+            expect(compose('smoke.spec.ts then `lock:age`')).toBeNull();
+            expect(compose('scripts.build then `smoke:dev`')).toBeNull();
+            expect(compose('src.lint then `smoke:dev`')).toBeNull();
+            expect(compose('build then `smoke:dev`')).not.toBeNull();
+            expect(compose('the build. `smoke:dev`')).toBeNull();
+        });
+    });
+
+    describe('a word filed under a script that is also one of its steps', () => {
+        const filedScripts = {
+            suite: 'npm run alpha && beta --strict && npm run gamma',
+            alpha: 'node scripts/alpha.mjs',
+            gamma: 'node scripts/gamma.mjs'
+        };
+        const filed = compositionModel({
+            checks: {},
+            scripts: filedScripts,
+            stages: new Set(['suite']),
+            stageWords: { suite: ['beta', 'assembly'] }
+        });
+        const filedEntry = (phrase) =>
+            filed.vocabulary.find((candidate) => candidate.phrase === phrase);
+        const composeFiled = (text) => {
+            const found = findComposition(text, filed);
+            return found === null ? null : [found.first, found.second];
+        };
+
+        it('keeps what a spelling is apart from what the docs file it under', () => {
+            expect([...filedEntry('beta').names]).toEqual(['beta', 'suite']);
+            expect([...filedEntry('beta').own]).toEqual(['beta']);
+            expect([...filedEntry('assembly').names]).toEqual(['suite']);
+            expect([...filedEntry('assembly').own]).toEqual([]);
+            expect([...filedEntry('suite').own]).toEqual(['suite']);
+        });
+
+        it('reads the script and the word as the script and one of its steps, in any order or case', () => {
+            expect(composeFiled('`suite` runs beta directly')).toEqual(['suite', 'beta']);
+            expect(composeFiled('`suite` runs `beta`')).toEqual(['suite', 'beta']);
+            expect(composeFiled('BETA is run by `suite`')).toEqual(['BETA', 'suite']);
+        });
+
+        it('leaves the word an ordinary one until the doc puts it in code', () => {
+            expect(filedEntry('beta').strong).toBe(false);
+            expect(composeFiled('suite runs beta')).toBeNull();
+            expect(composeFiled('suite runs `beta`')).toBeNull();
+        });
+
+        it('reads the script by its own name only, never by a word filed under it', () => {
+            expect(composeFiled('`beta` then very often alpha')).toBeNull();
+            expect(composeFiled('`alpha` then very often `beta`')).toBeNull();
+            expect(composeFiled('assembly then very often `alpha`')).toBeNull();
+            expect(composeFiled('`alpha beta` then very often gamma')).toBeNull();
+            expect(composeFiled('`beta` and `beta`')).toBeNull();
+            expect(composeFiled('`beta` then alpha')).toEqual(['beta', 'alpha']);
+        });
+
+        it('reads the own names of every word of a joined name', () => {
+            expect(composeFiled('`suite beta` then very often alpha')).toEqual([
+                'suite beta',
+                'alpha'
+            ]);
+            expect(composeFiled('`beta suite` then very often alpha')).toEqual([
+                'beta suite',
+                'alpha'
+            ]);
+            expect([...filedEntry('suite').own]).toEqual(['suite']);
+            expect([...filedEntry('beta').own]).toEqual(['beta']);
+        });
+
+        it('never pairs a script with itself, even where entry points call each other', () => {
+            const loop = {
+                ping: 'node scripts/gate-trace.mjs ping -- npm run ping:inner',
+                'ping:inner': 'npm run pong && node scripts/x.mjs',
+                pong: 'node scripts/gate-trace.mjs pong -- npm run pong:inner',
+                'pong:inner': 'npm run ping && node scripts/y.mjs'
+            };
+            const looped = compositionModel({
+                checks: { ping: {}, pong: {} },
+                scripts: loop,
+                stages: new Set(),
+                stageWords: {}
+            });
+            expect(looped.parts.get('ping').has('ping')).toBe(true);
+            expect(findComposition('`ping` and ping', looped)).toBeNull();
+            expect(findComposition('`ping` then also calls `pong`', looped)).not.toBeNull();
+        });
+
+        it('collects the own names of every script that one spelling stands for', () => {
+            const twins = compositionModel({
+                checks: {},
+                scripts: {
+                    'check:all': 'npm run alpha && npm run beta',
+                    'check-all': 'npm run gamma && npm run delta'
+                },
+                stages: new Set(),
+                stageWords: {}
+            });
+            expect(findComposition('`check:all` runs delta', twins)).toEqual({
+                first: 'check:all',
+                second: 'delta'
+            });
+        });
+    });
+});
+
+describe('checkChainRetelling: compositions', () => {
+    const scripts = {
+        verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+        'verify:inner':
+            'node scripts/check-hooks.mjs && npm run lint:oxlint && npm run typecheck && npm run build',
+        'verify:ci': 'node scripts/gate-trace.mjs verify:ci -- npm run verify:ci:inner',
+        'verify:ci:inner': 'npm run audit:gate && npm run lock:age && npm run verify'
+    };
+    const checks = { verify: {}, 'verify:ci': {} };
+    const stages = gateStages({ checks, scripts });
+    const stageWords = { 'lint:oxlint': ['oxlint'], typecheck: ['tsc'] };
+    const vocabulary = () => gateVocabulary({ stages, stageWords });
+    const composition = () => compositionModel({ checks, scripts, stages, stageWords });
+    const source = (file, text) => ({
+        file,
+        lines: text.split('\n').map((line, index) => ({ line: index + 1, text: line }))
+    });
+    const composed = (file, line, first, second) =>
+        `${file}:${String(line)}: composes the gate (${first} with ${second}) — point at scripts/gate-tiers.json instead`;
+    const retold = (file, line) =>
+        `${file}:${String(line)}: retells the gate chain — point at scripts/gate-tiers.json instead`;
+    const check = (text, file = 'README.md') =>
+        checkChainRetelling({
+            sources: [source(file, text)],
+            vocabulary: vocabulary(),
+            composition: composition()
+        });
+
+    it('flags two parts of one script that fewer stages than the threshold name, at that line', () => {
+        expect(check('fine\n`audit:gate` then `lock:age`\nfine')).toEqual([
+            composed('README.md', 2, 'audit:gate', 'lock:age')
+        ]);
+    });
+
+    it('flags a script that names one of its own steps', () => {
+        expect(check('`verify:ci` runs `audit:gate` first')).toEqual([
+            composed('README.md', 1, 'verify:ci', 'audit:gate')
+        ]);
+    });
+
+    it('keeps the threshold finding when a line is both', () => {
+        expect(check('`check-hooks`, `lint:oxlint` and `typecheck`')).toEqual([
+            retold('README.md', 1)
+        ]);
+    });
+
+    it('reports one finding per line', () => {
+        expect(check('`audit:gate` then `lock:age` then `verify:ci`')).toHaveLength(1);
+    });
+
+    it('passes a line that names no two parts of one script', () => {
+        expect(check('`audit:gate` is fine\nso is `lock:age`')).toEqual([]);
+        expect(check('`audit:gate` and `perf:ci`')).toEqual([]);
+    });
+
+    it('reads the lines of a chain wrapped at an arrow as one', () => {
+        expect(check('x\n`audit:gate` →\n`lock:age`')).toEqual([
+            composed('README.md', 2, 'audit:gate', 'lock:age')
+        ]);
+        expect(check('x\n`audit:gate`\n→ `lock:age`')).toEqual([
+            composed('README.md', 2, 'audit:gate', 'lock:age')
+        ]);
+        expect(check('x\n`audit:gate`\n`lock:age`')).toEqual([]);
+    });
+
+    it('reads the compositions only when it is given a model', () => {
+        expect(
+            checkChainRetelling({
+                sources: [source('README.md', '`audit:gate` then `lock:age`')],
+                vocabulary: vocabulary()
+            })
+        ).toEqual([]);
+    });
+
+    it('reads a table row like a line', () => {
+        expect(check('| `audit:gate` | `lock:age` |')).toEqual([
+            composed('README.md', 1, 'audit:gate', 'lock:age')
+        ]);
+        expect(check('| `check-hooks` | `lint:oxlint` | `typecheck` |')).toEqual([
+            retold('README.md', 1)
+        ]);
+    });
+});
+
+describe('retellingSources', () => {
+    const lines = (entry) => entry.lines.map(({ line, text }) => [line, text]);
+    const build = () =>
+        retellingSources({
+            docs: [['README.md', 'one\n```\ntwo\n```\nthree']],
+            workflows: [
+                [
+                    '.github/workflows/ci.yml',
+                    [
+                        'name: CI',
+                        'jobs:',
+                        '    validate:',
+                        '        steps:',
+                        '            # why one step',
+                        '            - name: Verify (oxlint, tsc, build)',
+                        '              run: npm run lint:oxlint && npm run typecheck && npm run build',
+                        '              run: echo done # not a comment line',
+                        '            - uses: actions/checkout@v1'
+                    ].join('\n')
+                ]
+            ],
+            hooks: [
+                [
+                    '.husky/pre-push',
+                    [
+                        '# phase 0 runs oxlint and tsc',
+                        'npm run verify:push || exit 1 # not a comment line'
+                    ].join('\n')
+                ]
+            ],
+            tiersText: [
+                '{',
+                '    "_phaseMeaning": "0 = scaffold",',
+                '    "checks": {',
+                '        "verify": {',
+                '            "description": "the gate",',
+                '            "chain": "check-hooks -> build"',
+                '        }',
+                '    },',
+                '    "ci": {',
+                '        "allowedRunSteps": [',
+                '            {',
+                '                "run": "npm run build",',
+                '                "reason": "a reason"',
+                '            }',
+                '        ]',
+                '    },',
+                '    "moments": {',
+                '        "iterate": {',
+                '            "expected": ["verify:iter", "docs:check"],',
+                '            "forbidden": [',
+                '                "verify",',
+                '                "build"',
+                '            ]',
+                '        }',
+                '    }',
+                '}'
+            ].join('\n')
+        });
+    const byFile = (file) => build().find((entry) => entry.file === file);
+
+    it('reads every line of a doc, fenced blocks included', () => {
+        expect(lines(byFile('README.md'))).toEqual([
+            [1, 'one'],
+            [2, '```'],
+            [3, 'two'],
+            [4, '```'],
+            [5, 'three']
+        ]);
+    });
+
+    it('reads a workflow for its step names, job names and comments, not its commands', () => {
+        expect(lines(byFile('.github/workflows/ci.yml'))).toEqual([
+            [1, 'name: CI'],
+            [5, '            # why one step'],
+            [6, '            - name: Verify (oxlint, tsc, build)']
+        ]);
+    });
+
+    it('reads a hook for its comments, not its commands', () => {
+        expect(lines(byFile('.husky/pre-push'))).toEqual([[1, '# phase 0 runs oxlint and tsc']]);
+    });
+
+    it('reads gate-tiers.json for its prose keys, not the chain view or the lists of names', () => {
+        expect(lines(byFile('scripts/gate-tiers.json'))).toEqual([
+            [2, '    "_phaseMeaning": "0 = scaffold",'],
+            [5, '            "description": "the gate",'],
+            [13, '                "reason": "a reason"']
+        ]);
+    });
+
+    it('reads the rows of a table like any other line', () => {
+        const sources = retellingSources({
+            docs: [['README.md', '| a | `lint` |\n|---|---|']],
+            workflows: [],
+            hooks: [],
+            tiersText: ''
+        });
+        expect(sources.map(lines)).toEqual([
+            [
+                [1, '| a | `lint` |'],
+                [2, '|---|---|']
+            ],
+            []
+        ]);
+    });
+
+    it('reads a JSON escape in tier prose as a space, not as a word', () => {
+        const tiersText = [
+            '{',
+            String.raw`    "_phaseMeaning": "cov 4.2 \u00b7 lint 2.1 \"q\" a\\b x\u00ZZ"`,
+            '}'
+        ].join('\n');
+        const sources = retellingSources({ docs: [], workflows: [], hooks: [], tiersText });
+        expect(sources.map(lines)).toEqual([
+            [[2, '    "_phaseMeaning": "cov 4.2   lint 2.1  q  a b x 00ZZ"']]
+        ]);
+    });
+
+    it('reads a JSON escape between two letters as a gap, not as a join', () => {
+        const tiersText = String.raw`    "description": "a\u00b7b\"c"`;
+        const sources = retellingSources({ docs: [], workflows: [], hooks: [], tiersText });
+        expect(sources.map(lines)).toEqual([[[1, '    "description": "a b c"']]]);
+    });
+
+    it('reads a JSON escape written in upper-case hex digits as a space too', () => {
+        const tiersText = String.raw`    "description": "a\u00B7b\u00D7c"`;
+        const sources = retellingSources({ docs: [], workflows: [], hooks: [], tiersText });
+        expect(sources.map(lines)).toEqual([[[1, '    "description": "a b c"']]]);
+    });
+});
+
+describe('run: the gate chain', () => {
+    /** A temp repo whose package.json defines `verify` and whose gate-tiers.json carries `tiers`. */
+    const withRepo = ({ tiers, readme }, check) => {
+        const root = mkdtempSync(path.join(tmpdir(), 'docs-check-chain-'));
+        try {
+            mkdirSync(path.join(root, 'scripts'));
+            writeFileSync(
+                path.join(root, 'scripts/gate-tiers.json'),
+                JSON.stringify(tiers, null, 4)
+            );
+            writeFileSync(
+                path.join(root, 'package.json'),
+                JSON.stringify({
+                    scripts: {
+                        verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+                        'verify:inner':
+                            'node scripts/check-hooks.mjs && npm run lint:oxlint && npm run build',
+                        'lint:oxlint': 'oxlint .',
+                        build: 'vite build'
+                    }
+                })
+            );
+            writeFileSync(path.join(root, 'package-lock.json'), '{"packages":{}}');
+            writeFileSync(path.join(root, 'AGENTS.md'), '`verify`\n`lint:oxlint`\n`build`\n');
+            writeFileSync(path.join(root, 'README.md'), readme);
+            check(run({ root, weekly: true, today: '2026-10-09' }).findings);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    };
+    const tiers = (chain) => ({
+        checks: { verify: { class: 'code', chain } },
+        docs: { stageWords: { 'check-hooks': ['hooks'] } }
+    });
+    const chain = 'check-hooks -> lint:oxlint -> build';
+
+    it('passes when the chain view matches and no doc retells it', () => {
+        withRepo({ tiers: tiers(chain), readme: '# Readme\n\nSee the gate.\n' }, (findings) => {
+            expect(findings).toEqual([]);
+        });
+    });
+
+    it('fails the check on a chain that differs from package.json', () => {
+        withRepo({ tiers: tiers('check-hooks -> build'), readme: '# Readme\n' }, (findings) => {
+            expect(findings).toEqual([
+                `scripts/gate-tiers.json: checks.verify.chain differs from package.json — expected "${chain}"`
+            ]);
+        });
+    });
+
+    it('fails the check on stage words filed under a name that is no stage', () => {
+        const wrong = { ...tiers(chain), docs: { stageWords: { 'check-hook': ['hooks'] } } };
+        withRepo({ tiers: wrong, readme: '# Readme\n' }, (findings) => {
+            expect(findings).toEqual([
+                'scripts/gate-tiers.json: docs.stageWords.check-hook names no stage of the verify chains in package.json — rename or drop it'
+            ]);
+        });
+    });
+
+    it('fails the check on a doc line that retells the chain', () => {
+        const readme = '# Readme\n\nThe gate runs hooks, then lint:oxlint, then build.\n';
+        withRepo({ tiers: tiers(chain), readme }, (findings) => {
+            expect(findings).toEqual([
+                'README.md:3: retells the gate chain — point at scripts/gate-tiers.json instead'
+            ]);
+        });
+    });
+
+    it('fails the check on prose in gate-tiers.json that retells the chain', () => {
+        const prose = {
+            _phaseMeaning: 'phase 0 runs hooks + lint:oxlint + build',
+            ...tiers(chain)
+        };
+        withRepo({ tiers: prose, readme: '# Readme\n' }, (findings) => {
+            expect(findings).toEqual([
+                'scripts/gate-tiers.json:2: retells the gate chain — point at scripts/gate-tiers.json instead'
+            ]);
+        });
+    });
+});
+
+describe('run: the files the retelling check reads', () => {
+    const cleanEnv = () =>
+        Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+    const gitIn = (cwd, args) =>
+        execFileSync('git', args, { cwd, env: cleanEnv(), stdio: 'ignore' });
+    const retold = 'runs hooks, lint:oxlint and build';
+    const tiers = {
+        checks: { verify: { class: 'code', chain: 'check-hooks -> lint:oxlint -> build' } },
+        docs: { stageWords: { 'check-hooks': ['hooks'] } }
+    };
+    const finding = (file, line) =>
+        `${file}:${line}: retells the gate chain — point at scripts/gate-tiers.json instead`;
+
+    /** A temp repo whose extra files are tracked by git, which is how the check finds workflows and hooks. */
+    const withTracked = (files, check) => {
+        const root = mkdtempSync(path.join(tmpdir(), 'docs-check-read-'));
+        const saved = Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'));
+        try {
+            mkdirSync(path.join(root, 'scripts'));
+            writeFileSync(path.join(root, 'scripts/gate-tiers.json'), JSON.stringify(tiers));
+            writeFileSync(
+                path.join(root, 'package.json'),
+                JSON.stringify({
+                    scripts: {
+                        verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+                        'verify:inner':
+                            'node scripts/check-hooks.mjs && npm run lint:oxlint && npm run build',
+                        'lint:oxlint': 'oxlint .',
+                        build: 'vite build'
+                    }
+                })
+            );
+            writeFileSync(path.join(root, 'package-lock.json'), '{"packages":{}}');
+            writeFileSync(path.join(root, 'AGENTS.md'), '`verify`\n`lint:oxlint`\n`build`\n');
+            writeFileSync(path.join(root, 'README.md'), '# Readme\n');
+            for (const [file, content] of Object.entries(files)) {
+                mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+                writeFileSync(path.join(root, file), content);
+            }
+            gitIn(root, ['init', '-q']);
+            gitIn(root, ['add', '-A']);
+            for (const [key] of saved) delete process.env[key];
+            check(run({ root, weekly: true, today: '2026-10-09' }).findings);
+        } finally {
+            for (const [key, value] of saved) process.env[key] = value;
+            rmSync(root, { recursive: true, force: true });
+        }
+    };
+
+    it('reads the step names of a tracked workflow', () => {
+        const workflow = [
+            'name: CI',
+            'on: workflow_dispatch',
+            'jobs:',
+            '    gate:',
+            '        runs-on: ubuntu-latest',
+            '        steps:',
+            `            - name: Verify (${retold})`,
+            '              run: npm run verify',
+            ''
+        ].join('\n');
+        withTracked({ '.github/workflows/ci.yml': workflow }, (findings) => {
+            expect(findings).toEqual([finding('.github/workflows/ci.yml', 7)]);
+        });
+    });
+
+    it('reads the comments of every tracked hook, not the files below .husky', () => {
+        const hook = `# ${retold}\nnpm run verify\n`;
+        const files = {
+            '.husky/commit-msg': hook,
+            '.husky/pre-commit': hook,
+            '.husky/pre-push': hook,
+            '.husky/_/husky.sh': hook
+        };
+        withTracked(files, (findings) => {
+            expect(findings).toEqual([
+                finding('.husky/commit-msg', 1),
+                finding('.husky/pre-commit', 1),
+                finding('.husky/pre-push', 1)
+            ]);
+        });
+    });
+});
+
+describe('run: compositions', () => {
+    /** A temp repo with the given package.json scripts, gate-tiers.json and extra files. */
+    const withRepo = ({ scripts, tiers, files = {} }, check) => {
+        const root = mkdtempSync(path.join(tmpdir(), 'docs-check-compose-'));
+        try {
+            mkdirSync(path.join(root, 'scripts'));
+            const tiersText = JSON.stringify(tiers, null, 4);
+            writeFileSync(path.join(root, 'scripts/gate-tiers.json'), tiersText);
+            writeFileSync(path.join(root, 'package.json'), JSON.stringify({ scripts }));
+            writeFileSync(path.join(root, 'package-lock.json'), '{"packages":{}}');
+            const documented = Object.keys(scripts).filter((name) => !name.endsWith(':inner'));
+            writeFileSync(
+                path.join(root, 'AGENTS.md'),
+                `${documented.map((name) => `\`${name}\``).join('\n')}\n`
+            );
+            writeFileSync(
+                path.join(root, 'README.md'),
+                '# Readme\n\nSee DECISIONS.md and MAP.md.\n'
+            );
+            for (const [file, content] of Object.entries(files)) {
+                mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+                writeFileSync(path.join(root, file), content);
+            }
+            check(run({ root, weekly: true, today: '2026-10-09' }).findings, tiersText);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    };
+    const lineOf = (text, needle) =>
+        text.split('\n').findIndex((line) => line.includes(needle)) + 1;
+    const composed = (file, line, first, second) =>
+        `${file}:${String(line)}: composes the gate (${first} with ${second}) — point at scripts/gate-tiers.json instead`;
+    const scripts = {
+        verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+        'verify:inner': 'node scripts/check-hooks.mjs && npm run lint:oxlint',
+        'verify:ci': 'node scripts/gate-trace.mjs verify:ci -- npm run verify:ci:inner',
+        'verify:ci:inner': 'npm run audit:gate && npm run verify',
+        'verify:native': 'npm run verify:ci && npm run doctor',
+        'lint:oxlint': 'oxlint .',
+        'audit:gate': 'node scripts/audit-gate.mjs',
+        doctor: 'expo-doctor'
+    };
+    const tiers = (nativeChain, description) => ({
+        checks: {
+            verify: { class: 'code', chain: 'check-hooks -> lint:oxlint' },
+            'verify:ci': { class: 'code', chain: 'audit:gate -> verify' },
+            'verify:native': { class: 'code', description, chain: nativeChain }
+        },
+        docs: { stageWords: { doctor: ['Expo doctor'], 'check-hooks': ['hooks'] } }
+    });
+
+    it('stays red on a description that retells the old chain after the chain view is fixed', () => {
+        const stale = tiers('verify -> doctor', 'verify plus Expo doctor');
+        withRepo({ scripts, tiers: stale }, (findings, text) => {
+            expect(findings).toEqual([
+                'scripts/gate-tiers.json: checks.verify:native.chain differs from package.json — expected "verify:ci -> doctor"',
+                composed(
+                    'scripts/gate-tiers.json',
+                    lineOf(text, 'verify plus'),
+                    'verify',
+                    'Expo doctor'
+                )
+            ]);
+        });
+        const fixed = tiers('verify:ci -> doctor', 'verify plus Expo doctor');
+        withRepo({ scripts, tiers: fixed }, (findings, text) => {
+            expect(findings).toEqual([
+                composed(
+                    'scripts/gate-tiers.json',
+                    lineOf(text, 'verify plus'),
+                    'verify',
+                    'Expo doctor'
+                )
+            ]);
+        });
+    });
+
+    it('reads the commands of a script joined by an operator in a description, in plain words', () => {
+        const withBuild = (description) => {
+            const base = tiers('verify:ci -> doctor', 'the gate plus the SDK compatibility check');
+            return {
+                ...base,
+                checks: {
+                    ...base.checks,
+                    build: { class: 'code', description, chain: 'tsc -b -> vite build' }
+                }
+            };
+        };
+        const buildScripts = { ...scripts, build: 'tsc -b && vite build' };
+        withRepo(
+            { scripts: buildScripts, tiers: withBuild('tsc -b && vite build') },
+            (findings, text) => {
+                expect(findings).toEqual([
+                    composed(
+                        'scripts/gate-tiers.json',
+                        lineOf(text, 'tsc -b &&'),
+                        'tsc',
+                        'vite build'
+                    )
+                ]);
+            }
+        );
+        withRepo(
+            { scripts: buildScripts, tiers: withBuild('the type-checked bundle') },
+            (findings) => {
+                expect(findings).toEqual([]);
+            }
+        );
+    });
+
+    it('passes once the description states the purpose and not the parts', () => {
+        const purpose = tiers('verify:ci -> doctor', 'the gate plus the SDK compatibility check');
+        withRepo({ scripts, tiers: purpose }, (findings) => {
+            expect(findings).toEqual([]);
+        });
+    });
+
+    it('reads DECISIONS.md and a table row in a doc', () => {
+        const files = {
+            '.cursor/brain/DECISIONS.md': '# Decisions\n\n`audit:gate` then `verify`\n',
+            '.cursor/brain/MAP.md': '| `check-hooks` | `lint:oxlint` |\n'
+        };
+        const clean = tiers('verify:ci -> doctor', 'the gate plus the SDK compatibility check');
+        withRepo({ scripts, tiers: clean, files }, (findings) => {
+            expect(findings).toEqual([
+                composed('.cursor/brain/DECISIONS.md', 3, 'audit:gate', 'verify'),
+                composed('.cursor/brain/MAP.md', 1, 'check-hooks', 'lint:oxlint')
+            ]);
+        });
+    });
+
+    it('reads a JSON escape between two names as a space, not as a word', () => {
+        const escaped = tiers('verify:ci -> doctor', 'hooks 1 \u0007 2 lint:oxlint');
+        withRepo({ scripts, tiers: escaped }, (findings, text) => {
+            expect(text).toContain(String.raw`hooks 1 \u0007 2 lint:oxlint`);
+            expect(findings).toEqual([
+                composed('scripts/gate-tiers.json', lineOf(text, 'hooks 1'), 'hooks', 'lint:oxlint')
+            ]);
+        });
+    });
+
+    it('does not count the chain view itself', () => {
+        const clean = tiers('verify:ci -> doctor', 'the gate plus the SDK compatibility check');
+        withRepo({ scripts, tiers: clean }, (findings, text) => {
+            expect(text).toContain('"chain": "verify:ci -> doctor"');
+            expect(findings).toEqual([]);
+        });
+    });
+
+    it('reads an alias of a registered check as no script of its own', () => {
+        const aliased = {
+            verify: 'npm run verify:enterprise',
+            'verify:enterprise':
+                'node scripts/gate-trace.mjs verify:enterprise -- npm run verify:enterprise:inner',
+            'verify:enterprise:inner': 'node scripts/check-hooks.mjs && npm run lint:oxlint',
+            'lint:oxlint': 'oxlint .'
+        };
+        const registered = {
+            checks: {
+                verify: { class: 'code' },
+                'verify:enterprise': { class: 'code', chain: 'check-hooks -> lint:oxlint' }
+            },
+            docs: { stageWords: { 'check-hooks': ['hooks'] } }
+        };
+        const files = { '.cursor/brain/MAP.md': '`verify` runs `check-hooks`\n' };
+        withRepo({ scripts: aliased, tiers: registered, files }, (findings) => {
+            expect(findings).toEqual([]);
+        });
+    });
+
+    it('reads a script and a step of it that the docs also file under the script', () => {
+        const filedScripts = {
+            verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+            'verify:inner': 'node scripts/check-hooks.mjs && npm run suite',
+            suite: 'npm run alpha && beta --strict',
+            alpha: 'node scripts/alpha.mjs'
+        };
+        const filedTiers = {
+            checks: {
+                verify: { class: 'code', chain: 'check-hooks -> suite' },
+                suite: { class: 'code', chain: 'alpha -> beta --strict' }
+            },
+            docs: { stageWords: { 'check-hooks': ['hooks'], suite: ['beta'] } }
+        };
+        const withLine = (line, check) =>
+            withRepo(
+                {
+                    scripts: filedScripts,
+                    tiers: filedTiers,
+                    files: { '.cursor/brain/MAP.md': `${line}\n` }
+                },
+                check
+            );
+        withLine('- **`npm run suite`** runs **beta** directly (`beta --strict`).', (findings) => {
+            expect(findings).toEqual([composed('.cursor/brain/MAP.md', 1, 'suite', 'beta')]);
+        });
+        withLine('- **`npm run suite`** calls the checks directly.', (findings) => {
+            expect(findings).toEqual([]);
+        });
     });
 });

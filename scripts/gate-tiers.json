@@ -1,31 +1,41 @@
 {
-    "_description": "The gate discipline as data. scripts/trace-report.mjs reads this instead of hardcoding stage names; scripts/verify-push.mjs reads `phase`. Editing THIS file is how the discipline changes; the analyser names no stage. Docs: .cursor/brain/VERIFICATION.md (phases + triggers).",
+    "_description": "The gate discipline as data. scripts/trace-report.mjs reads this instead of hardcoding stage names; scripts/verify-push.mjs reads `phase`. Editing THIS file is how the discipline changes; the analyser names no stage. `checks.<name>.chain` is the ONE readable view of the stages a gate script runs, in order: package.json defines what runs, scripts/docs-check.mjs derives the chain from it and fails on any difference, and no other file lists the stages. Docs: .cursor/brain/VERIFICATION.md (phases + triggers).",
     "phase": 0,
-    "_phaseMeaning": "0 = scaffold (pre-deploy): the push gate runs audit + lock:age + hooks + version holds + node floor + sibling-test range + docs-check + oxlint + format + types + lint + coverage and SKIPS build/web-vitals-chunks/size/e2e \u2014 there is no prod boundary to guard before the first deploy. 1 = deployed: the push gate runs the full verify:ci chain. Flip with a one-line commit at the FIRST DEPLOY; GATE_PHASE=full overrides per run (template maintainers push gate machinery with it).",
+    "_phaseMeaning": "0 = scaffold (pre-deploy): the push gate runs verify:scaffold:push and skips the stages only a deployed build can answer \u2014 there is no prod boundary to guard before the first deploy. 1 = deployed: the push gate runs the full verify:ci chain. Flip with a one-line commit at the FIRST DEPLOY; GATE_PHASE=full overrides per run (template maintainers push gate machinery with it).",
     "checks": {
         "verify:iter": {
             "class": "code",
-            "description": "oxlint -> tsc incremental -> vitest --changed"
+            "description": "iterate: the seconds-long check run per change",
+            "chain": "lint:oxlint -> typecheck -> vitest run --changed --passWithNoTests"
         },
         "verify": {
             "class": "code",
-            "description": "hooks -> version holds -> node floor -> sibling-test range -> docs-check -> gate env -> oxlint -> format -> tsc -> lint -> coverage -> build -> chunks -> size -> e2e:prod"
+            "description": "the offline gate: every check CI runs except the network-bound ones",
+            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> check-gate-env --kill-port -> lint:oxlint -> format:check -> typecheck -> lint -> test:coverage -> build -> verify:web-vitals-chunks -> size:check -> ensure-playwright -> test:e2e:prod"
         },
         "verify:ci": {
             "class": "code",
-            "description": "audit:gate -> lock:age -> verify"
+            "description": "the CI chain, and what the push runs from phase 1",
+            "chain": "audit:gate -> lock:age -> verify"
         },
         "verify:full": {
             "class": "code",
-            "description": "verify:ci -> smoke:dev"
+            "description": "predicts the whole CI pipeline, the dev-smoke job included",
+            "chain": "verify:ci -> smoke:dev"
         },
         "verify:push": {
             "class": "code",
-            "description": "phase-aware push gate: phase 0 -> audit + lock:age + verify:scaffold, phase 1 -> verify:ci"
+            "description": "phase-aware push gate: what a push must prove depends on the phase (scripts/verify-push.mjs, _phaseMeaning)"
         },
         "verify:scaffold": {
             "class": "code",
-            "description": "phase-0 offline gate: hooks -> version holds -> node floor -> sibling-test range -> docs-check -> oxlint -> format -> tsc -> lint -> coverage (no build/size/e2e)"
+            "description": "phase-0 offline gate: verify without the stages that need a build",
+            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> lint:oxlint -> format:check -> typecheck -> lint -> test:coverage"
+        },
+        "verify:scaffold:push": {
+            "class": "code",
+            "description": "what the push runs in phase 0, before the first deploy",
+            "chain": "audit:gate -> lock:age -> verify:scaffold"
         },
         "verify:measure": {
             "class": "measure",
@@ -45,7 +55,8 @@
         },
         "build": {
             "class": "code",
-            "description": "tsc -b && vite build"
+            "description": "the type-checked production bundle written to dist/",
+            "chain": "tsc -b -> vite build"
         },
         "smoke:dev": {
             "class": "code",
@@ -61,7 +72,7 @@
         },
         "docs:check": {
             "class": "docs",
-            "description": "mechanical doc drift: paths, scripts, sentinels, versions, command table, dead docs, agent-memory imports; the push budget vs traced pushes of the same phase (report only)"
+            "description": "mechanical doc drift: paths, scripts, sentinels, versions, command table, dead docs, agent-memory imports, the chain view against package.json, hand-written retellings and compositions of it; the push budget vs traced pushes of the same phase (report only)"
         }
     },
     "ci": {
@@ -105,7 +116,25 @@
         "rulesetContextAllowlist": []
     },
     "docs": {
-        "_description": "Data for scripts/docs-check.mjs. sentinels = verbatim fragments of the tier law that may live only in AGENTS.md; versions = doc names -> package names compared with package-lock.json (node -> .nvmrc).",
+        "_description": "Data for scripts/docs-check.mjs. sentinels = verbatim fragments of the tier law that may live only in AGENTS.md; versions = doc names -> package names compared with package-lock.json (node -> .nvmrc); stageWords = a stage of the verify chains -> the words the docs use for it besides its script name (a line outside the chain view that names enough distinct stages, or two parts of one script, is a retelling).",
+        "stageWords": {
+            "check-version-holds": ["version holds"],
+            "check-node-floor": ["node floor"],
+            "check-test-siblings": ["sibling-test range", "sibling gate"],
+            "check-gate-env": ["gate env", "preflight"],
+            "lint:oxlint": ["oxlint"],
+            "format:check": ["format", "prettier"],
+            "typecheck": ["tsc", "type-check"],
+            "lint": ["eslint"],
+            "test:coverage": ["coverage"],
+            "verify:web-vitals-chunks": ["web-vitals chunks"],
+            "size:check": ["size", "size-limit"],
+            "ensure-playwright": ["playwright browsers"],
+            "test:e2e:prod": ["e2e"],
+            "audit:gate": ["audit"],
+            "smoke:dev": ["smoke", "dev-server smoke"],
+            "build": ["production bundle"]
+        },
         "sentinels": [
             "never shortened by what the diff touched",
             "Legal at any time, in any lane, never a violation",
@@ -166,7 +195,7 @@
             "requiresMainCheckout": false
         },
         "commit": {
-            "description": "Husky pre-commit: staged autofix, TDD sibling gate, then repo-wide oxlint/format/tsc. Those run as direct commands, not traced npm scripts, so this moment is declared for completeness.",
+            "description": "Husky pre-commit (.husky/pre-commit): staged autofix, the TDD sibling gate, then the repo-wide cheap checks. Those run as direct commands, not traced npm scripts, so this moment is declared for completeness.",
             "expected": ["docs:check"],
             "forbidden": [],
             "budgetSeconds": 15,

@@ -10,10 +10,11 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
 fi
 
 # verify:push is PHASE-AWARE (scripts/verify-push.mjs reads scripts/gate-tiers.json):
-# phase 0 (scaffold, pre-deploy) runs audit + hooks + oxlint + format + tsc + lint + coverage and
-# loudly SKIPS build/chunks/size/e2e — no prod boundary exists yet to guard; phase 1 (deployed) runs
+# phase 0 (scaffold, pre-deploy) runs verify:scaffold:push and loudly SKIPS the stages that need a
+# build — no prod boundary exists yet to guard; phase 1 (deployed) runs
 # the full verify:ci chain, which is the same script CI runs, so a green pre-push keeps predicting a
-# green pipeline. Pushing implies network, so the audit gate runs in both phases.
+# green pipeline. Pushing implies network, so the network-bound checks run in both phases.
+# The stages of each chain are listed in scripts/gate-tiers.json (checks.<name>.chain).
 # GATE_PHASE=full forces the full chain for one run.
 echo "→ verify:push (phase-aware gate — see scripts/gate-tiers.json)"
 npm run verify:push || {

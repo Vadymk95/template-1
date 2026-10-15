@@ -45,7 +45,7 @@ Why it exists: `AGENTS.md` § Start here.
 
 - `AGENTS.md` § the gate — WINS: the tier law itself (what runs at which moment, the prohibitions).
 - `.cursor/brain/VERIFICATION.md` — the mechanics: the phase table, the tracer, the port rules.
-- `scripts/gate-tiers.json` — the moments/budgets as DATA; the discipline changes by editing this.
+- `scripts/gate-tiers.json` — the moments/budgets as DATA, and the readable stage chain of every gate script (`checks.<name>.chain`); the discipline changes by editing this.
 
 ## 6. About to add a dependency, or an advisory went red
 

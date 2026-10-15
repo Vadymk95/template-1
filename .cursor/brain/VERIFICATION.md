@@ -1,7 +1,8 @@
 # Verification — when to run what (agents & humans)
 
 **Goal:** match checks to the MOMENT. The tier law itself lives in `AGENTS.md` § the gate — one place,
-everything else points. This file holds the mechanics, the phase table, and the tracer.
+everything else points. This file holds the mechanics, the phase table, and the tracer. The stages each gate script runs:
+`scripts/gate-tiers.json` (`checks.<name>.chain`), not repeated here.
 
 ## Phases — what a push proves, and the trigger that adds more
 
@@ -11,9 +12,9 @@ always runs the full chain — the phase gates only the LOCAL hook.
 
 | Check | Runs at phase 0 (scaffold) | Added when (the trigger) |
 | --- | --- | --- |
-| audit, lock-age, hooks-check, version holds, node floor, sibling-test range, docs-check, oxlint, format, tsc, lint, coverage | yes — every push, seconds | day one |
+| the phase-0 push gate (`verify:scaffold:push`) | yes — every push, seconds | day one |
 | production build in the gate | no | the FIRST DEPLOY: flip `"phase": 1` in its own commit |
-| web-vitals chunks, `size:check` | no | same flip — they measure a built artefact |
+| the checks that read the built artefact | no | same flip — they measure a built artefact |
 | prod-mode e2e (`vite preview`) | no | same flip — a prod boundary now exists |
 | dev-server smoke (content variance) | CI `dev-smoke` job, every PR | unchanged by phases |
 | mutation score | weekly CI | unchanged by phases |
@@ -39,16 +40,16 @@ The push gate's preflight takes `--kill-port` (SIGTERM, re-probe, refuse if it w
 
 ## The four rungs
 
-- **`npm run verify:iter`** — the iteration rung: `lint:oxlint` → `typecheck` (incremental via `tsc -b`)
-  → `vitest run --changed --passWithNoTests` (only tests reachable from the uncommitted diff). Seconds;
+- **`npm run verify:iter`** — the iteration rung: the cheap static checks (the type check is incremental), then only the tests reachable
+  from the uncommitted diff (stages: `scripts/gate-tiers.json`). Seconds;
   run it after every change. Two deliberate properties: while `package.json` or a vite/vitest config is
   dirty, `--changed` runs the FULL suite (those files are force-rerun triggers); and `--changed` follows
   the import graph only, so cross-cutting suites surface at the full-gate run, not during iteration.
-- **`npm run verify`** — every **offline** check. Stage order: the `verify:inner` script; the superset
+- **`npm run verify`** — every **offline** check. Stage order: `scripts/gate-tiers.json`; the superset
   rule and the push/CI split: `AGENTS.md` § the gate; why: `DECISIONS.md` § The gate is `verify`.
-- **`npm run verify:ci`** — `audit:gate && lock:age && verify`. The first two need
+- **`npm run verify:ci`** — the CI gate, and the push from phase 1. Its network-bound checks need
   the network, which is why they are not inside `verify`: an offline implementer can still run the complete offline gate.
-- **`npm run verify:full`** — `verify:ci && smoke:dev`. `smoke:dev` measures the content-variance
+- **`npm run verify:full`** — predicts the whole CI pipeline, the dev-smoke job included. `smoke:dev` measures the content-variance
   fixture, which is mounted only under `import.meta.env.DEV` and therefore unreachable from the
   `vite preview` run inside `verify`. It needs a second server on its own port, so it is not in
   `verify`; CI runs it as its own `dev-smoke` job, mandatory on every PR. Run `verify:full` locally
@@ -85,7 +86,7 @@ Targeted checks are for the iteration loop. The gate is what says "done".
 - **i18n copy only** (value edits in `public/locales/**/*.json`) — `npm run format:check`; wrapping and
   overflow for new copy lengths belong to the content-variance tier, not to a per-edit run
 - **TS/TSX / tests** (logic, components, hooks, stores) — `npm run verify:iter`
-- **Docs, rules, commands, brain, tier data** (`*.md`, `*.mdc`, `scripts/gate-tiers.json`) — `npm run docs:check` (the pre-commit hook runs it when such files are staged, and `verify` and `verify:scaffold` run it on every push; `--weekly`, the scheduled Docs workflow's flag, runs the same checks so a quarantine that expires while nobody pushes still turns it red; it also refuses a focused test, an unconditional way to switch a test off (`.skip`, `.fixme`, an expected failure such as `.fails` or `.failing`, a constant `.skipIf(true)`) without `quarantine until YYYY-MM-DD` + reason, a quarantine date more than 30 days out, a quarantine whose date has arrived (red ON the date, UTC, not the day after), and an agent-memory import: an `@` pointer in `CLAUDE.md` or `AGENTS.md` that names a file, which Claude Code would load into every session; write it as a backticked path instead)
+- **Docs, rules, commands, brain, tier data** (`*.md`, `*.mdc`, `scripts/gate-tiers.json`) — `npm run docs:check` (the pre-commit hook runs it when such files are staged, and `verify` and `verify:scaffold` run it on every push; `--weekly`, the scheduled Docs workflow's flag, runs the same checks so a quarantine that expires while nobody pushes still turns it red; it also refuses a focused test, an unconditional way to switch a test off (`.skip`, `.fixme`, an expected failure such as `.fails` or `.failing`, a constant `.skipIf(true)`) without `quarantine until YYYY-MM-DD` + reason, a quarantine date more than 30 days out, a quarantine whose date has arrived (red ON the date, UTC, not the day after), a gate chain view in `scripts/gate-tiers.json` that differs from `package.json`, a hand-written retelling or composition of the chain (a line naming three or more of its stages, or two parts of one script), and an agent-memory import: an `@` pointer in `CLAUDE.md` or `AGENTS.md` that names a file, which Claude Code would load into every session; write it as a backticked path instead)
 - **Proposing a new browser spec** — the suite is counted in invariants, not screens (`AGENTS.md` § the gate); `npm run docs:check` reports the suite against the ceiling in `scripts/gate-tiers.json` § suites
 - **E2E / Playwright** (`e2e/**`, `playwright.config.ts`, routing) — `npm run e2e:one -- <spec>`. Locally a failure is a failure (no retries). In CI a test gets two retries so one flake cannot block a merge, but a test that only passed on a retry still fails the run (`failOnFlakyTests`): fix it or quarantine it (`docs:check` tracks quarantines), never let it pass quietly. Specs that run against the built app import `test` from `e2e/support/test.ts`: it fails a test on a Content-Security-Policy violation, read from the console and from the `securitypolicyviolation` event so every engine reports it, because `vite preview` sends the shipped headers (`vite-plugins/security-headers.ts`, whose unit test pins the set). A spec that visits a route also runs the axe scan (`e2e/support/a11y.ts`); a serious or critical violation, or a control under the WCAG 2.2 target-size minimum, fails it, and the failure prints the rule id and the selectors.
 - **A shared UI primitive, the layout shell, or `src/index.css`** — the MEASURE moment:
@@ -96,10 +97,10 @@ Targeted checks are for the iteration loop. The gate is what says "done".
   `CROSS_BROWSER=1 npm run smoke:dev` and `CROSS_BROWSER=1 npm run test:e2e:prod`. Engines disagree
   here in ways reasoning does not predict (measured: `DECISIONS.md` § Cross-engine coverage).
 - **Touches `src/env.ts`, `vite.config.ts`, `src/lib/vitals.ts`, `src/lib/webVitals/`** — above, plus
-  `npm run build && npm run verify:web-vitals-chunks`
+  `npm run verify:web-vitals-chunks` (it reads `dist/`; build first)
 - **Added or bumped a dependency** — `npm run audit:gate` (fails closed on high/critical, on an expired
   or stale allowance, and on its own inability to run), `npm run lock:age` (the new version must be older
-  than `min-release-age` or carry an allowance) plus `npm run build && npm run size:check`
+  than `min-release-age` or carry an allowance), plus `npm run size:check` (it reads `dist/`; build first)
 - **MSW** (`src/mocks/**`, `src/test/handlers.ts`, MSW wiring in `main.tsx`) — `npm run verify:iter`
 - **Touched `eslint.config.js`** — `npm run lint`, then confirm the run is not silently a no-op:
   `npx eslint --print-config <a real source file>` should report a plausible active-rule count. A config
@@ -113,8 +114,8 @@ Targeted checks are for the iteration loop. The gate is what says "done".
 
 ## Fixing what the checks report
 
-`npm run fix` is the one remedy command: `oxlint --fix` → `eslint --fix` → `prettier --write`,
-repo-wide. After it, re-run `npm run lint` and `npm run format:check` to see the residual autofix could
+`npm run fix` is the one remedy command: the autofix of every linter and the formatter (the `fix` script in
+`package.json`), repo-wide. After it, re-run `npm run lint` and `npm run format:check` to see the residual autofix could
 not handle — that residual needs a decision, not another `--fix`.
 
 Never resolve a finding by lowering a severity, adding an `eslint-disable`, moving a coverage threshold,
@@ -140,7 +141,7 @@ The rule: `AGENTS.md` § Critical rules › Content variance. Why and what it fo
 ## Pre-commit vs the gate
 
 Pre-commit is **repo-scoped**, not staged-scoped: `lint-staged` fixes and re-stages the staged set, then
-the hook runs `lint:oxlint`, `format:check` and `typecheck` over the whole repo and refuses the commit if
+the hook runs the cheap checks (the list is `.husky/pre-commit`) over the whole repo and refuses the commit if
 any fails. Why the repo-wide pass exists: `DECISIONS.md` § The gate is `verify` ("Pre-commit is repo-scoped"). Remedy on
 refusal: `npm run fix && git add -u`.
 

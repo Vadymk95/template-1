@@ -213,7 +213,7 @@ VITE_ENABLE_MSW=false
 | Command                            | Description                                                                                |
 | ---------------------------------- | ------------------------------------------------------------------------------------------ |
 | `npm run dev`                      | Start Vite dev server (port 3000)                                                          |
-| `npm run build`                    | `tsc -b` + Vite production build (Oxc + Brotli)                                            |
+| `npm run build`                    | Type-checked production build (Oxc + Brotli)                                               |
 | `npm run preview`                  | Serve production build locally                                                             |
 | `npm run typecheck`                | Runs `tsc -b` (no emit)                                                                    |
 | `npm run lint`                     | Run ESLint                                                                                 |
@@ -226,13 +226,13 @@ VITE_ENABLE_MSW=false
 | `npm run test:e2e`                 | Playwright E2E (vite dev locally unless preview)                                           |
 | `npm run test:e2e:prod`            | Playwright against `vite preview` (verify gate)                                            |
 | `npm run test:e2e:ui`              | Playwright UI mode                                                                         |
-| `npm run fix`                      | The remedy: oxlint `--fix` → eslint `--fix` → prettier, repo-wide                          |
+| `npm run fix`                      | The one remedy: repo-wide autofix, then format                                             |
 | `npm run verify`                   | **The gate** — every offline check (see below)                                             |
-| `npm run verify:ci`                | `audit:gate && lock:age && verify` — the CI chain; push phase 1                            |
+| `npm run verify:ci`                | The CI gate; what the push runs from phase 1                                               |
 | `npm run ci:local`                 | Alias of `verify:ci`                                                                       |
-| `npm run verify:iter`              | Iteration tier: oxlint → tsc → vitest --changed; run per change                            |
-| `npm run verify:measure`           | MEASURE moment: build + look (`-- e2e/<f>.spec.ts` for one spec)                           |
-| `npm run verify:full`              | `verify:ci` + `smoke:dev` — adds the content-variance fixture                              |
+| `npm run verify:iter`              | Iteration tier: the seconds-long check; run per change                                     |
+| `npm run verify:measure`           | MEASURE moment: builds first, then looks (`-- e2e/<f>.spec.ts` for one spec)               |
+| `npm run verify:full`              | Predicts the whole CI pipeline, the dev-smoke job included                                 |
 | `npm run smoke:dev`                | The content-stress fixture alone, against `vite dev`                                       |
 | `npm run e2e:one -- <spec>`        | One Playwright spec, FREE port, through the tracer                                         |
 | `npm run probe -- <route>`         | LOOK: render, screenshot per width, print measured quantities                              |
@@ -250,11 +250,11 @@ VITE_ENABLE_MSW=false
 
 ### The gate
 
-`npm run verify` is every offline check, the sibling-test check over the whole branch
-(`check-test-siblings.mjs --range`) included; `npm run verify:ci` adds the network-bound `audit:gate` and `lock:age` and is what CI runs. The gate is tiered by moment (iterate, measure, commit, push, CI), and the ONLY definition of
+`npm run verify` is every offline check, the sibling-test check over the whole branch included;
+`npm run verify:ci` is what CI runs. The gate is tiered by moment (iterate, measure, commit, push, CI), and the ONLY definition of
 which script belongs to which moment, what the push runs in each phase and what is never run by hand is
-`AGENTS.md` § Commands / the gate. Stage timings: `.cursor/brain/VERIFICATION.md`. The exact stage order:
-the `verify:inner` script in `package.json` — it is not repeated here on purpose.
+`AGENTS.md` § Commands / the gate. Stage timings: `.cursor/brain/VERIFICATION.md`. The stages of each gate
+script, in order: `scripts/gate-tiers.json` (`checks.<name>.chain`, checked against `package.json` by `docs:check`) — not repeated here on purpose.
 
 `npm test` deliberately does not enforce coverage — the thresholds in `vitest.config.ts` only apply with
 `--coverage`, which is why the gate uses `test:coverage`.
@@ -269,17 +269,17 @@ Five commands in `.claude/commands/` (`/onboard`, `/feat`, `/test`, `/review`, `
 
 **Pre-commit** (Husky):
 
-1. `lint-staged` — oxlint `--fix` → ESLint `--fix` → Prettier on the **staged** files
+1. `lint-staged` — autofix of the **staged** files (the tools it runs: `lint-staged` in `package.json`)
 2. TDD gate — a staged `src` logic file with no co-located `*.test.*` in the index (staged or already committed) blocks the commit; a test that exists only on disk does not count
-3. **Repo-wide** `lint:oxlint`, `format:check` and `typecheck`
+3. **Repo-wide** cheap checks (the list is `.husky/pre-commit`)
 
 Why step 3 exists: `.cursor/brain/DECISIONS.md` › "The gate is `verify`", paragraph "Pre-commit is repo-scoped". On failure the
 hook prints the remedy: `npm run fix && git add -u`.
 
 **Commit message** (Commitlint): `type(scope): subject`, max 96 chars.
 
-**Pre-push:** `npm run verify:push` — phase-aware (`scripts/gate-tiers.json`): phase 0 runs the audit gate, the
-lock-age check and the offline checks (the sibling-test range check among them), and loudly skips build, size and e2e until the first deploy; phase 1 runs the full `verify:ci`.
+**Pre-push:** `npm run verify:push` — phase-aware (`scripts/gate-tiers.json`): phase 0 runs
+`verify:scaffold:push` and loudly skips the stages that need a build until the first deploy; phase 1 runs the full `verify:ci`.
 
 ### CI (GitHub Actions)
 
@@ -445,7 +445,7 @@ describe('Component', () => {
 
 ### E2E
 
-Playwright specs in `e2e/` run against Chromium. Local default: `npm run test:e2e` starts `vite dev` on port 3000. CI / `npm run test:e2e:prod` / `PLAYWRIGHT_USE_PREVIEW=1` uses `vite preview` on 4173 after `build`. The local **`npm run verify`** gate runs `test:e2e:prod`; the push runs it only in phase 1 (§ Git Hooks).
+Playwright specs in `e2e/` run against Chromium. Local default: `npm run test:e2e` starts `vite dev` on port 3000. CI / `npm run test:e2e:prod` / `PLAYWRIGHT_USE_PREVIEW=1` uses `vite preview` on 4173 against a fresh production build. That production-mode run is part of the local gate; the push runs it only in phase 1 (§ Git Hooks).
 
 ## 🏗️ Build & Deployment
 
