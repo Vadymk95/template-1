@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.2](https://github.com/Vadymk95/template-1/compare/v3.3.1...v3.3.2) (2026-10-16)
+
+
+### Bug fixes
+
+* **gate:** verify:iter checks git hooks first, so a hookless clone cannot push ungated ([#109](https://github.com/Vadymk95/template-1/issues/109)) ([04f30a5](https://github.com/Vadymk95/template-1/commit/04f30a5d4c3f440bb0c11300b59f48f81550475a))
+
 ## [3.3.1](https://github.com/Vadymk95/template-1/compare/v3.3.0...v3.3.1) (2026-10-16)
 
 
