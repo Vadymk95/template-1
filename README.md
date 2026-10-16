@@ -230,7 +230,7 @@ VITE_ENABLE_MSW=false
 | `npm run verify`                   | **The gate** — every offline check (see below)                                             |
 | `npm run verify:ci`                | The CI gate; what the push runs from phase 1                                               |
 | `npm run ci:local`                 | Alias of `verify:ci`                                                                       |
-| `npm run verify:iter`              | Iteration tier: the seconds-long check; run per change                                     |
+| `npm run verify:iter`              | Iteration tier: the seconds-long check, git hooks checked first; run per change            |
 | `npm run verify:measure`           | MEASURE moment: builds first, then looks (`-- e2e/<f>.spec.ts` for one spec)               |
 | `npm run verify:full`              | Predicts the whole CI pipeline, the dev-smoke job included                                 |
 | `npm run smoke:dev`                | The content-stress fixture alone, against `vite dev`                                       |
@@ -280,6 +280,10 @@ hook prints the remedy: `npm run fix && git add -u`.
 
 **Pre-push:** `npm run verify:push` — phase-aware (`scripts/gate-tiers.json`): phase 0 runs
 `verify:scaffold:push` and loudly skips the stages that need a build until the first deploy; phase 1 runs the full `verify:ci`.
+
+The hooks exist only after `npm run prepare` (lifecycle scripts are disabled via `.npmrc`). `check-hooks` is the first
+step of `verify:iter` and of `verify`: on a clone without hooks they stop with "Git hooks are not installed", so a push
+cannot go out with no gate and no output.
 
 ### CI (GitHub Actions)
 
