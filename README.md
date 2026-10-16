@@ -71,7 +71,7 @@ After cloning, these are the exact files / symbols to edit to make the template 
 
 - **React 19** — latest features, no React import needed for JSX
 - **Vite 8** — official `vite` package with **Rolldown** + **Oxc** for production builds ([migration from `rolldown-vite`](https://vite.dev/guide/migration))
-- **TypeScript 6.0** — strict mode with `@/*` path aliases
+- **TypeScript 6** — strict mode with `@/*` path aliases
 - **React Router v7** — automatic lazy loading
 
 ### State & Data
@@ -100,8 +100,8 @@ After cloning, these are the exact files / symbols to edit to make the template 
 - **Prettier 3** — code formatting
 - **Husky + lint-staged** — git hooks for quality gates
 - **Commitlint** — conventional commits enforcement
-- **Vitest 4.1** — unit testing with Testing Library (held back from 5.x; see `AGENTS.md` § Version holds)
-- **Playwright 1.63** — E2E tests; browsers installed on demand by `scripts/ensure-playwright.mjs`
+- **Vitest 4** — unit testing with Testing Library (held back from 5.x; see `AGENTS.md` § Version holds)
+- **Playwright** — E2E tests; browsers installed on demand by `scripts/ensure-playwright.mjs`
 
 ## 🛠 Project Structure
 
