@@ -348,7 +348,8 @@ trailing `-n` still do, and more wildcards would start catching commit messages.
 the required CI check. Cursor and Codex do not read the file.
 
 **Also decided that day:** one Dependabot group, `minor-and-patch`, carries every non-major update
-(two groups both rewrote `package-lock.json` and conflicted); a major opens its own PR.
+(two groups both rewrote `package-lock.json` and conflicted), except the `size-limit` pair, which is
+excluded from it and lives in its own `size-limit` group; a major opens its own PR.
 `release.yml` passes `secrets.RELEASE_PLEASE_TOKEN || github.token`; without the secret release PRs
 wait in `action_required` for one approval, with a fine-grained PAT they get CI like any PR.
 
