@@ -6,7 +6,7 @@
         "verify:iter": {
             "class": "code",
             "description": "iterate: the seconds-long check run per change",
-            "chain": "lint:oxlint -> typecheck -> vitest run --changed --passWithNoTests"
+            "chain": "check-hooks -> lint:oxlint -> typecheck -> vitest run --changed --passWithNoTests"
         },
         "verify": {
             "class": "code",

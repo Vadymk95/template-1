@@ -88,6 +88,16 @@ describe('parseVerifySteps', () => {
         }
     });
 
+    // `.npmrc` disables lifecycle scripts, so a fresh clone has no git hooks until `npm run prepare`.
+    // `verify:iter` is the loop that runs while working, long before `verify` does: when only `verify`
+    // checks the hooks, the first push goes out with no gate and prints nothing about it.
+    it('starts verify:iter with the hooks check, so a clone without hooks fails before the first push', () => {
+        const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+        const iterate = resolveScript(manifest.scripts, 'verify:iter');
+
+        expect(iterate.startsWith('node scripts/check-hooks.mjs && '), iterate).toBe(true);
+    });
+
     it('labels an npm step by its script name and a node step by its file', () => {
         expect(parseVerifySteps('npm run typecheck && node scripts/check-hooks.mjs')).toEqual([
             { label: 'typecheck', command: 'npm', args: ['run', 'typecheck'] },

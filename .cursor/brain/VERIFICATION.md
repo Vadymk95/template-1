@@ -40,7 +40,8 @@ The push gate's preflight takes `--kill-port` (SIGTERM, re-probe, refuse if it w
 
 ## The four rungs
 
-- **`npm run verify:iter`** — the iteration rung: the cheap static checks (the type check is incremental), then only the tests reachable
+- **`npm run verify:iter`** — the iteration rung: the hooks check first (a clone without git hooks fails here, not at a push that
+  runs no gate), the cheap static checks (the type check is incremental), then only the tests reachable
   from the uncommitted diff (stages: `scripts/gate-tiers.json`). Seconds;
   run it after every change. Two deliberate properties: while `package.json` or a vite/vitest config is
   dirty, `--changed` runs the FULL suite (those files are force-rerun triggers); and `--changed` follows
