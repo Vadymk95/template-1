@@ -1,5 +1,46 @@
 # Changelog
 
+## [3.3.1](https://github.com/Vadymk95/template-1/compare/v3.3.0...v3.3.1) (2026-10-16)
+
+
+### Bug fixes
+
+* **api:** stop retrying 4xx through safeFetch; refuse agent-memory imports in docs ([#94](https://github.com/Vadymk95/template-1/issues/94)) ([f895803](https://github.com/Vadymk95/template-1/commit/f895803526da84ed0c6f23c76871417679c2d7a7))
+* **ci:** audit workflows with zizmor, fail CI on flaky tests, scan pages with axe ([#92](https://github.com/Vadymk95/template-1/issues/92)) ([dd6c487](https://github.com/Vadymk95/template-1/commit/dd6c487448a8ea4a46880605bfcb34be5150fb3d))
+* **ci:** pin actions by SHA, read-only tokens, SECURITY.md, prod error-boundary test ([#91](https://github.com/Vadymk95/template-1/issues/91)) ([717fce9](https://github.com/Vadymk95/template-1/commit/717fce93e07c9036a8ca44e90b1bc313c59dafec))
+* **gate:** close audit holes - CI steps, ruleset, size, boundary, safeFetch, shim ([#89](https://github.com/Vadymk95/template-1/issues/89)) ([cb92490](https://github.com/Vadymk95/template-1/commit/cb92490397b79fc5140f79d219a350af8c2de9b8))
+* **gate:** enable no-empty and run docs:check when the checker or scripts change ([#90](https://github.com/Vadymk95/template-1/issues/90)) ([ce22788](https://github.com/Vadymk95/template-1/commit/ce227880c1295bc0185a864ced3f45f02c5b171d))
+* **gate:** hook edits trigger docs-check at pre-commit ([#105](https://github.com/Vadymk95/template-1/issues/105)) ([3bbb253](https://github.com/Vadymk95/template-1/commit/3bbb25332177555cb8a6d9372e0acfbc704e4d27))
+* **harness:** gate edits need a gate-change label; sibling, marker and date guards tightened ([#100](https://github.com/Vadymk95/template-1/issues/100)) ([46df60a](https://github.com/Vadymk95/template-1/commit/46df60ac2fb1001377cac8c1766545aa7c5e1fc5))
+* **harness:** lock-age and Node-floor guards, quiet green gate, fork-path fixes ([#99](https://github.com/Vadymk95/template-1/issues/99)) ([a074807](https://github.com/Vadymk95/template-1/commit/a0748077cb2e8011f78467c3402d3fb8a1e85cd1))
+* **security:** ship default CSP and headers; suppressions need a reason ([#96](https://github.com/Vadymk95/template-1/issues/96)) ([7785f43](https://github.com/Vadymk95/template-1/commit/7785f435c3d5a98b00d658c6aa1128f462c62893))
+
+
+### Performance
+
+* **fonts:** preload the Latin Inter woff2 so first paint stops waiting on it ([#98](https://github.com/Vadymk95/template-1/issues/98)) ([c98dc25](https://github.com/Vadymk95/template-1/commit/c98dc2528adb9e4ce8d92df8ca4df847488eb53b))
+* **gate:** split the slowest test suite; size-limit stays one PR; README names majors ([#106](https://github.com/Vadymk95/template-1/issues/106)) ([036625e](https://github.com/Vadymk95/template-1/commit/036625e0c1c70e0b47aa0da18efad3cebfb1bec2))
+
+
+### Maintenance
+
+* **deps:** bump the minor-and-patch group across 1 directory with 3 updates ([#108](https://github.com/Vadymk95/template-1/issues/108)) ([f667e86](https://github.com/Vadymk95/template-1/commit/f667e864be960aa8d9c35fe149503e52cf09fab6))
+* **deps:** bump the size-limit group across 1 directory with 2 updates ([#107](https://github.com/Vadymk95/template-1/issues/107)) ([f95b9c0](https://github.com/Vadymk95/template-1/commit/f95b9c0be0d6158b38f7a879ef8768f276720f5c))
+* **deps:** newest compatible versions; holds and the cooldown bypass recorded ([#95](https://github.com/Vadymk95/template-1/issues/95)) ([bad0820](https://github.com/Vadymk95/template-1/commit/bad0820f26d202bbdda7a996f02d215da9b72d6c))
+
+
+### Documentation
+
+* **brain:** integration recipes for the first real API, auth, monitoring and hosting ([#93](https://github.com/Vadymk95/template-1/issues/93)) ([f9a5ce5](https://github.com/Vadymk95/template-1/commit/f9a5ce5b155a455ceddd6df97b3929cdce006151))
+* **decisions:** date the next check of the vitest hold lift trigger ([#87](https://github.com/Vadymk95/template-1/issues/87)) ([036ed57](https://github.com/Vadymk95/template-1/commit/036ed57c8d97a1968849014fa13070376b17e28b))
+* **harness:** one readable home for the gate chain; docs-check flags retold chains ([#104](https://github.com/Vadymk95/template-1/issues/104)) ([3226958](https://github.com/Vadymk95/template-1/commit/32269581b2db7341cc254f9d488695cd276fd44a))
+* **harness:** slim agent docs, enforce version holds, resolve section pointers ([#97](https://github.com/Vadymk95/template-1/issues/97)) ([7a82d8c](https://github.com/Vadymk95/template-1/commit/7a82d8ca40641e0c732feb0ccdb9b8af80c0bab1))
+
+
+### CI
+
+* **deps:** bump the actions group with 4 updates ([#103](https://github.com/Vadymk95/template-1/issues/103)) ([c137bc2](https://github.com/Vadymk95/template-1/commit/c137bc2475488f81cd1845339a01cbaade134509))
+
 ## [3.3.0](https://github.com/Vadymk95/template-1/compare/v3.2.3...v3.3.0) (2026-10-02)
 
 
