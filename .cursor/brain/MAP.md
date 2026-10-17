@@ -83,7 +83,8 @@ Dark mode toggle: `src/hooks/theme/useTheme.ts`
 - Toggles `.dark` class on `<html>`, persists to `localStorage` key `"theme"`
 - Usage: `const { theme, setTheme } = useTheme()`
 
-To change brand color: update `--primary` HSL values in `:root`.
+To change brand color: update `--primary` and `--primary-hover` HSL values in `:root` and `.dark`;
+`scripts/button-contrast.test.mjs` fails a button state whose label drops under 4.5:1.
 To add new color token: add to `:root`, then map in `@theme inline`.
 
 ## Testing / MSW

@@ -48,7 +48,7 @@ npm install && npm run prepare && npm run dev
 **Next steps after installation:**
 
 1. Create a `.env` file only if your project needs environment variables
-2. Customize `index.html` meta tags for your project
+2. Customize `index.html` meta tags for your project, and `app.config.ts` if you want another web font or none (see the fork checklist)
 3. Review [Key Patterns](#-key-patterns)
 
 ## 🧬 Make it yours (fork checklist)
@@ -60,9 +60,11 @@ After cloning, these are the exact files / symbols to edit to make the template 
 - **`public/locales/en/common.json`** — `appName` (currently `React Enterprise Foundation`): the brand rendered in the Header and Footer copyright via `t('appName')`. Repeat in every locale file you add.
 - **`e2e/smoke.spec.ts`** — the `toHaveTitle(/React Enterprise Foundation/)` assertion must match the new `<title>`, or the E2E smoke test fails.
 - **`src/lib/i18n/constants.ts`** — `SUPPORTED_LANGUAGES` (add locales beyond `'en'`), `DEFAULT_LANGUAGE`, and the namespace lists `DEFAULT_NAMESPACES` / `LAZY_NAMESPACES` (each must match a folder under `public/locales/{lng}/{ns}.json`).
-- **`src/index.css`** — brand theme tokens in `:root` and `.dark`: the HSL triples `--primary`, `--secondary`, `--accent`, `--ring`, `--chart-1`…`--chart-5`, plus the `--radius` scale. Currently Google Blue.
+- **`app.config.ts`** — `webFontUrls`: the stylesheet URLs of the web fonts the build self-hosts (currently Inter). Put your font's URL in the list, or empty the list to drop the web font, and set the family in `--font-sans` in `src/index.css`. `vite.config.ts` reads this file, but it is not a gate file, so the change needs no `gate-change` label.
+- **`src/index.css`** — brand theme tokens in `:root` and `.dark`: the HSL triples `--primary`, `--primary-hover`, `--secondary`, `--accent`, `--ring`, `--chart-1`…`--chart-5`, plus the `--radius` scale. Currently Google Blue. `--primary-hover` is the default button's hover fill: keep it a step away from `--primary` in the direction that raises the label's contrast; `scripts/button-contrast.test.mjs` fails any button state under 4.5:1.
 - **`LICENSE`** + **`README.md`** — replace the copyright holder (currently `Vadym Kononenko`) and the `# React Enterprise Foundation` heading / intro. MIT suits an open-source fork; for a proprietary app, swap the MIT text for a proprietary or `UNLICENSED` notice.
 - **Template seeds** — when you outgrow the demo modules, follow [`.cursor/brain/TEMPLATE_SEEDS.md`](.cursor/brain/TEMPLATE_SEEDS.md) to graduate or remove them.
+- **Private repository: CodeQL** — `.github/workflows/security.yml` and `.github/ruleset.json`. Code scanning is free on a public repository; a private one needs a GitHub Code Security license (a GitHub Team or GitHub Enterprise plan), and without it the `codeql` job fails with "Code scanning is not enabled for this repository". Get the license, or delete the `codeql` job and its required check in one commit. Sources and the exact check name: [Where the security workflow works](#where-the-security-workflow-works).
 - **Decisions and holds** — start your own `.cursor/brain/DECISIONS.md` fresh with a one-line pointer to this template's history (`git log -p -- .cursor/brain/DECISIONS.md` in the template repo). Keep `scripts/version-holds.json`: `verify` fails on a drift, and each hold is re-checked against your own Dependabot PRs, lifted when its condition is met.
 
 ## 🚀 Tech Stack
@@ -90,7 +92,7 @@ After cloning, these are the exact files / symbols to edit to make the template 
 
 - **Tailwind CSS v4** — utility-first with CSS-based design tokens (`src/index.css` via `@theme inline {}`, no `tailwind.config.ts`)
 - **Shadcn UI** — accessible components with CVA (Class Variance Authority)
-- **Inter Font** — self-hosted via `vite-plugin-webfont-dl` (zero external requests)
+- **Inter Font** — self-hosted via `vite-plugin-webfont-dl` (zero external requests); the URL list is `webFontUrls` in `app.config.ts`
 - **Lucide React** — icon library
 
 ### Developer Experience
@@ -190,7 +192,7 @@ Key optimizations configured in `vite.config.ts`:
 - **Chunking:** vendor splitting via `build.rolldownOptions.output.codeSplitting.groups` (`react-vendor`, `ui-vendor`, `state-vendor`, `i18n-vendor`)
 - **Compression:** Brotli (`.br`) files generated at build time
 - **Source Maps:** disabled in production output (`sourcemap: false`)
-- **Fonts:** auto-downloaded and self-hosted via `vite-plugin-webfont-dl`; the Latin woff2 is preloaded by the `fontPreload` plugin (`vite-plugins/font-preload.ts`) so it loads in parallel with the font stylesheet
+- **Fonts:** the URLs in `app.config.ts` are downloaded at build time and self-hosted via `vite-plugin-webfont-dl`; the Latin woff2 is preloaded by the `fontPreload` plugin (`vite-plugins/font-preload.ts`) so it loads in parallel with the font stylesheet
 - **FOUC Prevention:** custom `htmlOptimize` plugin (`vite-plugins/html-optimize.ts`)
 - **Bundle Analysis:** `ANALYZE=true npm run build` → `dist/bundle-analysis.html`
 
@@ -332,11 +334,20 @@ commits through the API, which a private repository answers only to a token with
 declares it, and `npm run docs:check` (with its unit test, which runs in the push gate) fails if a job that runs
 gitleaks loses it.
 
-`codeql` needs GitHub **code scanning**, which is free on **public** repositories and a paid add-on on
-private ones. This template is public, so it works as shipped. In a **private fork** the analyze step
-fails while uploading results (`Code scanning is not enabled for this repository`, HTTP 403). A private
-fork must either enable Advanced Security for the repo or delete the `codeql` job and keep `gitleaks`.
-That is a plan boundary, not a misconfiguration — do not weaken the workflow to make it green.
+`codeql` needs GitHub **code scanning**, and whether that works depends on the repository. On a **public**
+repository it is free: "Some of these features, such as code scanning and secret scanning, are enabled for
+public repositories by default"
+([About GitHub Advanced Security](https://docs.github.com/en/get-started/learning-about-github/about-github-advanced-security)).
+A **private** repository needs a GitHub Code Security license ("If you want to use code scanning on private
+repositories, you need a GitHub Code Security license",
+[About code scanning](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning)),
+and only a GitHub Team or GitHub Enterprise plan can buy one ("You must be on a GitHub Team or GitHub
+Enterprise plan in order to purchase GitHub Code Security", first link). Without it the analyze step fails
+while uploading results (`Code scanning is not enabled for this repository`, HTTP 403), and a required check
+that can never pass teaches people to ignore red. A private fork therefore either gets the license, or
+deletes the `codeql` job and the required check `CodeQL (JavaScript / TypeScript) (javascript-typescript)`
+from `.github/ruleset.json` in the same commit, and keeps `gitleaks`. This template is public and keeps
+both. That is a plan boundary, not a misconfiguration — do not weaken the workflow to make it green.
 
 **Dependabot** (weekly): proposes npm and GitHub Actions updates, with a cooldown so fresh releases
 soak before a PR opens.
@@ -556,7 +567,7 @@ Files travel with a fork. Settings do not. Everything the gate needs is in the f
 
 Not inherited, and each one is a switch in your own repository's settings:
 
-- **Rulesets and branch protection**, including every required status check. Until you add one, your default branch accepts any push, and the pull-request discipline this repository documents is a habit rather than a rule. Rulesets also need a **public** repository or a paid plan: in a private fork on GitHub Free the required CI check is only a convention, whatever this file says. A private fork also removes the `codeql` job (code scanning is a paid add-on there) AND its entry in `.github/ruleset.json` in the same commit, or the ruleset waits forever for a check that never reports.
+- **Rulesets and branch protection**, including every required status check. Until you add one, your default branch accepts any push, and the pull-request discipline this repository documents is a habit rather than a rule. Rulesets also need a **public** repository or a paid plan: in a private fork on GitHub Free the required CI check is only a convention, whatever this file says. A private fork without a GitHub Code Security license also removes the `codeql` job AND its entry in `.github/ruleset.json` in the same commit, or the ruleset waits forever for a check that never reports ([why](#where-the-security-workflow-works)).
 - **Actions permissions.** A fork starts with workflows disabled; GitHub asks you to enable them once, in the Actions tab. Until you do, the CI described here never runs, and a green screen means nobody looked.
 - **Secret scanning and push protection**, **CodeQL**, and **Dependabot alerts.** The Dependabot CONFIG file travels; the alerts it feeds are a setting.
 - **The `gate-change` label and, in a team fork, CODEOWNERS.** Create the label `gate-change` once (the `gate-integrity` check needs it to pass a reviewed gate change). CI runs the pull request's OWN copy of the script and the workflow, so a change that edits them also decides whether they stop it: the real boundary is the required `gate-integrity` check plus a person who reads the list before labelling. In a team fork add a `CODEOWNERS` file covering the paths in `scripts/gate-files.json` and turn on required code-owner review, so that person is never the author. A label change re-runs the check; re-running an OLD run replays the labels that run started with, so after labelling let the `labeled` event run the job.

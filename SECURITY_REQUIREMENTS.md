@@ -36,7 +36,7 @@ Deny by default (`default-src 'none'`), then allow exactly what the app loads: i
 
 There is no `'unsafe-inline'` and no `'unsafe-eval'`. `index.html` has no inline script (`public/theme-boot.js` is external), and the web fonts are emitted as a blocking `<link rel="stylesheet">` (`vite.config.ts`, `webfontDownload` with `injectAsStyleTag: false, async: false`) because the plugin's default is an inline `<style>` (blocked by `style-src 'self'`) and its async mode swaps `media="print"` with an inline onload handler (blocked by `script-src 'self'`). React `style` props are fine: they are written through `element.style`, which CSP does not block.
 
-Zod runs with its JIT off (`z.config({ jitless: true })` in `src/env.ts`), so no `'unsafe-eval'` is needed: zod's default probes for `eval` with `new Function`, which this policy blocks, and browsers report the caught attempt as a violation. A schema built before `src/env.ts` loads would bring the probe back, and the e2e CSP guard would name it.
+Zod runs with its JIT off (`z.config({ jitless: true })` in `src/lib/zod.ts`), so no `'unsafe-eval'` is needed: zod's default probes for `eval` with `new Function`, which this policy blocks, and browsers report the caught attempt as a violation. Every module takes `z` from `@/lib/zod` and never from `zod`, and `no-restricted-imports` in `eslint.config.js` fails a direct import, so the setting holds whichever module loads first. A schema built by a module that imported `zod` itself would bring the probe back, and the e2e CSP guard would name it.
 
 ## 🛠 Adapt it
 

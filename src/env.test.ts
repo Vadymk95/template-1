@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
 
 import '@/env';
+import { z } from '@/lib/zod';
 
 describe('env', () => {
     it('runs zod without its JIT, so the shipped CSP needs no unsafe-eval', () => {

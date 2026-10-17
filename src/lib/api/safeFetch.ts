@@ -24,7 +24,8 @@
  * safeFetch wrapper" for the rationale + revisit trigger.
  */
 import type { QueryFunction } from '@tanstack/react-query';
-import type { z } from 'zod';
+
+import type { z } from '@/lib/zod';
 
 import { ApiError } from './client';
 

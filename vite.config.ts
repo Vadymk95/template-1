@@ -8,6 +8,7 @@ import { defineConfig, loadEnv, type Plugin, type PluginOption } from 'vite';
 import compression from 'vite-plugin-compression';
 import { webfontDownload } from 'vite-plugin-webfont-dl';
 
+import { webFontUrls } from './app.config.ts';
 import pkg from './package.json' with { type: 'json' };
 import { fontPreload } from './vite-plugins/font-preload.ts';
 import { htmlOptimize } from './vite-plugins/html-optimize.ts';
@@ -36,6 +37,12 @@ const removeMswPlugin = (): Plugin => ({
         if (fs.existsSync(swBr)) fs.unlinkSync(swBr);
     }
 });
+
+// `treeshake.moduleSideEffects` below is false for every module, so the bundler drops one that nothing
+// imports a binding from. `src/lib/zod.ts` only re-exports zod's `z` after switching its JIT off, which
+// makes it that kind of module: its body has to run before any schema is built, so it is the one exception.
+const ZOD_MODULE = /[\\/]src[\\/]lib[\\/]zod\.ts$/;
+const hasSideEffects = (id: string): boolean => ZOD_MODULE.test(id);
 
 export default defineConfig(({ command, mode }) => ({
     server: {
@@ -68,10 +75,11 @@ export default defineConfig(({ command, mode }) => ({
             ext: '.br',
             deleteOriginFile: false
         }),
-        // Downloads fonts from @import in CSS and bundles them locally (0 external requests).
+        // Downloads the fonts listed in app.config.ts (and any @import found in CSS) and bundles them
+        // locally (0 external requests).
         // Emitted as a blocking <link>: the plugin's default inline <style> is blocked by style-src 'self',
         // and its async media="print" swap uses an inline onload handler that script-src 'self' blocks.
-        webfontDownload([], { injectAsStyleTag: false, async: false }),
+        webfontDownload(webFontUrls, { injectAsStyleTag: false, async: false }),
         // Preloads the Latin woff2 so it is fetched in parallel with the font stylesheet, not behind it.
         fontPreload(),
         // Bundle analyzer: only runs when ANALYZE=true env variable is set
@@ -113,7 +121,7 @@ export default defineConfig(({ command, mode }) => ({
         assetsInlineLimit: 4096,
         rolldownOptions: {
             treeshake: {
-                moduleSideEffects: false
+                moduleSideEffects: hasSideEffects
             },
             output: {
                 codeSplitting: {

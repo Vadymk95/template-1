@@ -91,6 +91,21 @@ CI and lint-staged also run **Oxlint** (`.oxlintrc.json`) before ESLint — fast
   content-stress spec allows an empty measurement ONLY for the `none` collection state (an empty list
   legitimately has no box). Do not relax either assertion to make a flake go away.
 
+## The CSP has no `unsafe-eval`, so zod must run jitless
+
+- **Risk:** zod 4 probes for JIT support with `new Function('')` when the first object schema is built. Under this
+  policy that is a CSP violation (Firefox writes it to the console; Chromium raises only a
+  `securitypolicyviolation` event), and the CSP guard in `e2e/support/test.ts` fails the browser specs while the
+  unit tests stay green. A module that builds a schema while it loads, before the switch is set, brings the probe
+  back, so a switch kept in one consumer (`src/env.ts`) was protected by import order alone.
+- **Mitigation:** `src/lib/zod.ts` calls `z.config({ jitless: true })` and re-exports `z`. Every module under `src`
+  takes `z` from `@/lib/zod`, and `no-restricted-imports` in `eslint.config.js` fails a direct import of `zod`
+  (tests included), so the order modules load in cannot matter; `scripts/lint-guards.test.mjs` pins the rule.
+  The production build would drop that module, which only re-exports `z`, under `treeshake.moduleSideEffects:
+  false`, and the call with it; `vite.config.ts` exempts `src/lib/zod.ts` (`hasSideEffects`) and
+  `scripts/zod-config-bundle.test.mjs` builds a consumer and fails if the call is missing. Moving the file means
+  editing both. Never add `'unsafe-eval'` to the policy.
+
 ## Known deviation: a `<button>` nested inside a `<NavLink>`
 
 - **Where:** `src/components/layout/Header/index.tsx`, the sign-in control.

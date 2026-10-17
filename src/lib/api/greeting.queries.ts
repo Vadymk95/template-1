@@ -10,7 +10,8 @@
  * safeFetch wrapper" and `src/lib/api/safeFetch.ts`).
  */
 import { queryOptions } from '@tanstack/react-query';
-import { z } from 'zod';
+
+import { z } from '@/lib/zod';
 
 import { API_BASE_URL } from './client';
 import { safeFetchQueryFn } from './safeFetch';

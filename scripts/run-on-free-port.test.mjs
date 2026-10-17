@@ -8,6 +8,11 @@ import { buildChildEnv, findFreePort } from './run-on-free-port.mjs';
 
 const SCRIPT = resolve(process.cwd(), 'scripts/run-on-free-port.mjs');
 
+/* Every child captures its output. `execFileSync` copies the child's stderr onto the test run's
+   unless `stdio` is given, so the usage line a case provokes would land in every log; the cases
+   read the captured text back for their assertions. */
+const CAPTURE = ['ignore', 'pipe', 'pipe'];
+
 /** Holds a real port so the probe meets a genuinely busy socket; `host` narrows which family. */
 const occupyPort = (host) =>
     new Promise((resolveServer) => {
@@ -108,7 +113,7 @@ describe('run-on-free-port CLI', () => {
                 '-e',
                 'console.log(process.env.PORT, process.env.PLAYWRIGHT_BASE_URL)'
             ],
-            { encoding: 'utf8', env: { ...process.env, PORT: String(base) } }
+            { encoding: 'utf8', env: { ...process.env, PORT: String(base) }, stdio: CAPTURE }
         );
         /* The lane lands on the NEXT FREE port, not necessarily base + 1: the base is an
            OS-assigned ephemeral port, so its neighbours may be taken by any other process — a
@@ -127,7 +132,8 @@ describe('run-on-free-port CLI', () => {
         try {
             execFileSync('node', [SCRIPT, 'node', '-e', 'process.exit(3)'], {
                 encoding: 'utf8',
-                env: { ...process.env, PORT: '0' }
+                env: { ...process.env, PORT: '0' },
+                stdio: CAPTURE
             });
         } catch (error) {
             code = error.status;
@@ -142,7 +148,7 @@ describe('run-on-free-port CLI', () => {
         try {
             execFileSync(process.execPath, [SCRIPT, 'no-such-binary-on-this-host'], {
                 encoding: 'utf8',
-                stdio: ['ignore', 'pipe', 'pipe'],
+                stdio: CAPTURE,
                 env: { ...process.env, PORT: '0' }
             });
         } catch (error) {
@@ -159,7 +165,7 @@ describe('run-on-free-port CLI', () => {
     it('rejects a call with no command instead of spinning on nothing', () => {
         let verdict = { status: 0, output: '' };
         try {
-            execFileSync('node', [SCRIPT], { encoding: 'utf8' });
+            execFileSync('node', [SCRIPT], { encoding: 'utf8', stdio: CAPTURE });
         } catch (error) {
             verdict = {
                 status: error.status,
