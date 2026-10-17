@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.3](https://github.com/Vadymk95/template-1/compare/v3.3.2...v3.3.3) (2026-10-17)
+
+
+### Bug fixes
+
+* **app:** zod set up in one module, font list out of a gate file, AA hover on the button ([#111](https://github.com/Vadymk95/template-1/issues/111)) ([775e350](https://github.com/Vadymk95/template-1/commit/775e3503100d1237746481f4ff4a4a58ded338e6))
+
 ## [3.3.2](https://github.com/Vadymk95/template-1/compare/v3.3.1...v3.3.2) (2026-10-16)
 
 
