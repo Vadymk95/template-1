@@ -14,7 +14,7 @@ src/lib/api/
   client.ts             # Base fetch wrapper + ApiError (configured)
   safeFetch.ts          # Zod boundary-validation wrapper for queryFn
   <domain>.ts           # Domain-specific API functions (getUser, updateUser, ...)
-  <domain>.queries.ts   # queryOptions() factories + query key factory (reference: greeting.queries.ts)
+  <domain>.queries.ts   # queryOptions() factories + query key factory
 
 src/pages/<Page>/
   use<Page>.ts          # Page-local hook consuming the factory via useQuery(...)
@@ -50,7 +50,7 @@ export const userOptions = (id: string) =>
         staleTime: 5 * 60 * 1000
     });
 
-// src/pages/UserPage/useUserPage.ts — page-local hook (reference: useHomePage.ts)
+// src/pages/UserPage/useUserPage.ts — page-local hook
 // Hooks are NOT exempt — an explicit return type is mandatory.
 export const useUserPage = (id: string): {
     user: User | undefined;
@@ -111,7 +111,7 @@ export const useUpdateUserMutation = () => {
 
 ## 7. Boundary adapter
 
-- A response is parsed **once**, at the boundary: `safeFetch` / `safeFetchQueryFn` + a Zod schema (`src/lib/api/safeFetch.ts`; live example `greeting.queries.ts`).
+- A response is parsed **once**, at the boundary: `safeFetch` / `safeFetchQueryFn` + a Zod schema (`src/lib/api/safeFetch.ts`).
 - Defaults and renames live in the schema or a mapper next to it — `.default()`, `.catch()`, `.transform()`, or a `toViewModel(dto)` function in `lib/api/<domain>.ts` — never in a component.
 - Components and page hooks receive the parsed view model: they never see a raw DTO and never supply their own fallbacks (`data?.x ?? ''` in JSX is the smell).
 - A schema change is a payload-contract change: the Approval Law applies (`workflow.mdc`).

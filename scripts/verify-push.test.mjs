@@ -9,6 +9,11 @@ import { readConfiguredPhase, resolvePushPlan } from './verify-push.mjs';
 
 const SCRIPT = resolve(process.cwd(), 'scripts/verify-push.mjs');
 
+/* The dispatcher's child captures its output. `execFileSync` copies the child's stderr onto the test
+   run's unless `stdio` is given, so a message the dispatcher prints on purpose would land in every log;
+   `runDispatcher` hands the captured text back for the assertions. */
+const CAPTURE = ['ignore', 'pipe', 'pipe'];
+
 /* CLI cases run in a throwaway package, never against this repo's own gate: the dispatcher
    spawns whatever `verify:scaffold:push` / `verify:ci` say, and the fixture package defines
    them as one-line exits so the passthrough is provable in seconds. */
@@ -37,7 +42,8 @@ const runDispatcher = (cwd, env = {}) => {
         const output = execFileSync('node', [SCRIPT], {
             cwd,
             encoding: 'utf8',
-            env: { ...process.env, GATE_PHASE: '', ...env }
+            env: { ...process.env, GATE_PHASE: '', ...env },
+            stdio: CAPTURE
         });
         return { code: 0, output };
     } catch (error) {

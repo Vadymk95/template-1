@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+/* Web fonts are listed in `app.config.ts` (`webFontUrls`) and self-hosted at build time by
+   vite-plugin-webfont-dl. Don't add `@import url('https://fonts.googleapis.com/...')` here: it
+   would send a runtime request to Google despite the plugin's "zero external requests" promise. */
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -15,6 +17,7 @@
     --color-popover-foreground: hsl(var(--popover-foreground));
     --color-primary: hsl(var(--primary));
     --color-primary-foreground: hsl(var(--primary-foreground));
+    --color-primary-hover: hsl(var(--primary-hover));
     --color-secondary: hsl(var(--secondary));
     --color-secondary-foreground: hsl(var(--secondary-foreground));
     --color-muted: hsl(var(--muted));
@@ -71,6 +74,9 @@
     /* Google Blue (approx #1a73e8 / #4285f4) - HSL: 217, 91%, 60% */
     --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
+    /* The primary button's hover fill. A token, not `bg-primary/90`: a translucent primary drifts toward
+       the page colour and the label drops under 4.5:1. `scripts/button-contrast.test.mjs` measures it. */
+    --primary-hover: 221.2 83.2% 48%;
 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -110,6 +116,7 @@
     /* Google Blue for Dark Mode (Lighter, approx #8ab4f8) */
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
+    --primary-hover: 217.2 91.2% 65%;
 
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;

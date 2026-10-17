@@ -29,6 +29,12 @@ const parentRelativeImportPatternGroup = {
         'Use the `@/` alias for code under `src/`, or `@locales/` for JSON under `public/locales/`, instead of parent-relative imports.'
 };
 
+// `src/lib/zod.ts` turns zod's JIT off, and zod reads that switch when the first object schema is built.
+// A module that imports `zod` itself can build a schema before that file has run; the `new Function`
+// probe then comes back, the shipped CSP blocks it and the browser reports it.
+const zodImportMessage =
+    "Import `z` from '@/lib/zod', not from 'zod': that module turns zod's JIT off before any schema is built, and a direct import can run first (the shipped CSP has no 'unsafe-eval').";
+
 export default defineConfig([
     globalIgnores([
         'dist',
@@ -269,6 +275,35 @@ export default defineConfig([
             // structural strings do not flood. Intentional English-only surfaces
             // turn it off in their own block below.
             'i18next/no-literal-string': ['warn', { mode: 'jsx-text-only' }]
+        }
+    },
+    // ─── Zod comes from one module ────────────────────────────────────────────
+    // Every module under `src` takes `z` from `src/lib/zod.ts`, which sets `jitless` before any schema
+    // exists, so the order modules load in cannot bring the `new Function` probe back. That file is the
+    // one exception (`ignores`) and keeps the options of the block above. Flat config REPLACES a rule's
+    // options rather than merging them, so this block restates the FC ban and the parent-relative group.
+    {
+        files: ['src/**/*.{ts,tsx}'],
+        ignores: ['src/lib/zod.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    paths: [
+                        {
+                            name: 'react',
+                            importNames: ['FC'],
+                            message:
+                                "Use 'FunctionComponent' instead: const MyComponent: FunctionComponent<Props> = ({ ... }) => { ... }"
+                        },
+                        { name: 'zod', message: zodImportMessage }
+                    ],
+                    patterns: [
+                        parentRelativeImportPatternGroup,
+                        { group: ['zod/**'], message: zodImportMessage }
+                    ]
+                }
+            ]
         }
     },
     // ─── A suppression must carry its reason ─────────────────────────────────

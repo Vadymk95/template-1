@@ -28,7 +28,13 @@ const GIT_ENV = {
     NODE_ENV: process.env.NODE_ENV ?? 'test'
 };
 
-const git = (args, cwd) => execFileSync('git', args, { cwd, env: GIT_ENV, encoding: 'utf8' });
+/* Every child captures its output. `execFileSync` copies the child's stderr onto the test run's
+   unless `stdio` is given, so git's progress lines ("Preparing worktree") and the wrapper's usage
+   line would land in every log; `runWrapper` hands the captured text back for the assertions. */
+const CAPTURE = ['ignore', 'pipe', 'pipe'];
+
+const git = (args, cwd) =>
+    execFileSync('git', args, { cwd, env: GIT_ENV, encoding: 'utf8', stdio: CAPTURE });
 
 const makeRepo = () => {
     const dir = mkdtempSync(join(tmpdir(), 'gate-trace-'));
@@ -44,7 +50,8 @@ const runWrapper = (cwd, args) => {
         const output = execFileSync('node', [SCRIPT, ...args], {
             cwd,
             encoding: 'utf8',
-            env: GIT_ENV
+            env: GIT_ENV,
+            stdio: CAPTURE
         });
         return { code: 0, output };
     } catch (error) {
