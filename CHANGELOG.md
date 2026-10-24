@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.3.4](https://github.com/Vadymk95/template-1/compare/v3.3.3...v3.3.4) (2026-10-24)
+
+
+### Bug fixes
+
+* **deps:** bump zod and the undici floor for two high advisories ([#115](https://github.com/Vadymk95/template-1/issues/115)) ([03cdf19](https://github.com/Vadymk95/template-1/commit/03cdf199cbf52f9da681f56f26d2a961d299f637))
+
+
+### Documentation
+
+* name the Actions switch a fork needs for release pull requests ([#117](https://github.com/Vadymk95/template-1/issues/117)) ([08013b8](https://github.com/Vadymk95/template-1/commit/08013b86867d80683bc8b5e7d2d419b661cb4f1c))
+
 ## [3.3.3](https://github.com/Vadymk95/template-1/compare/v3.3.2...v3.3.3) (2026-10-17)
 
 
