@@ -43,7 +43,7 @@ it('displays user name after login', async () => {
 
 ## 4. Quality Standards
 
-- **Isolation**: Mock external APIs and modules via `vi.mock()`. Never let tests hit real network.
+- **Isolation**: Mock external APIs and modules via `vi.mock()`. Never let tests hit real network. Mocks reset before every test (`mockReset` in `vitest.config.ts`): a mock keeps only the implementation it was created with, so set a return value or a spy inside the test or a `beforeEach`, never once at module level.
 - **Edge cases**: Always include error boundary tests, empty state, and network failure scenarios.
 - **Behavior over internals**: Test public API and user behavior — not implementation details.
 - **BDD naming**: `describe('UserStore')` → `it('sets username and marks as logged in on setUser()')`.
@@ -79,6 +79,7 @@ describe('userStore', () => {
 - Static constants
 - Simple presentational components with no logic
 - Dev-only utilities (e.g., HMR hooks)
+- A fix whose only residual is a lint finding has no behaviour to assert: the red is the lint run on the unfixed copy (the rule name in the output); say so in the report instead of inventing a test.
 
 ## 7. Commands
 

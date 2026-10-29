@@ -56,7 +56,7 @@ npm run verify:measure                # need to LOOK at a built result? legal at
 Green means nothing until you know the gate can go red.
 
 1. Exit code without a pipe: `npm run verify:iter > /tmp/verify.log 2>&1; echo $?`. A pipe to `tail` returns the pipe's status, so a failed build reads as a pass.
-2. Mutation-check the tests by hand (not the `test:mutation` StrykerJS gate): if mentally reverting your change leaves the suite green, the test is worthless.
+2. Mutation-check the tests in your head, not on disk: if reverting your change would leave the suite green, the test is worthless. Do not edit the code, run the tests and restore it; a physical mutation is for a NEW gate only (item 3), and a pure file move needs none.
 3. Prove a new gate gates: break it on purpose once (an expired `scripts/audit-allowlist.json` entry, a raw hex in a component, a staged `src` logic file with no `*.test.*` sibling), watch it refuse, revert.
 4. A check that reports success when it could not run is fail-open: ask what it does on a missing directory, an empty result, no network.
 5. Name the condition under which the green would have been RED; if you cannot, the check proved nothing. Real shapes here: a layout measurement taken while i18next still hides the document sees no element and passes vacuously; a Playwright `testMatch` matching nothing collects zero tests and exits 0; `vitest --coverage` prints `Excluding it from coverage` for a file it could not parse and exits 0.
@@ -73,7 +73,7 @@ A failing check: no symptom patch. Trace to the origin (`sequential-thinking`), 
 
 ### 4.4 Diff self-review (mandatory)
 
-Re-read every changed file: the diff matches the Step 2 plan, nothing is outside scope, no changed line breaks an existing caller.
+Re-read every changed file: the diff matches the Step 2 plan, nothing is outside scope, no changed line breaks an existing caller. Find each changed module's importers by SYMBOL (`rg -w <exportName>`), never by file path: a directory import (`@/components/X`) or a barrel re-export hides the path.
 
 ## Step 5: Brain sync
 

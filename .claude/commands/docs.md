@@ -26,9 +26,10 @@ Nothing else. Source files are not in scope for this command.
 Start from history, not from the docs. The docs cannot tell you what they are missing.
 
 ```bash
-git log --oneline -40 origin/master
+git log --oneline -40 origin/HEAD
+# origin/HEAD is the default branch; if it is unset, run git remote set-head origin -a once
 git log --oneline -20 -- AGENTS.md .cursor/brain/    # when were the docs last touched?
-git diff --stat <last-docs-commit>..origin/master    # what landed since
+git diff --stat <last-docs-commit>..origin/HEAD      # what landed since
 ```
 
 Read the subjects of everything that landed after the docs were last updated, and for each ask whether it

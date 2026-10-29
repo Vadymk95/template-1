@@ -12,7 +12,8 @@ tests. Report; do not fix unless asked.
 git status --short
 git diff                       # unstaged
 git diff --cached              # staged
-git diff origin/master...HEAD  # committed on a branch
+git diff origin/HEAD...HEAD    # committed on a branch
+# origin/HEAD is the default branch; if it is unset, run git remote set-head origin -a once
 ```
 
 Every finding must sit on a line this diff touches. Whole-file context tempts you toward legacy code;

@@ -11,7 +11,7 @@ Production-ready React 19 SPA template. Stack and versions: the table in `.curso
 ## Source of truth
 
 - **This file is canonical for every tool** (Claude Code loads it through the import in `CLAUDE.md`). Edit THIS file; never grow the shim.
-- **Code is ground truth; this file is a verifiable pointer.** A line that conflicts with the code is stale: follow the code, fix or flag the line in the same session.
+- **Code is ground truth; this file is a verifiable pointer.** A line that conflicts with the code is stale: follow the code, fix or flag the line in the same session. A pointer names a path and the symbol in it, never a line number: `docs:check` fails `path:12`.
 - **One canonical place per fact:** versions → `package.json`, commands → the table below, gate stages → `scripts/gate-tiers.json`, holds → `scripts/version-holds.json`, size budgets → `.size-limit.json`, why → `.cursor/brain/DECISIONS.md`. Everything else points.
 
 ## Critical rules
@@ -21,8 +21,7 @@ Production-ready React 19 SPA template. Stack and versions: the table in `.curso
 - **Pages** are lazy (`PageName.tsx` + `index.ts` with `lazy()`) under `WithSuspense`. **Stores**: Zustand with `createSelectors` in `src/store/<domain>/`, tests alongside.
 - **i18n**: every user-visible string goes through `t()`. **Imports**: `@/` alias only, never `../../`.
 - **Reuse first**: search for an existing function, util, component or constant before creating one; match the surrounding file.
-- **Content variance**: UI that renders authored copy is proven against content it has NOT seen (`minimal` / `typical` / `long` / `unbroken` text, `none` / `one` / `many` collections) on `/dev/ui/content-stress` (`e2e/dev/content-stress.spec.ts`; widths in `DECISIONS.md`); assembled pages by `e2e/layout-geometry.spec.ts`. Add a case with every content-bearing component. A wrap class with no red-to-green proof is deleted.
-- **Rendering differences are measured, not predicted**: `CROSS_BROWSER=1` adds Firefox and WebKit to the geometry specs.
+- **Content variance**: UI that renders authored copy is proven against content it has NOT seen (`minimal` / `typical` / `long` / `unbroken` text, `none` / `one` / `many` collections) on `/dev/ui/content-stress` (`e2e/dev/content-stress.spec.ts`; widths in `DECISIONS.md`); assembled pages by `e2e/layout-geometry.spec.ts`. Add a case with every content-bearing component, as a `test.step` or an extra assertion in the existing test, never a new `test(` (the suite ceiling in `gate-tiers.json` counts those calls). A wrap class with no red-to-green proof is deleted. Rendering differences are measured, not predicted: `CROSS_BROWSER=1` adds Firefox and WebKit to the geometry specs.
 
 ## Commands / the gate
 
@@ -36,7 +35,8 @@ npm run verify:iter        # iterate: the seconds-long check, run per change
 npm run verify:measure     # MEASURE: build + look; `-- e2e/<f>.spec.ts` for one preview-mode spec
 npm run e2e:one -- <spec>  # one Playwright spec, free port, through the tracer
 npm run test:one -- <file> # one unit test file, through the tracer
-npm run probe -- <route> [widths] # LOOK: render, screenshot per width, print measured quantities
+npx --no-install eslint <path> # lint one path from the repo root; npm exec --prefix keeps the caller's cwd
+npm run probe -- <route> [widths] [--signed-in] [--theme=dark] # LOOK: render, screenshot per width, print measured quantities
 npm run verify:push        # what pre-push runs; phase-aware (gate-tiers.json)
 npm run verify             # THE gate: every offline check; the push/CI chain, not a desk tool
 npm run verify:ci          # the CI gate; what the push runs from phase 1 (alias: ci:local)
@@ -45,7 +45,7 @@ npm run smoke:dev          # the content-stress fixture alone, against `vite dev
 npm run test:e2e:prod      # Playwright against `vite preview` (same mode as the gate)
 npm run bench:verify       # the gate step by step with timings
 npm run trace:report       # findings from .gate-trace.log
-npm run docs:check         # docs drift (paths, scripts, versions, command table, dead docs, the gate chain view and any retelling or composition of it); inside verify, weekly CI adds --weekly
+npm run docs:check         # docs drift (paths against the files git lists, line pointers, scripts, versions, command table, dead docs, the DECISIONS shape, the gate chain view, its strict flags and any retelling or composition of it); inside verify, weekly CI adds --weekly
 npm run test:mutation      # StrykerJS strength gate: weekly mutation.yml, NOT in verify
 ```
 
@@ -77,7 +77,8 @@ list of the stages each gate script runs (`checks.<name>.chain`, checked against
   before the first deploy) runs the offline checks and loudly SKIPS the heavy stages; phase 1 (from the
   first deploy) runs the full `verify:ci`. A skipped stage is printed, never silent; flip the phase in one
   commit at the first deploy. A repo whose gate has no heavy stage runs the full `verify:ci` at push and
-  records in `gate-tiers.json` that a phase switch would gate nothing.
+  records in `gate-tiers.json` that a phase switch would gate nothing. With no remote there is no push
+  moment: the lead hand-runs the push chain once per slice on the main checkout; an implementer never does.
 - **CI** - phase-blind: always the full `verify:ci`, plus what only CI can do (the security workflow, the
   scheduled mutation job, a mandatory dev-smoke job where the repo has one).
 
@@ -117,17 +118,19 @@ moments, blown budgets, gate runs from a worktree). After a push, gate output in
 the contract: **silence is a failure, not a pass** - a push that printed no gate ran no gate, whatever the
 exit code says.
 
-**Ports.** A busy port means MOVE, never kill a server you did not start; the single-spec and measure
-scripts take the next free port. Only the push gate clears its own port.
+**Ports.** A busy port means MOVE, never kill a server you did not start; the single-spec, measure
+and probe scripts take the next free port. Only the push gate clears its own port.
 
 ### Lanes - who runs what
 
 - **Main agent, inline.** Iterate and measure while working; the push runs the chain, never a hand-run.
-- **Implementer subagent.** Works in a hand-made `git worktree` OUTSIDE the repo directory, on its own
-  port, with `node_modules` symlinked from the main checkout. Iterate and measure only; the gate never
-  runs from a worktree (the tracer records it as a finding). The lead removes the worktree, checks the
-  branch out in the main checkout and pushes from there, so the gate runs once, at the push, for every
-  writer.
+- **Implementer subagent.** Works in a hand-made `git worktree` OUTSIDE the repo directory, on its own port,
+  with `node_modules` symlinked from the main checkout. Iterate and measure only; the gate never runs from a
+  worktree. The lead removes the worktree, checks the branch out in the main checkout and pushes from there,
+  so the gate runs once, at the push, for every writer. A lane never waits on a prompt: it writes only in its
+  worktree and report folder (a planner or gate file change goes in the report as exact lines, which the lead
+  applies with the operator), reads with Read and Grep, and runs `git -C <dir>` and `npm run --prefix <dir>`
+  instead of `cd`, with no shell variable or `;` chain. Lane rules: `.cursor/templates/LANE.md`.
 - **Copilot coding agent.** Hand-over is a fully specified issue (goal as behaviour, paths in scope,
   acceptance, out of scope; use `.github/ISSUE_TEMPLATE/agent-task.yml` where the repo ships it), assigned
   to Copilot. It works on its own branch and opens a draft pull request; workflows on that PR start only
@@ -169,7 +172,7 @@ that lives only in a conversation is not a plan.
 
 ## Working agreements
 
-- **Bootstrap after clone**: `npm run prepare` once (`.npmrc` disables lifecycle scripts, so husky does not self-install; `verify:iter` and `verify` fail loudly without hooks, and a push from a clone without them runs no gate). `.npmrc` `min-release-age=3` (days): a brand-new package or an urgent patch needs `npm install <pkg> --min-release-age=0`. The lockfile obeys the same cooldown: `npm run lock:age` (a network-bound check) fails a changed `name@version` younger than `min-release-age`; a deliberate bypass bump is listed with a reason and an expiry in `scripts/lock-age-allowlist.json`.
+- **Bootstrap after clone**: `npm run prepare` once (`.npmrc` disables lifecycle scripts, so husky does not self-install; `verify:iter` and `verify` fail loudly without hooks, and a push from a clone without them runs no gate). `.npmrc` `min-release-age=3` (days): a brand-new package or an urgent patch needs `npm install <pkg> --min-release-age=0`. The lockfile obeys the same cooldown: `npm run lock:age` (a network-bound check) fails a changed `name@version` younger than `min-release-age`. Prefer waiting out the cooldown. An agent never runs the `--min-release-age=0` install and never edits `scripts/lock-age-allowlist.json` (an agent's classifier refuses both); the operator runs the bypass install and lists the row (reason, expiry no later than the day the version is old enough on its own).
 - **Zero warnings** (`eslint --max-warnings 0`, `oxlint --deny-warnings`): fix the cause, never downgrade a rule or sprinkle `eslint-disable`. A directive that must stay names its rule and carries its reason (`-- why`). A rule wrong for a class of files gets a documented file-scoped override in `eslint.config.js`.
 - **Complexity ratchet**: `complexity` 10 / `max-depth` 3 / `max-params` 4 / `max-lines-per-function` 120 / `max-lines` 200 over `src/**`, tests exempt. A hit means new drift: split the function. Raising a number needs a fresh measurement (`DECISIONS.md`).
 - **Mutation score** shows whether tests would CATCH a wrong implementation; coverage only shows they RUN it. `thresholds.break` in `stryker.config.json` is a measured floor: raise it after a good run, never lower it to go green.
@@ -190,9 +193,7 @@ Weakening the verify gate, a lint severity or a coverage threshold to get green 
 
 ## Changes reach master through a pull request
 
-Branch, run the gate, push the branch, open a PR, merge when CI is green. Here `master` has a ruleset requiring the `validate` check, and the owner role can bypass it with a direct push: don't. **A fork inherits files, not settings:** it arrives with the whole gate and none of the enforcement until you switch it on (`README.md` § "What your fork does not inherit").
-
-**Commit format**: `type(scope): description`, max 96 chars. Types: `feat` `fix` `chore` `docs` `style` `refactor` `perf` `test` `revert` `build` `ci`.
+Branch, run the gate, push the branch, open a PR, merge when CI is green. Here `master` has a ruleset requiring the `validate` check, and the owner role can bypass it with a direct push: don't. **A fork inherits files, not settings:** it arrives with the whole gate and none of the enforcement until you switch it on (`README.md` § "What your fork does not inherit"). **Commit format**: `type(scope): description`, max 96 chars. Types: `feat` `fix` `chore` `docs` `style` `refactor` `perf` `test` `revert` `build` `ci`.
 
 ## Maintaining this file
 

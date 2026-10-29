@@ -166,7 +166,7 @@
         }
     },
     "suites": {
-        "_description": "Ceilings on the browser suite. It is counted in INVARIANTS, not screens (AGENTS.md \u00a7 the gate): a route earns a browser test only when it brings an invariant the existing specs do not measure. A suite over its ceiling is a finding, and so is a ceiling more than twice the measurement \u2014 that high it flags nothing. Raise a number on a measurement plus a DECISIONS.md line, like a size budget.",
+        "_description": "Ceilings on the browser suite. It is counted in INVARIANTS, not screens (AGENTS.md \u00a7 the gate): a route earns a browser test only when it brings an invariant the existing specs do not measure. A suite over its ceiling is a finding, and so is a ceiling more than twice the measurement \u2014 that high it flags nothing. A second subject of an existing invariant becomes a test.step or an extra assertion in that case, never a new test( or it( call: those two are what is counted. Raise a number on a measurement plus a DECISIONS.md line, like a size budget.",
         "e2e": {
             "dir": "e2e",
             "match": "\\.spec\\.ts$",

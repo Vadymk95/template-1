@@ -65,6 +65,7 @@ After cloning, these are the exact files / symbols to edit to make the template 
 - **`LICENSE`** + **`README.md`** — replace the copyright holder (currently `Vadym Kononenko`) and the `# React Enterprise Foundation` heading / intro. MIT suits an open-source fork; for a proprietary app, swap the MIT text for a proprietary or `UNLICENSED` notice.
 - **Template seeds** — when you outgrow the demo modules, follow [`.cursor/brain/TEMPLATE_SEEDS.md`](.cursor/brain/TEMPLATE_SEEDS.md) to graduate or remove them.
 - **Private repository: CodeQL** — `.github/workflows/security.yml` and `.github/ruleset.json`. Code scanning is free on a public repository; a private one needs a GitHub Code Security license (a GitHub Team or GitHub Enterprise plan), and without it the `codeql` job fails with "Code scanning is not enabled for this repository". Get the license, or delete the `codeql` job and its required check in one commit. Sources and the exact check name: [Where the security workflow works](#where-the-security-workflow-works).
+- **Repository layout** — keep the app at the git root: `scripts/check-hooks.mjs` refuses to run from a subfolder of the repository, because every gate script reads git paths relative to the repository root.
 - **Decisions and holds** — start your own `.cursor/brain/DECISIONS.md` fresh with a one-line pointer to this template's history (`git log -p -- .cursor/brain/DECISIONS.md` in the template repo). Keep `scripts/version-holds.json`: `verify` fails on a drift, and each hold is re-checked against your own Dependabot PRs, lifted when its condition is met.
 
 ## 🚀 Tech Stack
@@ -181,15 +182,15 @@ src/
 ### TypeScript Configuration
 
 - **Path Aliases:** `@/*` → `./src/*`; `@locales/*` → `./public/locales/*`
-- **Strict Mode:** enabled across `tsconfig.app.json`, `tsconfig.node.json`, `tsconfig.vitest.json`
-- **Project References:** split configs for app, node scripts, and tests
+- **Strict Mode:** enabled across `tsconfig.app.json`, `tsconfig.node.json`, `tsconfig.vitest.json` and `tsconfig.e2e.json`, with `noUncheckedIndexedAccess` and `noImplicitOverride` on
+- **Project References:** split configs for app, node scripts, unit tests and the browser specs (`e2e/`, the Playwright configs)
 
 ### Vite Configuration
 
 Key optimizations configured in `vite.config.ts`:
 
 - **Minification:** Oxc (faster than Terser)
-- **Chunking:** vendor splitting via `build.rolldownOptions.output.codeSplitting.groups` (`react-vendor`, `ui-vendor`, `state-vendor`, `i18n-vendor`)
+- **Chunking:** vendor splitting via `build.rolldownOptions.output.codeSplitting.groups` (`react-vendor`, `ui-vendor`, `state-vendor`, `i18n-vendor`, `schema-vendor`)
 - **Compression:** Brotli (`.br`) files generated at build time
 - **Source Maps:** disabled in production output (`sourcemap: false`)
 - **Fonts:** the URLs in `app.config.ts` are downloaded at build time and self-hosted via `vite-plugin-webfont-dl`; the Latin woff2 is preloaded by the `fontPreload` plugin (`vite-plugins/font-preload.ts`) so it loads in parallel with the font stylesheet
@@ -238,7 +239,7 @@ VITE_ENABLE_MSW=false
 | `npm run verify:full`              | Predicts the whole CI pipeline, the dev-smoke job included                                 |
 | `npm run smoke:dev`                | The content-stress fixture alone, against `vite dev`                                       |
 | `npm run e2e:one -- <spec>`        | One Playwright spec, FREE port, through the tracer                                         |
-| `npm run probe -- <route>`         | LOOK: render, screenshot per width, print measured quantities                              |
+| `npm run probe -- <route>`         | LOOK: render, screenshot per width, measure; `--signed-in`, `--theme=dark`                 |
 | `npm run test:one -- <file>`       | One unit test file, through the tracer (not around it)                                     |
 | `npm run trace:report`             | Findings from `.gate-trace.log`: moments, budgets, worktrees                               |
 | `npm run docs:check`               | Mechanical doc drift: paths, scripts, sentinels, versions, dead docs, agent-memory imports |
@@ -273,7 +274,7 @@ Five commands in `.claude/commands/` (`/onboard`, `/feat`, `/test`, `/review`, `
 **Pre-commit** (Husky):
 
 1. `lint-staged` — autofix of the **staged** files (the tools it runs: `lint-staged` in `package.json`)
-2. TDD gate — a staged `src` logic file with no co-located `*.test.*` in the index (staged or already committed) blocks the commit; a test that exists only on disk does not count
+2. TDD gate — a staged `src` logic file with no co-located `*.test.*` in the index (staged or already committed) blocks the commit; a test that exists only on disk does not count; the first commit of a repository is not judged (nothing earlier to compare with)
 3. **Repo-wide** cheap checks (the list is `.husky/pre-commit`)
 
 Why step 3 exists: `.cursor/brain/DECISIONS.md` › "The gate is `verify`", paragraph "Pre-commit is repo-scoped". On failure the

@@ -43,6 +43,7 @@ Trigger: the first screen that needs data this repo does not own.
 Wiring for the same-origin path:
 
 - **Dev proxy.** Vite `server.proxy` takes a prefix key with `target`, `changeOrigin` and an optional `rewrite` [vite-server]. The docs warn that `rewriteWsOrigin` can leave websocket proxying open to cross-site request forgery: do not enable it. `server` in `vite.config.ts` today has only `port` and `cors`.
+- **Dev proxy recipe** _(recorded in a fork that shipped it as a small dev plugin; not built in this template, so untested here)_. One key per backend prefix, written as a regular expression that ends at a path-segment boundary: a key that starts with `^` is read as a RegExp and any other key as a plain prefix, so a bare `'/api'` would also proxy `/apiary`; the key is tested against `req.url`, which carries the query string, so the boundary accepts `/`, `?` or the end (both read in the installed Vite source). `changeOrigin: false`, so the backend sees the `Host` the browser used _(inference: what a cookie session and an `Origin` check expect)_. `ws: true` only on the one prefix that carries a websocket. A carve-out for every client route that shares the prefix, so the dev server answers it and the backend never sees it. A table test pins the keys (1.7). With the proxy the browser talks to its own origin: the CSP `connect-src` stays `'self'` and a cookie session needs no CORS.
 - **Production.** A host rewrite or reverse proxy; the Vercel form is in Phase 6.
 - **Schema.** `VITE_API_URL` is `z.url().optional()` in `src/env.ts` and `API_BASE_URL` falls back to `http://localhost:3001/api` in `src/lib/api/client.ts`. Both are wrong for a deployed product: a build without the variable would silently point production at localhost. Make the value required, drop the fallback, and accept a path as well as an absolute URL. **Approval Law** (API contract).
 
@@ -144,6 +145,8 @@ Log the first key segment, not the whole key: keys carry filter values that can 
 
 Copy the shape of `src/lib/api/_example.queries.ts` (`all` / `lists` / `list(filters)` / `details` / `detail(id)`, each built from the previous with `as const`) and the wiring of `greeting.queries.ts` (a `queryOptions()` factory, no React, no raw `fetch`). Invalidate by prefix: after a mutation, invalidate `lists()`, not everything. `invalidateQueries` marks matching queries stale and refetches the active ones [tq]. Layout and the page-local `use<Page>.ts` hook: `.cursor/rules/api.mdc`, not restated. The recommended ESLint preset for TanStack Query is already on in `eslint.config.js`.
 
+**Multi-tenant apps** _(a pattern recorded in a fork; nothing of it ships here, because the starter has one demo query and no tenant)_: put the active membership id (or tenant id) first in every key, so two memberships never share a cache entry and a prefix invalidation stays inside one; handle a 401 once, in the transport, not at each call site; and drop the whole query cache when the active membership changes and on logout (`QueryClient.clear()` [tq]). _(Inference: the previous membership's data should not outlive the switch, and after a logout another person may use the tab.)_ The starter's transport has no 401 handling and `userStore` does not touch a query cache on logout, so each is a change to add. **Approval Law** (API and store contracts).
+
 ### 1.5 Turning MSW off in development
 
 The dev worker starts only when `import.meta.env.DEV && VITE_ENABLE_MSW !== 'false'` (`src/main.tsx`), so the default in dev is ON.
@@ -154,7 +157,7 @@ The dev worker starts only when `import.meta.env.DEV && VITE_ENABLE_MSW !== 'fal
 
 `public/mockServiceWorker.js` stays for dev; the `removeMswPlugin` in `vite.config.ts` deletes it from `dist`. Handlers in `src/test/handlers.ts` match with `**/api/<path>` globs. If your real base path is not `/api`, they stop matching (_inference_), and `src/test/setup.ts` runs the server with `onUnhandledRequest: 'error'`, so the unit tests fail loudly rather than silently: good, then fix the globs to follow `API_BASE_URL`. Override per test with `server.use()` [msw].
 
-**Pitfall: the e2e suite sees two different networks.** `playwright.config.ts` serves `vite preview` (a production build, no MSW) in CI and in the gate (`npm run test:e2e:prod`), but `vite dev` (MSW on by default) for a plain local `npm run test:e2e`. In the gate, any route that fetches data hits the real `API_BASE_URL`. Stub the network inside the spec with `page.route(...)` and `route.fulfill({ json })`, registered before `page.goto` [pw-mock], and set `test.use({ serviceWorkers: 'block' })` in that spec: `page.route` does not see requests a service worker intercepts, so on the dev server the MSW worker would answer instead of the stub [pw-page]. Shared helpers belong beside the existing ones in `e2e/support`.
+**Pitfall: the e2e suite sees two different networks.** `playwright.config.ts` serves `vite preview` (a production build, no MSW) in CI and in the gate (`npm run test:e2e:prod`), but `vite dev` (MSW on by default) for a plain local `npm run test:e2e`. In the gate, any route that fetches data hits the real `API_BASE_URL`. Stub the network inside the spec with `page.route(...)` and `route.fulfill({ json })`, registered before `page.goto` [pw-mock]. Both Playwright configs already set `serviceWorkers: 'block'`, so a spec adds nothing: `page.route` does not see requests a service worker intercepts, and on the dev server the MSW worker would otherwise answer instead of the stub [pw-page]. The block also keeps that worker from starting under Playwright, so `main.tsx` logs `[msw] Failed to start browser worker` as an error there; no spec reads console errors on the dev server. Shared helpers belong beside the existing ones in `e2e/support`.
 
 ### 1.6 Zod at the boundary
 
@@ -169,6 +172,7 @@ The dev worker starts only when `import.meta.env.DEV && VITE_ENABLE_MSW !== 'fal
 - A transport test with fake timers: the timer firing throws the timeout error, and an abort of the caller's signal still surfaces as an `AbortError` (a cancellation, not a timeout).
 - A test that the production env schema rejects a missing API URL.
 - An e2e spec that stubs the data route with `page.route` and asserts the page renders it.
+- With the dev proxy of 1.1: a table test of path to target (or to none), with a prefix look-alike, a path with a query string and the carved-out client route among the rows.
 
 ### 1.8 Security and what not to do
 
@@ -238,7 +242,7 @@ export const meOptions = () =>
 
 ### 2.3 Cookie attributes, for the backend team
 
-`HttpOnly; Secure; SameSite=Lax` is the repo policy. The `__Host-` prefix additionally requires `Secure`, `Path=/` and no `Domain` [mdn-cookies]; use it only for a single-app deployment, because the shared-scope cookie described in `SECURITY_REQUIREMENTS.md` (`Domain` / `Path` across apps) cannot carry it.
+`HttpOnly; Secure; SameSite=Lax` is the repo policy. Cross-browser runs: WebKit refuses a `Secure` cookie over plain `http://localhost` while Chromium and Firefox accept it _(measured in a fork, not re-verified here)_, so a fork whose dev backend sets `Secure` either serves the preview over https for the WebKit runs or strips `Secure` for WebKit on plain http only (`DECISIONS.md` § Cross-engine coverage). The `__Host-` prefix additionally requires `Secure`, `Path=/` and no `Domain` [mdn-cookies]; use it only for a single-app deployment, because the shared-scope cookie described in `SECURITY_REQUIREMENTS.md` (`Domain` / `Path` across apps) cannot carry it.
 
 ### 2.4 CSRF
 
@@ -248,7 +252,7 @@ A cookie session makes state-changing requests forgeable cross-site. `SameSite` 
 
 - Extend `src/hocs/ProtectedRoute.test.tsx`, regression-first: pending renders no redirect; user A to user B swaps the rendered identity; a 401 from `/me` redirects; an authenticated user sees the outlet.
 - A test that after login nothing token-like is in `localStorage` or `sessionStorage`. The Pre-Deployment Checklist in `SECURITY_REQUIREMENTS.md` also asks for a grep of the production bundle for both.
-- An e2e spec that stubs `/me` with `page.route` for the anonymous and the signed-in case, service workers blocked as in 1.5 [pw-mock].
+- An e2e spec that stubs `/me` with `page.route` for the anonymous and the signed-in case, service workers blocked by default (1.5) [pw-mock].
 
 ### 2.6 Security and what not to do
 
@@ -382,7 +386,7 @@ src/store/keys.ts        (edit) add a storage key for the consent choice (consta
 
 ### 4.4 Guards for Phase 4
 
-- An e2e spec that registers `page.route` on the analytics origin before `page.goto`, loads a page without consenting, and asserts zero hits, service workers blocked as in 1.5 [pw-mock].
+- An e2e spec that registers `page.route` on the analytics origin before `page.goto`, loads a page without consenting, and asserts zero hits, service workers blocked by default (1.5) [pw-mock].
 - A unit test for `useFlag`: SDK absent returns the default; flag name constants only.
 - A unit test that logout calls `reset()` before `opt_in_capturing()`.
 
@@ -486,10 +490,53 @@ Sources: [vercel] [vite-build] [mdn-cache] [mdn-csp] [mdn-csp-style] [mdn-abort]
 
 ---
 
+## Appendix — traps when a fork adds Storybook or a Radix-based UI kit
+
+Trigger: a fork adds a story runner (Storybook, its stories run through the Vitest browser mode) or a UI kit built on Radix primitives. This template ships neither a story runner nor a Radix widget, so nothing below is exercised here. Every line is a trap measured in one fork that added both: a lead to confirm in your own tree, not a recipe, the symptom first and the remedy after. A line says so when the source recorded no remedy.
+
+### The story runner
+
+- **A story project in the Vitest config is also run by everything else.** A bare `vitest`, coverage, `--changed` and the mutation run would all execute the browser story project too: the Vitest measured (4.1.11) documents no config-level default project, only `--project` selects one. Keep the story project behind an environment switch from the start.
+- **A link followed in a play navigates the host window.** Storybook's preview head carries `<base target="_parent">`, so following a link drops the browser connection. Set `target="_self"` on the link before the click.
+- **A failure frame can name the wrong line.** A 130-line file was reported at line 188, an excerpt came from another story of the same file, a frame pointed into a child component, and the message was right each time: read the message, not the frame.
+- **A whole-suite story run can stall silently.** Nothing was printed for over 8 minutes; elsewhere a run sat at 0 % CPU with every file at "0 test"; no cause was found. Run it with `--reporter=verbose` and a hard time bound, so a stall is visible and ends.
+- **The first story run of a fresh checkout can reload mid-run.** Vite's dependency optimiser finds a package late, reloads, and the files in flight fail at "0 test"; Vitest names the fix (`optimizeDeps.include`). List every package the stories import, one that only a dynamic `import()` loads included. The optimiser cache sits under `node_modules/.cache/storybook/<version>/<hash>/sb-vitest`, keyed by the hash of the Storybook config path, so each checkout has its own; the story runs also fetch their fonts from the network.
+- **Locale JSON imported from `public/` in a story helper warns on every run** (three times per story run): "Assets in public directory cannot be imported from JavaScript". Vite's own message gives the remedy: import the file from `src/`, or use its URL.
+- **`parameters.layout: 'centered'` does nothing in the story runner.** An overlay or placement story brings its own fixed, centred box and measures against the scrim, never `innerWidth`: the runner window carries an 11 px scrollbar.
+- **`userEvent.click` throws on an element with `pointer-events: none`** (a loading button, a disabled tab). Assert `toBeDisabled`, or press with the keyboard.
+- **The story-test types are thin.** `toHaveBeenCalledExactlyOnceWith` is missing and `MockInstance` is not exported: use `toHaveBeenCalledTimes(1)` plus `toHaveBeenCalledWith`, and have a helper return the call count instead of a typed spy.
+- **A story window cannot press a real mouse**, so code that branches on `:focus-visible` (a trigger that scripts `focus()` on click, such as a Select) needs a stub of `Element.prototype.matches` in a shared helper under `src/test/`. Importing the browser-mode entry of Vitest for a real pointer is no way out: Storybook's own UI loads every story file.
+- **A story cannot send a real Tab.** Prove keyboard order with the synthetic Tab plus `focus()` on the elements that must refuse it (the platform refuses focus on inert nodes), and measure the real key order once in a probe outside the story tree. In Firefox, with two story files in sibling iframes, a `focus()` from the frame without the window focus takes the window focus and moves no element focus, so a counted Tab press does nothing: press until the focus arrives (a `tabTo` helper).
+- **An `IntersectionObserver` with no root measures the runner page**, whose story window sits scaled and above it. Give it an explicit root through a shim, and keep a short stub observer in `src/test/` as the unit-test seam for any component that reads an observer's report.
+- **A bulk migration of a test idiom by regex needs the three-engine run before review:** one of 54 sites was synchronous on purpose.
+- **Two `<header>` elements in one story fail axe `landmark-no-duplicate-banner`**, so a width comparison takes two stories; a story that mounts a sheet cannot size it, only fill it.
+- **Story files count against the 200-line `max-lines` cap** (`src/**`, tests exempt), so data and helpers move to a fixtures file and every extra story file repeats its meta and decorators: export the decorators once per component.
+
+### Radix primitives
+
+- **A viewport global plus a layer that closes on window resize (Select) races in Firefox.** It sends the phone frame's resize after the first render, and a list mounted open closes under the play. Open the list in the play and assert `data-state="open"`; refuse a `defaultOpen` Select under a viewport global.
+- **A RadioGroup chooses on arrow focus only while the key is held**, and user-event releases a key at once: hold it (`{ArrowDown>}`, wait for the choice, `{/ArrowDown}`).
+- **A list mounted open makes axe report `aria-hidden-focus`**, because Radix hides the rest of the page while the trigger inside it stays focusable. Turn that rule off only in the stories that mount the list open, with a comment saying why.
+- **A layer focuses its first tab stop in the commit after its content mounts**, so a conditional tab stop (a scroll region) that appears in that commit takes the focus. Delay the first measure by one microtask.
+- **The tooltip runs its open side effects before a consumer's `onOpenChange`.** A consumer can refuse an open only after those effects, or by cancelling the focus event, which reaches roving items and tabs. Check for a veto option at each Radix bump.
+- **A controlled tooltip drops a close that arrives before its re-render**, so every controlled tooltip can stick open _(read from the installed source in the fork; no remedy recorded)_.
+
+### Styling and lint in a kit
+
+- **`cn` knows a design-token name only once tailwind-merge is told it.** With this template's plain `cn`, `h-menu-item h-auto` keeps both classes (run here); register the token names so that `h-auto` replaces `h-menu-item` in a merge.
+- **An unnamed container query reads the nearest container**, so a density lift keyed to an unnamed container variant (`@max-<size>:`) fires inside any component that is itself a container, such as a card narrower than the breakpoint on a desktop. Name the frame container and key the lift to that name from the start.
+- **The base layer's `overflow-wrap: break-word` makes a wrap class red only in a flex row or a grid:** unlike `anywhere`, it leaves the min-content size alone (the comment in `src/index.css`), so a content story for such a class puts the component there.
+- **The unbroken stress token sized for a 280 px box fits a 640 px phone frame without breaking**, so a layer story proves nothing with it: a layer story needs a token sized to the layer.
+- **`jsx-a11y/no-noninteractive-tabindex` cannot see spread props**, so a conditional region is written as a spread object, an idiom the rule does not check at all.
+- **`better-tailwindcss/no-unknown-classes` reads a map key inside `cn()` as a class** (four false hits, such as a tone lookup with a `?? 'neutral'` fallback). The rule has an `ignore` option, a list of regular expressions for names to skip (read in the installed plugin); this template enables only `no-deprecated-classes` and `enforce-canonical-classes`.
+
+---
+
 ## Not covered here
 
 - **Payments, offline and installable-app features:** the sibling SPA-plus-PWA template has the recipes; this template does not ship them. A payments integration is subject to the "no client-side pricing" rule in `SECURITY_REQUIREMENTS.md`.
 - **Server rendering and SEO:** a different template.
+- **A story runner or a Radix-based UI kit:** the option survey for Storybook is in `../docs/enterprise-upgrade.md`; the traps a fork recorded are in the appendix above.
 - **Tables, dates, real-time:** the option survey in `../docs/enterprise-upgrade.md`. Its snippets predate this file: where they conflict with a recipe above, the recipe wins.
 - **Hosted auth providers, non-Vercel hosts, other analytics vendors, right-to-left layout:** not researched, labelled above.
 

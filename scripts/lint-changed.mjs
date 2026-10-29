@@ -18,7 +18,7 @@ import path from 'node:path';
 
 import { isEntryPoint } from './is-entry-point.mjs';
 
-// The extensions ESLint lints in this repository (the default patterns plus the Next preset's).
+// The extensions ESLint lints in this repository (the default patterns plus the TypeScript and JSX ones).
 const LINTABLE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
 const CACHE_LOCATION = '.eslintcache';
 
@@ -45,7 +45,8 @@ export const changedFiles = ({ cwd }) => {
         // Exit status 1 is `--quiet` saying HEAD does not resolve; anything else (no git, no repository) is its own failure.
         if (error.status !== 1) throw error;
         throw new Error(
-            'lint-changed: this repository has no commit yet, so there is nothing to compare against'
+            'lint-changed: this repository has no commit yet, so there is nothing to compare against',
+            { cause: error }
         );
     }
     const tracked = nulSeparated(

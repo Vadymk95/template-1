@@ -55,6 +55,7 @@ UserCard/
 - **Arrow functions** for hooks.
 - **Explicit return type**: hooks declare their output (`(): UseXResult`) — enforced by `@typescript-eslint/explicit-function-return-type`.
 - **Domain grouping**: `src/hooks/<domain>/hookName.ts` + `hookName.test.ts` alongside.
+- **Where an exported hook may live** (lint rule `local/hook-location`, list `HOOK_HOMES` in `eslint.config.js`): `src/hooks/**`, a page folder `src/pages/<Page>/`, any folder under `src/components/`, a store folder `src/store/<domain>/`. An exported `use*` anywhere else (`src/lib/`, `src/router/`, `src/hocs/`, ...) fails lint; tests and `src/test/` are exempt.
 - **Direct imports** — no `index.ts` barrel re-exports.
 - **Rules of Hooks**: Hooks only in React components or other hooks. Never in callbacks, loops, or conditions.
 

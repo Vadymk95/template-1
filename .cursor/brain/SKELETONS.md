@@ -10,7 +10,8 @@
 - Class detection is an allowlist: `src/index.css` turns automatic detection off and `@source` lines name what
   is scanned (`src/` minus tests and test helpers), so a class quoted in a test, a script or a doc page ships no
   CSS. A new top-level folder that holds class names needs its own `@source` line, or its utilities silently do
-  not ship; so does `index.html` the day it carries a utility class. A unit test pins the lines.
+  not ship; so does `index.html` the day it carries a utility class. `scripts/tailwind-sources.test.mjs` pins the
+  lines.
 
 ## i18n Init Race
 
