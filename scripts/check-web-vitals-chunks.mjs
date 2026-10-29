@@ -25,6 +25,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = path.join(root, 'dist');
 const distAssets = path.join(distDir, 'assets');
@@ -172,6 +174,6 @@ const main = () => {
 };
 
 // Guarded so importing this module for a test does not inspect `dist`.
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

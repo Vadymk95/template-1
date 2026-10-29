@@ -5,6 +5,7 @@ import { z } from 'zod';
 // Zod reads the switch when an object schema is built, so it has to be set before any schema exists. That
 // holds whatever order the modules load in only because every module takes `z` from here: a direct
 // `import ... from 'zod'` is a lint error (`no-restricted-imports` in eslint.config.js).
+// Stryker disable next-line all: scripts/zod-config-bundle.test.mjs reads this call as written
 z.config({ jitless: true });
 
 // This module only re-exports `z`, so with `treeshake.moduleSideEffects: false` the bundler would resolve

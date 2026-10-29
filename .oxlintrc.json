@@ -37,5 +37,11 @@
             }
         }
     ],
-    "ignorePatterns": ["dist/**", "node_modules/**", "public/mockServiceWorker.js", "**/*.d.ts"]
+    "ignorePatterns": [
+        ".cursor/**",
+        "dist/**",
+        "node_modules/**",
+        "public/mockServiceWorker.js",
+        "**/*.d.ts"
+    ]
 }

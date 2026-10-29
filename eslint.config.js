@@ -16,6 +16,11 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+import { cssFingerprint } from './scripts/css-fingerprint.mjs';
+
+/** The stylesheet both Tailwind lint rule families read (their settings and the cache fingerprint below). */
+const TAILWIND_ENTRY = './src/index.css';
+
 const parentRelativeImportPatternGroup = {
     group: [
         '../*',
@@ -46,6 +51,10 @@ export default defineConfig([
         'playwright-report/**',
         'blob-report/**',
         'playwright/.cache/**',
+        // `.cursor/` is tracked for the brain, rules, commands and templates, so a throwaway script an
+        // agent leaves there is an untracked file the linters would pick up and red the iterate chain
+        // with. Nothing under it is product code.
+        '.cursor',
         // An agent worktree created under the repository root is a full SECOND CHECKOUT, and every
         // ignore above is root-anchored, so its copies walk straight past them. Same class as the
         // `.stryker-tmp` line - the gate must never lint a copy of the repo - and measured with a
@@ -368,6 +377,21 @@ export default defineConfig([
             ]
         }
     },
+    // Both Tailwind rule families below read the stylesheet on their own, and ESLint's cache keys on the
+    // linted file and the resolved config, never on a file a rule opens itself: after a token or utility
+    // change a cached run replays the verdicts of the old stylesheet (`scripts/lint-config.test.mjs`
+    // reproduces it against ESLint itself). `settings` is part of that key, so a fingerprint of the
+    // stylesheet, the local files it imports and the installed version of each package it imports
+    // re-lints exactly the files these rules cover. How the hash is built: `scripts/css-fingerprint.mjs`.
+    {
+        files: ['**/*.tsx'],
+        settings: {
+            tailwindCssFingerprint: cssFingerprint({
+                root: import.meta.dirname,
+                entry: TAILWIND_ENTRY
+            })
+        }
+    },
     // ─── Tailwind class hygiene (v4, CSS-config) ─────────────────────────────
     // Reads the theme from src/index.css (@import 'tailwindcss' + @theme).
     // Ordering + shorthand are autofixable; contradictions are a hard error.
@@ -375,7 +399,7 @@ export default defineConfig([
         files: ['**/*.tsx'],
         plugins: { tailwindcss: tailwind },
         settings: {
-            tailwindcss: { cssConfigPath: './src/index.css' }
+            tailwindcss: { cssConfigPath: TAILWIND_ENTRY }
         },
         rules: {
             'tailwindcss/no-contradicting-classname': 'error',
@@ -524,7 +548,7 @@ export default defineConfig([
     {
         files: ['**/*.tsx'],
         plugins: { 'better-tailwindcss': betterTailwindcss },
-        settings: { 'better-tailwindcss': { entryPoint: './src/index.css' } },
+        settings: { 'better-tailwindcss': { entryPoint: TAILWIND_ENTRY } },
         rules: {
             'better-tailwindcss/no-deprecated-classes': 'error',
             'better-tailwindcss/enforce-canonical-classes': 'error'

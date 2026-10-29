@@ -18,6 +18,8 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 const INSTALL_LOCATION_PATTERN = /^\s*Install location:\s*(.+?)\s*$/gm;
 
 /**
@@ -118,6 +120,6 @@ const main = () => {
 };
 
 // Only run when executed directly, so importing it in a test has no side effects.
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

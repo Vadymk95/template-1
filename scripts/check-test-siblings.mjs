@@ -21,6 +21,8 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 // Exempt: tests themselves, type decls, barrels, declaration-only registries
 // (constants / store keys / route paths), app shell, generated UI, MSW mocks,
 // test utils, and the documented `_example*` template seeds. These have no
@@ -255,6 +257,6 @@ const main = () => {
 };
 
 // Guarded so importing this module for a test does not shell out to git.
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

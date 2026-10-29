@@ -42,7 +42,7 @@
         "prepare": "husky",
         "test:e2e:prod": "PLAYWRIGHT_USE_PREVIEW=1 playwright test",
         "verify:inner": "node scripts/check-hooks.mjs && node scripts/check-version-holds.mjs && node scripts/check-node-floor.mjs && node scripts/check-test-siblings.mjs --range && node scripts/docs-check.mjs && node scripts/check-gate-env.mjs --kill-port && npm run lint:oxlint && npm run format:check && npm run typecheck && npm run lint && npm run test:coverage && npm run build && npm run verify:web-vitals-chunks && npm run size:check && node scripts/ensure-playwright.mjs && npm run test:e2e:prod",
-        "verify:iter:inner": "node scripts/check-hooks.mjs && npm run lint:oxlint && npm run typecheck && vitest run --changed --passWithNoTests",
+        "verify:iter:inner": "node scripts/check-hooks.mjs && npm run lint:oxlint && npm run typecheck && node scripts/lint-changed.mjs && vitest run --changed --passWithNoTests && vitest run scripts/mutation-scope.test.mjs",
         "verify:ci:inner": "npm run audit:gate && npm run lock:age && npm run verify",
         "verify:full:inner": "npm run verify:ci && npm run smoke:dev",
         "test:e2e:inner": "playwright test",

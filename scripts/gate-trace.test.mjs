@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -9,6 +9,7 @@ import {
     buildSpawnPlan,
     classifyChange,
     formatLogLine,
+    gatherRunContext,
     isDocsPath,
     parseStatusPath
 } from './gate-trace.mjs';
@@ -203,6 +204,52 @@ describe('gate-trace change-class detection (real git status)', () => {
         runWrapper(repo, ['clean-check', '--', 'node', '-e', 'process.exit(0)']);
         const fields = readLogLines(repo)[0]?.split('\t') ?? [];
         expect(fields[7]).toBe('clean');
+    });
+});
+
+/* The porcelain line of a tracked file with an unstaged edit is ` M path`: the leading space is the
+   "index unchanged" column, not padding. Git runs inside the code under test, so these cases use a
+   real repository; the pure classifier above never sees the text git printed. A first line that
+   lost its space shifted the path parse by one character and read a `.cursor/` path as code. */
+describe('gate-trace change class when a status line starts with a space (real git status)', () => {
+    const commitFiles = (repo, files) => {
+        for (const file of files) {
+            mkdirSync(dirname(join(repo, file)), { recursive: true });
+            writeFileSync(join(repo, file), 'before');
+            // Forced: a developer's global ignore file may list `.cursor/`, and git refuses to add it.
+            git(['add', '-f', file], repo);
+        }
+        git(['commit', '-q', '-m', 'add tracked files'], repo);
+        for (const file of files) {
+            writeFileSync(join(repo, file), 'after');
+        }
+    };
+
+    const changeClassWith = (files) => {
+        const repo = makeRepo();
+        cleanupDirs.push(repo);
+        commitFiles(repo, files);
+        return gatherRunContext(repo).changeClass;
+    };
+
+    it('reads an edited .cursor/ file on the first line as docs', () => {
+        expect(changeClassWith(['.cursor/rules/x.mdc'])).toBe('docs');
+    });
+
+    it('reads an edited code file on the first line as code', () => {
+        expect(changeClassWith(['scripts/a.mjs'])).toBe('code');
+    });
+
+    it('reads a docs first line plus a code later line as mixed', () => {
+        expect(changeClassWith(['.cursor/rules/x.mdc', 'scripts/a.mjs'])).toBe('mixed');
+    });
+
+    it('reads a code first line plus a docs later line as mixed', () => {
+        expect(changeClassWith(['a.ts', 'docs/x.md'])).toBe('mixed');
+    });
+
+    it('still reads two edited docs files, one of them first, as docs', () => {
+        expect(changeClassWith(['.cursor/rules/x.mdc', 'docs/x.md'])).toBe('docs');
     });
 });
 

@@ -17,8 +17,10 @@
 import { spawnSync } from 'node:child_process';
 import { connect, createServer } from 'node:net';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 /* The preview port the gate's Playwright run binds (playwright.config.ts). GATE_PREFLIGHT_PORT is a
-   test seam only: the suite points the preflight at an ephemeral port so it never touches the
+   test seam only: the suite points the preflight at a port of its own so it never touches the
    machine's real 4173 — a suite that binds the gate's own port races every other lane for it. */
 const PORT = Number(process.env.GATE_PREFLIGHT_PORT ?? 4173);
 
@@ -116,42 +118,71 @@ const portIsFree = async (port) => {
     });
 };
 
-if (!(await portIsFree(PORT))) {
-    let cleared = false;
-    let lookupError = null;
-    if (shouldKillPort) {
-        const lookup = listeningPids(PORT);
-        const { pids } = lookup;
-        lookupError = lookup.lookupError ?? null;
-        for (const pid of pids) {
-            try {
-                process.kill(pid, 'SIGTERM');
-            } catch {
-                // Already gone, or not ours to signal — the re-probe below is the verdict.
-            }
-        }
-        if (pids.length > 0) {
-            await sleep(1500);
-            if (await portIsFree(PORT)) {
-                cleared = true;
-                console.log(
-                    `Cleared port ${String(PORT)}: killed stray listener pid ${pids.join(', ')} (the push gate owns its port; parallel lanes use run-on-free-port instead).`
-                );
-            }
-        }
-    }
+/** How long the second look waits. A socket that is open for a moment is gone well inside it. */
+export const PORT_RECHECK_MS = 150;
 
-    if (!cleared) {
-        console.error('\nGate preflight failed:\n');
-        console.error(
-            `  - Port ${String(PORT)} is busy, and the gate's \`vite preview\` needs it (strictPort).\n` +
-                `      A leftover preview from an earlier run is the common case.\n` +
-                (lookupError
-                    ? `      ${lsofUnavailableHint(PORT, lookupError)}\n`
-                    : shouldKillPort
-                      ? `      --kill-port could not clear it — look: lsof -nP -iTCP:${String(PORT)} -sTCP:LISTEN\n`
-                      : `      The push gate clears its own port (--kill-port); by hand: lsof -ti tcp:${String(PORT)} -sTCP:LISTEN | xargs kill\n`)
-        );
-        process.exit(1);
+/*
+ * Busy only when two looks, PORT_RECHECK_MS apart, both find the port busy. One look cannot tell a
+ * server from a socket another process holds for a millisecond: scripts/run-on-free-port.mjs binds
+ * every port it walks, and macOS hands out `listen(0)` ports in sequence, so a parallel test or lane
+ * can be caught mid-bind. Read as a stray, it fails the gate (or, under --kill-port, makes it
+ * signal a process that is not a stray). A port that is free on the first look is free; the second
+ * look only ever overturns a busy one. `isFree` and `wait` are injected so the cases need no socket.
+ */
+export const isPortBusy = async (
+    port,
+    { isFree = portIsFree, wait = sleep, gapMs = PORT_RECHECK_MS } = {}
+) => {
+    if (await isFree(port)) {
+        return false;
     }
+    await wait(gapMs);
+    return !(await isFree(port));
+};
+
+const main = async () => {
+    if (await isPortBusy(PORT)) {
+        let cleared = false;
+        let lookupError = null;
+        if (shouldKillPort) {
+            const lookup = listeningPids(PORT);
+            const { pids } = lookup;
+            lookupError = lookup.lookupError ?? null;
+            for (const pid of pids) {
+                try {
+                    process.kill(pid, 'SIGTERM');
+                } catch {
+                    // Already gone, or not ours to signal — the re-probe below is the verdict.
+                }
+            }
+            if (pids.length > 0) {
+                await sleep(1500);
+                if (!(await isPortBusy(PORT))) {
+                    cleared = true;
+                    console.log(
+                        `Cleared port ${String(PORT)}: killed stray listener pid ${pids.join(', ')} (the push gate owns its port; parallel lanes use run-on-free-port instead).`
+                    );
+                }
+            }
+        }
+
+        if (!cleared) {
+            console.error('\nGate preflight failed:\n');
+            console.error(
+                `  - Port ${String(PORT)} is busy, and the gate's \`vite preview\` needs it (strictPort).\n` +
+                    `      A leftover preview from an earlier run is the common case.\n` +
+                    (lookupError
+                        ? `      ${lsofUnavailableHint(PORT, lookupError)}\n`
+                        : shouldKillPort
+                          ? `      --kill-port could not clear it — look: lsof -nP -iTCP:${String(PORT)} -sTCP:LISTEN\n`
+                          : `      The push gate clears its own port (--kill-port); by hand: lsof -ti tcp:${String(PORT)} -sTCP:LISTEN | xargs kill\n`)
+            );
+            process.exit(1);
+        }
+    }
+};
+
+// Run only as the entry point, so the cases can import `isPortBusy`.
+if (isEntryPoint(import.meta.url)) {
+    await main();
 }

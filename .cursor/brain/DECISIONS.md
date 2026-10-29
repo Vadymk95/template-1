@@ -7,6 +7,9 @@ points here (README § fork checklist).
 
 | Entry                                                              | Date    | Status         |
 | ------------------------------------------------------------------ | ------- | -------------- |
+| The iterate chain: a config edit reruns all, ESLint sees the diff  | 2026-10 | in force       |
+| Tailwind scans an allowlist: `@source` names the folders           | 2026-10 | in force       |
+| Gate scripts cannot pass silently or race on ports                 | 2026-10 | in force       |
 | vitest 5 and the Stryker runner                                    | 2026-10 | held           |
 | `msw` stays 2.x                                                    | 2026-10 | held           |
 | TypeScript 6.0.x, held below 6.1                                   | 2026-04 | held           |
@@ -40,6 +43,77 @@ points here (README § fork checklist).
 | Component pattern: arrow function plus `FunctionComponent`         | 2026-04 | in force       |
 | Build stack: Tailwind v4, Vite 8 with Rolldown, `plugin-react` v6  | 2026-03 | in force       |
 | No FSD; Zustand for client state, TanStack Query for server state  | 2026-03 | in force       |
+
+## [2026-10] The iterate chain: a config edit reruns all, ESLint sees the diff
+
+**Status:** in force. **Evidence:** `scripts/vitest-force-rerun.test.mjs`, `scripts/css-fingerprint.test.mjs`,
+`scripts/lint-config.test.mjs`, `scripts/lint-changed.test.mjs`, `scripts/iterate-chain.test.mjs`.
+
+**Context:** `verify:iter` answered about something other than the change in five ways. (1) The runner's own
+triggers (`**/package.json/**`, `**/{vitest,vite}.config.*/**`) never match a config file, and a `**` never crosses
+a dot-directory: under `.worktrees/` not even `package.json` fired, and a dirty `vitest.config.ts` ran only the 2 of
+77 test files that import it. (2) The Tailwind lint rules read the stylesheet themselves and ESLint's cache keys on
+the linted file and the resolved config only, so after a stylesheet change a cached run replays the old verdicts
+(`scripts/lint-config.test.mjs` shows it against ESLint with a stand-in rule). (3) oxlint has no types, so
+type-aware findings appeared first at the commit hook. (4) A scratch script under tracked `.cursor/` was linted by
+both linters. (5) `scripts/mutation-scope.test.mjs` reads `stryker.config.json` as text, so `--changed` never
+selects it for an edit of that file alone.
+
+**Decision:** (1) `forceRerunTriggers` are literal paths anchored at the repository root, glob syntax escaped
+(`forceRerunTriggersFor` in `vitest.config.ts`); the vite config counts too, this one merges it. (2) `eslint.config.js`
+puts a fingerprint of the stylesheet, the local files it imports and the installed version of each package it
+imports (`scripts/css-fingerprint.mjs`) into `settings` for `**/*.tsx`; ESLint hashes `settings` into every cache
+entry, so `lint`, `fix` and the staged pass follow it with no second cache. (3) `scripts/lint-changed.mjs` lints what
+differs from HEAD plus untracked files, with the `lint` flags and the same cache. (4) Both linters ignore `.cursor/`.
+(5) The chain runs the scope test by name.
+
+**Consequences:** a dirty `package.json` or vitest config costs the whole suite on purpose (26 to 34 s here, over the
+15 s iterate budget); the new leg adds 1.5 to 3.5 s to a warm run and about 6.5 s to a first run on ten files
+(`VERIFICATION.md` § Phases has the measured runs). Rejected: the stylesheet hash in the cache path, which a
+sibling template measured as silently skipped when `.eslintcache` already exists as a file. Not covered: a patched
+copy of a package with an unchanged version (the package's files are not hashed).
+
+## [2026-10] Tailwind scans an allowlist: `@source` names the folders
+
+**Status:** in force. **Evidence:** `src/index.css` and the unit test in `scripts/` that pins its `@source` lines.
+
+**Context:** Tailwind 4 emits a rule for every class-shaped string in every file it scans, so with automatic
+detection a class quoted in a test, a spec, a script, a root config file or a doc page can become CSS that no page
+uses.
+
+**Decision:** `src/index.css` imports Tailwind with automatic detection off and names what is scanned in `@source`
+lines: `src/` minus tests and test helpers, paths resolved from the stylesheet. `src/pages/DevPlayground` is dev-only
+but stays scanned, because the dev server needs its utilities.
+
+**Consequences:** a new top-level folder that holds class names needs its own `@source` line, or its utilities
+silently do not ship; so does `index.html` the day it carries a utility class (today it holds custom classes only,
+defined in the stylesheet). The shipped CSS size before and after is not measured here. The stylesheet is also the
+input of the ESLint cache fingerprint, so editing it re-lints every `.tsx` file once (see the iterate-chain entry).
+
+## [2026-10] Gate scripts cannot pass silently or race on ports
+
+**Status:** in force. **Evidence:** `scripts/is-entry-point.test.mjs`, `scripts/gate-trace.test.mjs`,
+`scripts/docs-check.test.mjs`, `scripts/check-gate-env.test.mjs`, `scripts/quiet-ports.test.mjs`.
+
+**Context:** (1) The entry check `import.meta.url === new URL('file://' + process.argv[1]).href`, in 16 scripts (two
+more spelled it with `pathToFileURL`, which a symlink also defeats), is false through a symlink or for a path with
+`#`, `%` or `?`: the script skips its check and exits 0, a pass that checked nothing. (2) `gate-trace` trimmed the
+front of `git status --porcelain`, so the first line of an unstaged edit (` M path`) lost its space and the path
+parse shifted by one character: a `.cursor/` file counted as code. (3) `docs:check` reported a helper named `fit` or
+`xit` that the file declares itself as a focused or skipped test. (4) The preflight called a port busy on one look.
+(5) Tests bound `listen(0)` ports from the OS's ephemeral range, where parallel tests meet each other's sockets.
+
+**Decision:** (1) `scripts/is-entry-point.mjs` (real path, encoded) in every script that runs only when started;
+`is-entry-point.test.mjs` fails a hand-written guard, and `check-gate-env.mjs` became importable (a `main()` behind
+the guard) so its port check can be tested. (2) `gate-trace` trims only the end of the status text. (3) A Jest name
+the file declares itself is its own helper; an imported or destructured one is still read, it may be the Jest
+global. (4) A port is busy only when two looks 150 ms apart both find it busy (`isPortBusy`). (5) Tests that bind
+sockets take ports from `scripts/quiet-ports.mjs`: 10000-19999, below both ephemeral ranges, one window per
+checkout, one lane per test file.
+
+**Consequences:** the preflight waits 150 ms longer on a port that really is busy. A sibling template counted 7 red
+preflights in 100 runs with one look and none in 100 with two; this repository's own count is not measured. A new
+test file that binds sockets adds a lane to `quiet-ports.mjs`; its test refuses an overlap.
 
 ## [2026-10] vitest 5 and the Stryker runner
 

@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { quietPort } from './quiet-ports.mjs';
 import { buildChildEnv, findFreePort } from './run-on-free-port.mjs';
 
 const SCRIPT = resolve(process.cwd(), 'scripts/run-on-free-port.mjs');
@@ -13,20 +14,27 @@ const SCRIPT = resolve(process.cwd(), 'scripts/run-on-free-port.mjs');
    read the captured text back for their assertions. */
 const CAPTURE = ['ignore', 'pipe', 'pipe'];
 
+/* The base every case starts from, in this checkout's quiet window (scripts/quiet-ports.mjs). Not
+   `listen(0)`: the OS hands those out from its ephemeral range, in sequence on macOS, so the
+   neighbours a walk from there lands on belong to other tests and processes. */
+const BASE = quietPort('run-on-free-port');
+
 /** Holds a real port so the probe meets a genuinely busy socket; `host` narrows which family. */
 const occupyPort = (host) =>
-    new Promise((resolveServer) => {
+    new Promise((resolveServer, rejectServer) => {
         const server = createServer();
+        server.once('error', rejectServer);
         const ready = () => {
             resolveServer(server);
         };
-        if (host === undefined) server.listen(0, ready);
-        else server.listen(0, host, ready);
+        if (host === undefined) server.listen(BASE, ready);
+        else server.listen(BASE, host, ready);
     });
 
 /* A bindable IPv6 loopback is a capability, not a given: Docker's default network namespace sets
    `disable_ipv6=1` on `lo`, and binding `::1` there throws EADDRNOTAVAIL. Probed ONCE per file; the
-   case that needs it is skipped with the reason printed, never run into a crash or skipped silently. */
+   case that needs it is skipped with the reason printed, never run into a crash or skipped silently.
+   Port 0 on purpose: only the capability is probed, and the socket closes before any case runs. */
 const ipv6LoopbackProblem = await new Promise((resolveProbe) => {
     const probe = createServer();
     probe.once('error', (error) => {
@@ -56,11 +64,12 @@ afterEach(async () => {
 
 describe('findFreePort', () => {
     it('returns the base port when it is free', async () => {
-        // A port the OS just assigned and released is free again the moment the server closes.
-        const server = await occupyPort();
-        const base = server.address().port;
-        await new Promise((resolveClose) => server.close(resolveClose));
-        expect(await findFreePort(base)).toBe(base);
+        expect(await findFreePort(BASE)).toBe(BASE);
+    });
+
+    it('holds its ports below both ephemeral ranges, where no parallel test or browser takes one', async () => {
+        heldServer = await occupyPort();
+        expect(heldServer.address().port).toBeLessThan(32_768);
     });
 
     it('skips a busy base port and lands on the next free one', async () => {
@@ -115,10 +124,10 @@ describe('run-on-free-port CLI', () => {
             ],
             { encoding: 'utf8', env: { ...process.env, PORT: String(base) }, stdio: CAPTURE }
         );
-        /* The lane lands on the NEXT FREE port, not necessarily base + 1: the base is an
-           OS-assigned ephemeral port, so its neighbours may be taken by any other process — a
-           fixed `base + 1` assertion was flaky for exactly that reason. Read the port the script
-           announced and check the child received the same one. */
+        /* The lane lands on the NEXT FREE port, not necessarily base + 1: a listener this suite
+           does not know about may sit on a neighbour, and a fixed `base + 1` assertion was flaky
+           when the base was an OS-assigned port whose neighbours any process could take. Read the
+           port the script announced and check the child received the same one. */
         const announced = output.match(/is busy — this lane runs on (\d+)\./);
         expect(announced, output).not.toBeNull();
         const reassigned = Number(announced[1]);
@@ -132,14 +141,13 @@ describe('run-on-free-port CLI', () => {
         try {
             execFileSync('node', [SCRIPT, 'node', '-e', 'process.exit(3)'], {
                 encoding: 'utf8',
-                env: { ...process.env, PORT: '0' },
+                env: { ...process.env, PORT: String(BASE) },
                 stdio: CAPTURE
             });
         } catch (error) {
             code = error.status;
         }
-        // PORT=0 probes from 0, which the OS treats as "assign one" and always grants — the
-        // child still runs and its own exit code must be the verdict.
+        // The port is free, so the child runs and its own exit code must be the verdict.
         expect(code).toBe(3);
     });
 
@@ -149,7 +157,7 @@ describe('run-on-free-port CLI', () => {
             execFileSync(process.execPath, [SCRIPT, 'no-such-binary-on-this-host'], {
                 encoding: 'utf8',
                 stdio: CAPTURE,
-                env: { ...process.env, PORT: '0' }
+                env: { ...process.env, PORT: String(BASE) }
             });
         } catch (error) {
             verdict = {

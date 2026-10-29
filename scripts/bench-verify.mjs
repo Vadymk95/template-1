@@ -14,6 +14,8 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 /**
  * Turns the `&&`-chained verify script into labelled steps.
  *
@@ -113,6 +115,6 @@ const main = () => {
 };
 
 // Guarded so importing this module for a test does not run the gate.
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

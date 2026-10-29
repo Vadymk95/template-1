@@ -47,7 +47,8 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+
+import { isEntryPoint } from './is-entry-point.mjs';
 
 export const LOCKFILE = 'package-lock.json';
 export const NPMRC_FILE = '.npmrc';
@@ -501,7 +502,7 @@ const main = async () => {
     process.exitCode = ok ? 0 : 1;
 };
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isEntryPoint(import.meta.url)) {
     main().catch((error) => {
         console.error(`lock-age: ${describeError(error)}`);
         process.exitCode = 1;

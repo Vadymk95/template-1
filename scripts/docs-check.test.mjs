@@ -1237,6 +1237,116 @@ describe('checkQuarantine', () => {
             });
         }
 
+        /* A Jest focus name is read as the Jest global unless the file declares that name itself: a
+           helper called `fit` is not a focused test. An import or a destructured binding is no
+           declaration, because it may be the Jest global. The markers are assembled from parts like
+           the ones around: this check reads this file too, and a literal one in its text would be
+           reported against the very rule these cases pin. */
+        describe('a Jest name the file declares itself', () => {
+            const FIT = form('f', 'it');
+            const FDESCRIBE = form('f', 'describe');
+            const lines = (...parts) => `${parts.join('\n')}\n`;
+            const read = (text) => checkQuarantine({ tests: [['a.test.ts', text]], today });
+
+            it('reports a Jest focused test definition', () => {
+                const findings = read(`${FIT}('works', () => {});\n`);
+
+                expect(findings).toHaveLength(1);
+                expect(findings[0]).toContain('a.test.ts:1');
+                expect(findings[0]).toContain('a focused test');
+            });
+
+            it('reports a focused describe', () => {
+                const findings = read(form('describe', '.only', "('works', () => {});\n"));
+
+                expect(findings).toHaveLength(1);
+                expect(findings[0]).toContain('.only');
+            });
+
+            it('does not report an arrow helper with a Jest name, nor its calls inside a test', () => {
+                const text = lines(
+                    `const ${FIT} = (value) => value * 2;`,
+                    "it('doubles', () => {",
+                    `    expect(${FIT}(2)).toBe(4);`,
+                    '});'
+                );
+
+                expect(read(text)).toEqual([]);
+                expect(findSwitchedOff(text)).toEqual([]);
+            });
+
+            it('does not report a function helper with a Jest name, nor its calls inside a test', () => {
+                const text = lines(
+                    `function ${FIT}(value) {`,
+                    '    return value * 2;',
+                    '}',
+                    "it('doubles', () => {",
+                    `    ${FIT}(2);`,
+                    `    expect(${FIT}(2)).toBe(4);`,
+                    '});'
+                );
+
+                expect(read(text)).toEqual([]);
+            });
+
+            for (const keyword of ['let', 'var']) {
+                it(`does not report a helper declared with ${keyword}`, () => {
+                    const text = lines(
+                        `${keyword} ${FIT} = (value) => value * 2;`,
+                        "it('doubles', () => {",
+                        `    expect(${FIT}(2)).toBe(4);`,
+                        '});'
+                    );
+
+                    expect(read(text)).toEqual([]);
+                });
+            }
+
+            it('does not report a method called on an object', () => {
+                const text = lines("it('fits', () => {", `    layout.${FIT}(2);`, '});');
+
+                expect(read(text)).toEqual([]);
+            });
+
+            it('reports a real focused test when only a helper with a longer name is declared', () => {
+                const text = lines(
+                    `const ${FIT}Text = (value) => value;`,
+                    `${FIT}('works', () => {});`
+                );
+
+                const findings = read(text);
+
+                expect(findings).toHaveLength(1);
+                expect(findings[0]).toContain('a.test.ts:2');
+            });
+
+            it('reports another Jest name in a file whose helper only shares the first one', () => {
+                const text = lines(
+                    `function ${FIT}(value) {`,
+                    '    return value;',
+                    '}',
+                    `${FDESCRIBE}('works', () => {});`
+                );
+
+                const findings = read(text);
+
+                expect(findings).toHaveLength(1);
+                expect(findings[0]).toContain('a.test.ts:4');
+            });
+
+            it('reports the name imported from the Jest globals, which is the real API', () => {
+                const text = lines(
+                    `import { ${FIT} } from '@jest/globals';`,
+                    `${FIT}('works', () => {});`
+                );
+
+                const findings = read(text);
+
+                expect(findings).toHaveLength(1);
+                expect(findings[0]).toContain('a.test.ts:2');
+            });
+        });
+
         it('reads the very options a subtest hides once the call is a declaration', () => {
             const declared = [
                 form('it', "('x', { sk", 'ip: true }, f);'),

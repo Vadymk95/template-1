@@ -81,6 +81,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 export const DOC_FILES = [
     'AGENTS.md',
     'README.md',
@@ -1015,6 +1017,8 @@ export const listTestFiles = (root) => {
  *               test.step.skip; testInfo.skip, fixme and fail; { annotation: { type: 'skip' } } (also
  *               'fixme' and 'fail') in the details of a test or of a describe
  *   node:test   .skip .todo .expectFailure; { skip, todo, expectFailure, only }; t.skip, t.todo
+ * A Jest name the file declares for itself (`function fit(`, `const fit =`) is its own helper and is
+ * not read; one it imports or destructures still is, because it may be the Jest global.
  * A `.todo` with a title alone is a placeholder for a test nobody wrote and hides no body, so it is
  * not a switch; with a body, on the test context or as an option it is one. In `skip(a, b)` a second
  * argument that is not a string says `a` is a title and `b` its body, whatever `a` looks like.
@@ -1068,6 +1072,13 @@ const CHAIN_TAIL = /((?:\.[A-Za-z_$][\w$]*)*)\s*([(`])/y;
 const TABLE_CHAIN = /(?:^|\.)(?:each|for)$/;
 /** The Jest names that carry the modifier themselves: `xit`, `fdescribe` and a table of either. */
 const PREFIXED_CALL = /(?<![\w$.])(xit|xtest|xdescribe|fit|fdescribe)(?=\(|\.(?:each|failing)\b)/g;
+/**
+ * A Jest name the file declares for itself (`function fit(`, `const fit =`) is that file's helper, not
+ * the Jest global, so neither its declaration nor its calls are test declarations. An import or a
+ * destructured binding is not read as a declaration: it may be the Jest global, so it stays reported.
+ */
+const OWN_PREFIXED_NAME =
+    /\b(?:function|const|let|var|class)\s+(xit|xtest|xdescribe|fit|fdescribe)\b/g;
 /** A call that declares a test or a suite, with the modifiers written before its parenthesis. */
 const DECLARATION = /(?<![\w$.])(?:test|it|describe|suite)((?:\.[A-Za-z_$][\w$]*)*)\s*\(/g;
 const OPTION_KEY = /(?<![\w$.])(skip|todo|fails|expectFailure|only)\s*:([^,}]*)/g;
@@ -1272,7 +1283,10 @@ export const findSwitchedOff = (text) => {
         const hit = modifierHit(text, match);
         if (hit !== null) hits.push(hit);
     }
+    const ownNames = new Set();
+    for (const match of text.matchAll(OWN_PREFIXED_NAME)) ownNames.add(match[1]);
     for (const match of text.matchAll(PREFIXED_CALL)) {
+        if (ownNames.has(match[1])) continue;
         const hit = { index: match.index, label: match[1] };
         hits.push(
             match[1].startsWith('f') ? { ...hit, focused: true } : { ...hit, unconditional: true }
@@ -1606,7 +1620,7 @@ const tracedScript = (scripts, name) => {
 };
 
 /** A traced script is a moment's entry point (`verify`, `verify:ci`), not a stage of the gate. */
-const isEntryPoint = (scripts, name) => tracedScript(scripts, name) !== null;
+const isMomentEntry = (scripts, name) => tracedScript(scripts, name) !== null;
 
 /** The stages of the gate: the steps of every `verify*` chain, less the entry points those chains call. */
 export const gateStages = ({ checks, scripts }) => {
@@ -1618,7 +1632,7 @@ export const gateStages = ({ checks, scripts }) => {
         if (steps.length < 2) continue;
         for (const step of steps) {
             const stage = stageName(step);
-            if (!isEntryPoint(scripts, stage)) stages.add(stage);
+            if (!isMomentEntry(scripts, stage)) stages.add(stage);
         }
     }
     return stages;
@@ -2142,6 +2156,6 @@ const main = () => {
     process.exit(1);
 };
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

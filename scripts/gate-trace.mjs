@@ -21,6 +21,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 export const LOG_FILE_NAME = '.gate-trace.log';
 
 /**
@@ -33,8 +35,11 @@ export const LOG_FILE_NAME = '.gate-trace.log';
 export const withoutGitEnv = (environment) =>
     Object.fromEntries(Object.entries(environment).filter(([key]) => !key.startsWith('GIT_')));
 
+// Only the end is trimmed: the first column of `git status --porcelain` can be a space (` M path`),
+// and a trim from the front shifts the path parse by one character. The other git calls here print a
+// single token, so the front never carried anything.
 const gitOutput = (cwd, args) =>
-    execFileSync('git', args, { cwd, env: withoutGitEnv(process.env), encoding: 'utf8' }).trim();
+    execFileSync('git', args, { cwd, env: withoutGitEnv(process.env), encoding: 'utf8' }).trimEnd();
 
 // Porcelain v1: two status-code characters, one space, then the path (or, for a rename,
 // "old -> new"). The rename case is resolved to the path the file lives at NOW.
@@ -195,6 +200,6 @@ const main = () => {
     process.exit(exitCode ?? 1);
 };
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }
