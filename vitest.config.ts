@@ -1,4 +1,6 @@
 /// <reference types="vitest" />
+import path from 'node:path';
+
 import { mergeConfig } from 'vite';
 import { defineConfig } from 'vitest/config';
 
@@ -9,6 +11,21 @@ const viteConfig =
         ? viteConfigFn({ command: 'build', mode: 'test' })
         : viteConfigFn;
 
+// Characters picomatch reads as pattern syntax: in a literal path each one has to be escaped.
+const GLOB_SYNTAX = /[\\()[\]{}!+@*?|]/g;
+
+// The files that make `vitest run --changed` run the WHOLE suite instead of the tests the import graph
+// reaches: the manifest and the runner's own config, neither of which is part of that graph. The
+// runner's defaults (`**/package.json/**`, `**/{vitest,vite}.config.*/**`) never match the config file
+// itself, and a `**` does not cross a dot-directory, so a checkout under `.worktrees/` matched nothing.
+// A literal path anchored at the checkout matches from wherever it lives; the only wildcard is the
+// config file's extension. The vite config is in the list because this config merges it.
+export const forceRerunTriggersFor = (root: string): string[] => {
+    const anchor = root.split(path.sep).join('/').replace(GLOB_SYNTAX, '\\$&');
+
+    return [`${anchor}/package.json`, `${anchor}/{vitest,vite}.config.*`];
+};
+
 export default mergeConfig(
     viteConfig,
     defineConfig({
@@ -16,8 +33,14 @@ export default mergeConfig(
             globals: true,
             // Vitest defaults this to `!isCI`, which lets a stray `.only` pass every local gate.
             allowOnly: false,
+            // Vitest keeps a mock's calls and implementation from one test to the next by default.
+            // Resetting before each test returns a mock to the implementation it was created with, so
+            // the order of the tests in a file cannot decide a verdict.
+            mockReset: true,
             environment: 'jsdom',
             setupFiles: ['./src/test/setup.ts'],
+            // The runner adds `setupFiles` to this list itself, so the setup file is covered as well.
+            forceRerunTriggers: forceRerunTriggersFor(import.meta.dirname),
             coverage: {
                 provider: 'v8',
                 // text: terminal summary, json-summary: CI badge/diff, lcov: Codecov/Coveralls, html: local drill-down

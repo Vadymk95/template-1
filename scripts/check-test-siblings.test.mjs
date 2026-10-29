@@ -295,14 +295,20 @@ describe('the command line against a real repository', () => {
         return { code: result.status, stdout: result.stdout, stderr: result.stderr };
     };
 
-    /** A repo whose first commit is covered code, with `origin/master` pointing at it. */
-    const makeRepo = () => {
-        const root = mkdtempSync(path.join(tmpdir(), 'test-siblings-'));
+    /** A repository with no commit yet. */
+    const initRepo = (prefix) => {
+        const root = mkdtempSync(path.join(tmpdir(), prefix));
         repos.push(root);
         git(root, ['init', '--quiet', '--initial-branch=master']);
         git(root, ['config', 'user.email', 'test@example.test']);
         git(root, ['config', 'user.name', 'Test']);
         git(root, ['config', 'commit.gpgsign', 'false']);
+        return root;
+    };
+
+    /** A repo whose first commit is covered code, with `origin/master` pointing at it. */
+    const makeRepo = () => {
+        const root = initRepo('test-siblings-');
         write(root, 'src/lib/ok.ts');
         write(root, 'src/lib/ok.test.ts');
         commit(root, 'base');
@@ -404,6 +410,60 @@ describe('the command line against a real repository', () => {
             expect(cli(root).code).toBe(0);
             expect(cli(root, [], { GIT_INDEX_FILE: alternate }).code).toBe(1);
         });
+
+        // A fork's first commit is the whole template, starter files with no sibling included, and
+        // there is no earlier commit to compare with, so nothing is judged (range mode does the same).
+        it('says so, and passes, on the first commit of a repository', () => {
+            const root = initRepo('test-siblings-first-');
+            write(root, 'src/lib/starter.ts');
+            git(root, ['add', '-A']);
+
+            const result = cli(root);
+
+            expect(result.code).toBe(0);
+            expect(result.stdout).toMatch(/the first commit/);
+        });
+
+        it('judges the second commit again', () => {
+            const root = initRepo('test-siblings-second-');
+            write(root, 'src/lib/starter.ts');
+            commit(root, 'first');
+            write(root, 'src/lib/added.ts');
+            git(root, ['add', '-A']);
+
+            const result = cli(root);
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toContain('src/lib/added.ts');
+            expect(result.stderr).not.toContain('src/lib/starter.ts');
+        });
+
+        // The first-commit exemption is "HEAD does not resolve", and that is just as true of a
+        // folder that is no repository and of a repository whose index cannot be read. Both
+        // refusals have to come first: past them the gate would pass where it can see nothing.
+        it('refuses a folder outside any git repository, never reading it as a first commit', () => {
+            const outside = mkdtempSync(path.join(tmpdir(), 'test-siblings-outside-'));
+            repos.push(outside);
+
+            // The ceiling stops git from walking up out of the temp folder into a repository
+            // around it, which would be read as that repository's first commit.
+            const result = cli(outside, [], { GIT_CEILING_DIRECTORIES: path.dirname(outside) });
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toMatch(/not inside a git repository/);
+            expect(result.stdout).not.toMatch(/the first commit/);
+        });
+
+        it('refuses an index it cannot read, even before the first commit', () => {
+            const root = initRepo('test-siblings-index-');
+            write(root, '.git/index', 'not an index');
+
+            const result = cli(root);
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toMatch(/cannot read the git index/);
+            expect(result.stdout).not.toMatch(/the first commit/);
+        });
     });
 
     describe('range mode', () => {
@@ -489,19 +549,14 @@ describe('the command line against a real repository', () => {
         });
 
         it('says so, and passes, when the first commit leaves nothing to compare with', () => {
-            const root = mkdtempSync(path.join(tmpdir(), 'test-siblings-root-'));
-            repos.push(root);
-            git(root, ['init', '--quiet', '--initial-branch=master']);
-            git(root, ['config', 'user.email', 'test@example.test']);
-            git(root, ['config', 'user.name', 'Test']);
-            git(root, ['config', 'commit.gpgsign', 'false']);
+            const root = initRepo('test-siblings-root-');
             write(root, 'src/lib/orphan.ts');
             commit(root, 'first');
 
             const result = cli(root, ['--range']);
 
-            // A template's own first commit carries files of the template; it is the index that
-            // guards that commit, not a range with no other end.
+            // A template's own first commit carries files of the template, so a range with no
+            // other end judges nothing, and neither does the staged check of that commit.
             expect(result.code).toBe(0);
             expect(result.stdout).toMatch(/no base commit to compare with/);
         });

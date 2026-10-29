@@ -6,12 +6,12 @@
         "verify:iter": {
             "class": "code",
             "description": "iterate: the seconds-long check run per change",
-            "chain": "check-hooks -> lint:oxlint -> typecheck -> vitest run --changed --passWithNoTests"
+            "chain": "check-hooks -> lint:oxlint -> typecheck -> lint-changed -> vitest run --changed --passWithNoTests -> vitest run scripts/mutation-scope.test.mjs"
         },
         "verify": {
             "class": "code",
             "description": "the offline gate: every check CI runs except the network-bound ones",
-            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> check-gate-env --kill-port -> lint:oxlint -> format:check -> typecheck -> lint -> test:coverage -> build -> verify:web-vitals-chunks -> size:check -> ensure-playwright -> test:e2e:prod"
+            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> check-gate-env --kill-port -> lint:oxlint -> format:check -> typecheck:force -> lint -> test:coverage -> build -> verify:web-vitals-chunks -> size:check -> ensure-playwright -> test:e2e:prod"
         },
         "verify:ci": {
             "class": "code",
@@ -30,7 +30,7 @@
         "verify:scaffold": {
             "class": "code",
             "description": "phase-0 offline gate: verify without the stages that need a build",
-            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> lint:oxlint -> format:check -> typecheck -> lint -> test:coverage"
+            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> lint:oxlint -> format:check -> typecheck:force -> lint -> test:coverage"
         },
         "verify:scaffold:push": {
             "class": "code",
@@ -125,6 +125,7 @@
             "lint:oxlint": ["oxlint"],
             "format:check": ["format", "prettier"],
             "typecheck": ["tsc", "type-check"],
+            "typecheck:force": ["tsc", "type-check"],
             "lint": ["eslint"],
             "test:coverage": ["coverage"],
             "verify:web-vitals-chunks": ["web-vitals chunks"],
@@ -165,13 +166,12 @@
         }
     },
     "suites": {
-        "_description": "Ceilings on the browser suite. It is counted in INVARIANTS, not screens (AGENTS.md \u00a7 the gate): a route earns a browser test only when it brings an invariant the existing specs do not measure. A suite over its ceiling is a finding, and so is a ceiling more than twice the measurement \u2014 that high it flags nothing. Raise a number on a measurement plus a DECISIONS.md line, like a size budget.",
+        "_description": "Ceilings on the browser suite. It is counted in INVARIANTS, not screens (AGENTS.md \u00a7 the gate): a route earns a browser test only when it brings an invariant the existing specs do not measure. A suite over its ceiling is a finding, and so is a ceiling more than twice the measurement \u2014 that high it flags nothing. A second subject of an existing invariant becomes a test.step or an extra assertion in that case, never a new test( or it( call: those two are what is counted. Raise a number on a measurement plus a DECISIONS.md line, like a size budget.",
         "e2e": {
             "dir": "e2e",
             "match": "\\.spec\\.ts$",
             "count": "tests",
-            "max": 10,
-            "_measured": "7 on 2026-09-13"
+            "max": 10
         }
     },
     "moments": {

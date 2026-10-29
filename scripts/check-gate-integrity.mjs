@@ -87,7 +87,8 @@
  */
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+
+import { isEntryPoint } from './is-entry-point.mjs';
 
 export const MANIFEST_PATH = 'scripts/gate-files.json';
 export const OVERRIDE_LABEL = 'gate-change';
@@ -704,6 +705,6 @@ const main = () => {
     process.exitCode = code;
 };
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

@@ -14,6 +14,8 @@
 import { spawnSync } from 'node:child_process';
 import { connect, createServer } from 'node:net';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 const PROBE_LIMIT = 20;
 
 const CONNECT_TIMEOUT_MS = 300;
@@ -112,6 +114,6 @@ const main = async () => {
     process.exit(result.status ?? 1);
 };
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     await main();
 }

@@ -10,9 +10,13 @@
  * reading half can happen less often and on a stable baseline. It is not a replacement for a reader.
  *
  * Checks (each finding is `file:line: message`; exit 1 when any finding exists):
- *   paths      a backticked repo path (starts with a tracked top-level directory, e.g. `src/x.ts`,
- *              `.cursor/brain/MAP.md`) must exist; bare file names, routes, package subpaths and
- *              build output are not judged
+ *   paths      a backticked repo path (starts with a top-level directory git lists, e.g. `src/x.ts`,
+ *              `.cursor/brain/MAP.md`) must resolve to a file git lists (tracked, or new and not
+ *              ignored) or to a folder holding one, so an emptied folder and an ignored file are
+ *              gone, here as on a clean checkout; bare file names, routes, package subpaths and
+ *              build output are not judged. A path that ends in `:12` or `:12-20` is a finding
+ *              too, and so is the name of a file at the root (`name.ext:12`; a host with a port is
+ *              no file): cite the symbol, a line moves with every edit
  *   scripts    a backticked `npm run x` or `family:name` token whose family is one of package.json's
  *              script families must exist in package.json
  *   sentinels  the tier-law sentinel sentences (gate-tiers.json → docs.sentinels) appear only in
@@ -20,7 +24,8 @@
  *   memoryImports  CLAUDE.md and AGENTS.md hold no `@path` that Claude Code would import into every
  *              session (a `~/` path, or one naming an existing file), except `@AGENTS.md` in CLAUDE.md
  *   suites     the browser suite has not outgrown the ceiling in gate-tiers.json, and that
- *              ceiling is not more than twice the measurement
+ *              ceiling is not more than twice the measurement; every run prints the measurement
+ *              (`suites.e2e: 9 test(s) of 10`), so no suite carries a hand-written `_measured`
  *   tests      no focused test (`.only`, `fit`, `only: true`) lands; a test switched off for good
  *              (a skip, todo, fixme, expected failure or annotation, in the spellings of vitest,
  *              Jest, Playwright and node:test; the list sits above findSwitchedOff) carries
@@ -40,10 +45,21 @@
  *              job (its `name:` or id, plus matrix values) or listed in ci.rulesetContextAllowlist
  *   pointers   a section pointer, `file` § Heading, in any tracked .md/.mdc file (DECISIONS.md
  *              included) must resolve to a heading of that file (rules above checkSectionPointers)
+ *   decisions  DECISIONS.md keeps its shape: one index row per entry heading and one entry
+ *              heading per row (compared without the `[YYYY-MM]` prefix), and an entry holds at
+ *              most DECISION_ENTRY_MAX_LINES lines after its heading (trailing blank lines not
+ *              counted; a heading named Index is the table's, not an entry)
  *   chains     `checks.<name>.chain` in gate-tiers.json, the one readable view of what a gate script
  *              runs, equals the chain derived from that script in package.json (the tracer wrapper
  *              unwrapped, `&&` split); a multi-step script without a chain, or a chain for a script
  *              that is not one, is a finding too
+ *   flags      the commands of the package.json scripts that are gate checks, or that an `npm run`
+ *              step reaches from one (the arguments a step passes after its own `--` included),
+ *              keep their strict flags: eslint `--max-warnings 0` (the last value counts), oxlint
+ *              `--deny-warnings`, vitest run once (`run`), jest not watching, and
+ *              `--passWithNoTests` only inside the iterate chain. A command ends at `&&`, `||`,
+ *              `;` or a newline, and what a `node scripts/*.mjs` step spawns is not read. The chain
+ *              view cannot judge this: it compares package.json with itself
  *   stageWords every key of `docs.stageWords` is a stage of the `verify*` chains
  *   retelling  no line outside that view retells the gate chain. A line does when it names
  *              RETELLING_MIN_STAGES or more distinct stages (the stage names derived from
@@ -64,8 +80,9 @@
  *
  * The discipline itself is data in scripts/gate-tiers.json (`docs` block + the `docs:check` entry);
  * this file names no sentinel and no version of its own. History files (DECISIONS.md) are skipped
- * by the paths, scripts, sentinels and versions checks (an entry's evidence link names the tree as
- * it was when the decision was taken) and read only by the dead-doc and section-pointer checks.
+ * by the scripts, sentinels and versions checks (an entry may quote a script or a sentence as it
+ * stood when the decision was taken) and read by the paths check (an evidence link that points
+ * nowhere proves nothing), the dead-doc, section-pointer and decisions-shape checks.
  *
  * No check reads a date out of prose: a revisit line carrying a date was read as a deadline and was
  * gamed by rewording. Dates are checked only where they are structured data: `quarantine until` on
@@ -80,6 +97,8 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+
+import { isEntryPoint } from './is-entry-point.mjs';
 
 export const DOC_FILES = [
     'AGENTS.md',
@@ -184,28 +203,106 @@ export const classifyToken = (rawToken, { topDirs, families }) => {
     return { kind: 'other', value: token };
 };
 
-/** A doc may name a module without its extension (`shared/lib/logger`) or a folder by its index. */
-const MODULE_EXTENSIONS = ['', '.ts', '.tsx', '.mjs', '.js', '/index.ts', '/index.tsx'];
-export const pathExists = (root, value) =>
-    MODULE_EXTENSIONS.some((ext) => existsSync(path.join(root, value + ext)));
+/**
+ * Every file git lists in `root`: tracked, or new and not ignored. Null when git cannot answer, so
+ * a caller can fall back to the disk. One call serves the whole run.
+ */
+export const listRepoFiles = (root) => {
+    try {
+        return new Set(
+            execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
+                cwd: root,
+                encoding: 'utf8',
+                stdio: ['ignore', 'pipe', 'pipe'],
+                maxBuffer: 64 * 1024 * 1024
+            })
+                .split('\0')
+                .filter(Boolean)
+        );
+    } catch {
+        return null;
+    }
+};
 
-export const checkPathsAndScripts = ({ docs, root, scripts, topDirs }) => {
+/** A folder counts while a file git lists lies under it and is still on disk (a deleted file stays listed until the deletion is staged). */
+const holdsListedFile = (root, listed, folder) => {
+    const prefix = folder.endsWith('/') ? folder : `${folder}/`;
+    for (const file of listed) {
+        if (file.startsWith(prefix) && existsSync(path.join(root, file))) return true;
+    }
+    return false;
+};
+
+/**
+ * A doc may name a module without its extension (`shared/lib/logger`) or a folder by its index. With
+ * `listed` (the files git lists, see listRepoFiles) a file resolves only if git lists it AND it is on
+ * disk, and a folder only if it holds such a file: the disk alone answers differently on a machine
+ * that kept an emptied folder or an ignored file than on a clean checkout. Without `listed`, the
+ * disk decides.
+ */
+const MODULE_EXTENSIONS = ['', '.ts', '.tsx', '.mjs', '.js', '/index.ts', '/index.tsx'];
+export const pathExists = (root, value, listed = null) =>
+    MODULE_EXTENSIONS.some((ext) => {
+        const target = value + ext;
+        if (listed === null || listed.has(target)) return existsSync(path.join(root, target));
+        return ext === '' && holdsListedFile(root, listed, target);
+    });
+
+/**
+ * `:12` or `:12-20` closing a path token or the name of a file at the root: a pointer into a file's
+ * lines, which move with every edit.
+ */
+const LINE_POINTER = /:\d+(?:-\d+)?$/;
+
+/**
+ * A file at the repository root, the one place a pointer has no directory (`name.ext:12`), so
+ * classifyToken never calls it a path. Like pathExists, a file counts when git lists it and it is on
+ * disk, and without a file list the disk alone decides. A name with a slash is no root file, and a
+ * folder is no file: a host with a port (`server:3000`) stays alone even where a `server/` folder
+ * exists. One stat, never an existence check first: that two-step form is a file-system race.
+ */
+const isRootFile = (root, name, listed) => {
+    if (name.includes('/') || (listed !== null && !listed.has(name))) return false;
+    try {
+        return statSync(path.join(root, name)).isFile();
+    } catch {
+        return false;
+    }
+};
+
+export const checkPathsAndScripts = ({ docs, root, scripts, topDirs, listed = null }) => {
     const findings = [];
     const families = scriptFamilies(scripts);
     for (const [file, text] of docs) {
-        if (HISTORY_FILES.includes(file)) continue;
+        // A history entry may name a script as it stood when the decision was taken; its paths must resolve.
+        const history = HISTORY_FILES.includes(file);
         for (const { token, line } of extractTokens(text)) {
             const { kind, value } = classifyToken(token, { topDirs, families });
-            if (kind === 'family' && !Object.keys(scripts).some((name) => name.startsWith(value))) {
+            const citesLine = LINE_POINTER.test(token.replace(/[:,.]+$/, ''));
+            if (
+                citesLine &&
+                (kind === 'path' || (kind === 'other' && isRootFile(root, value, listed)))
+            ) {
+                findings.push(
+                    `${file}:${line}: \`${token}\` cites a line number — name the symbol instead, a line moves with every edit`
+                );
+            }
+            if (kind === 'path') {
+                if (!pathExists(root, value, listed)) {
+                    findings.push(`${file}:${line}: \`${token}\` does not exist in the tree`);
+                }
+            } else if (
+                !history &&
+                kind === 'family' &&
+                !Object.keys(scripts).some((name) => name.startsWith(value))
+            ) {
                 findings.push(
                     `${file}:${line}: \`${token}\` names a script family that package.json does not have`
                 );
-            } else if (kind === 'script' && !(value in scripts)) {
+            } else if (!history && kind === 'script' && !(value in scripts)) {
                 findings.push(
                     `${file}:${line}: \`${token}\` names an npm script that package.json does not have`
                 );
-            } else if (kind === 'path' && !pathExists(root, value)) {
-                findings.push(`${file}:${line}: \`${token}\` does not exist in the tree`);
             }
         }
     }
@@ -621,25 +718,100 @@ export const checkSectionPointers = ({ docs }) => {
     return findings;
 };
 
-/** Every tracked (or about-to-be-tracked) .md/.mdc file, for the pointer check; the doc lists when git is absent. */
-export const listMarkdownFiles = (root) => {
-    let listed;
-    try {
-        listed = execFileSync(
-            'git',
-            ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
-            {
-                cwd: root,
-                encoding: 'utf8',
-                stdio: ['ignore', 'pipe', 'pipe']
-            }
-        )
-            .split('\0')
-            .filter(Boolean);
-    } catch {
-        return listDocFiles(root);
+/**
+ * The shape of DECISIONS.md, the file that holds only the decisions true today. Its index is a
+ * markdown table before the first entry (under a heading named Index, or none): one row per entry
+ * heading and one heading per row, compared as the row repeats it, without the `[YYYY-MM]` prefix
+ * and with the words spaced once. An entry is the lines from its `##` heading to the next `##`
+ * heading, and holds at most DECISION_ENTRY_MAX_LINES lines after the heading, trailing blank lines
+ * not counted. Without the cap an entry grows into the log the file says it is not; without the row
+ * check the index stops being the one place that lists what is decided.
+ */
+export const DECISION_ENTRY_MAX_LINES = 30;
+const TABLE_RULE = /^:?-+:?$/;
+const entryTitle = (raw) => raw.replace(DATE_PREFIX, '').replace(/\s+/g, ' ').trim();
+const isIndexHeading = ({ title }) => title.toLowerCase() === 'index';
+
+/** The data rows of the markdown tables above line `end`: the first cell, its line, header and rule rows left out. */
+const indexRows = (lines, end) => {
+    const rows = [];
+    let inTable = false;
+    for (let index = 0; index < end; index += 1) {
+        const row = lines[index].trim();
+        if (!row.startsWith('|')) {
+            inTable = false;
+            continue;
+        }
+        const cells = row
+            .replace(/^\|/, '')
+            .replace(/\|$/, '')
+            .split(/(?<!\\)\|/)
+            .map((cell) => cell.trim());
+        if (!inTable) {
+            inTable = true;
+        } else if (!cells.every((cell) => TABLE_RULE.test(cell))) {
+            rows.push({ title: entryTitle(cells[0].replaceAll('\\|', '|')), line: index });
+        }
     }
-    return [...new Set(listed)].filter((file) => {
+    return rows;
+};
+
+export const checkDecisionShape = ({ docs }) => {
+    const findings = [];
+    for (const [file, text] of docs) {
+        if (!HISTORY_FILES.includes(file)) continue;
+        const raw = text.split('\n');
+        const lines = outsideFences(text);
+        const headings = [];
+        lines.forEach((line, index) => {
+            const match = HEADING_LINE.exec(line);
+            if (match?.[1].length === 2)
+                headings.push({ line: index, title: entryTitle(match[2]) });
+        });
+        const found = [];
+        headings.forEach((heading, position) => {
+            if (isIndexHeading(heading)) return;
+            let last = (headings[position + 1]?.line ?? raw.length) - 1;
+            while (last > heading.line && raw[last].trim() === '') last -= 1;
+            const length = last - heading.line;
+            if (length > DECISION_ENTRY_MAX_LINES) {
+                found.push({
+                    line: heading.line,
+                    message: `entry "${heading.title}" runs ${String(length)} lines after its heading, over the cap of ${String(DECISION_ENTRY_MAX_LINES)} — keep what is true today and point at the evidence for the rest`
+                });
+            }
+        });
+        const entries = headings.filter((heading) => !isIndexHeading(heading));
+        const unmatched = indexRows(lines, entries[0]?.line ?? lines.length);
+        for (const entry of entries) {
+            const row = unmatched.findIndex(({ title }) => title === entry.title);
+            if (row === -1) {
+                found.push({
+                    line: entry.line,
+                    message: `entry "${entry.title}" has no row in the index table — add one that repeats the heading without its [YYYY-MM] prefix`
+                });
+            } else {
+                unmatched.splice(row, 1);
+            }
+        }
+        for (const row of unmatched) {
+            found.push({
+                line: row.line,
+                message: `index row "${row.title}" names no entry — a row repeats an entry heading without its [YYYY-MM] prefix; fix or drop it`
+            });
+        }
+        found.sort((a, b) => a.line - b.line);
+        findings.push(
+            ...found.map(({ line, message }) => `${file}:${String(line + 1)}: ${message}`)
+        );
+    }
+    return findings;
+};
+
+/** Every tracked (or about-to-be-tracked) .md/.mdc file, for the pointer check; the doc lists when git is absent. */
+export const listMarkdownFiles = (root, listed = listRepoFiles(root)) => {
+    if (listed === null) return listDocFiles(root);
+    return [...listed].filter((file) => {
         if (!DOC_EXTENSIONS.has(path.extname(file))) return false;
         const absolute = path.join(root, file);
         return existsSync(absolute) && statSync(absolute).isFile();
@@ -1015,6 +1187,8 @@ export const listTestFiles = (root) => {
  *               test.step.skip; testInfo.skip, fixme and fail; { annotation: { type: 'skip' } } (also
  *               'fixme' and 'fail') in the details of a test or of a describe
  *   node:test   .skip .todo .expectFailure; { skip, todo, expectFailure, only }; t.skip, t.todo
+ * A Jest name the file declares for itself (`function fit(`, `const fit =`) is its own helper and is
+ * not read; one it imports or destructures still is, because it may be the Jest global.
  * A `.todo` with a title alone is a placeholder for a test nobody wrote and hides no body, so it is
  * not a switch; with a body, on the test context or as an option it is one. In `skip(a, b)` a second
  * argument that is not a string says `a` is a title and `b` its body, whatever `a` looks like.
@@ -1068,6 +1242,13 @@ const CHAIN_TAIL = /((?:\.[A-Za-z_$][\w$]*)*)\s*([(`])/y;
 const TABLE_CHAIN = /(?:^|\.)(?:each|for)$/;
 /** The Jest names that carry the modifier themselves: `xit`, `fdescribe` and a table of either. */
 const PREFIXED_CALL = /(?<![\w$.])(xit|xtest|xdescribe|fit|fdescribe)(?=\(|\.(?:each|failing)\b)/g;
+/**
+ * A Jest name the file declares for itself (`function fit(`, `const fit =`) is that file's helper, not
+ * the Jest global, so neither its declaration nor its calls are test declarations. An import or a
+ * destructured binding is not read as a declaration: it may be the Jest global, so it stays reported.
+ */
+const OWN_PREFIXED_NAME =
+    /\b(?:function|const|let|var|class)\s+(xit|xtest|xdescribe|fit|fdescribe)\b/g;
 /** A call that declares a test or a suite, with the modifiers written before its parenthesis. */
 const DECLARATION = /(?<![\w$.])(?:test|it|describe|suite)((?:\.[A-Za-z_$][\w$]*)*)\s*\(/g;
 const OPTION_KEY = /(?<![\w$.])(skip|todo|fails|expectFailure|only)\s*:([^,}]*)/g;
@@ -1272,7 +1453,10 @@ export const findSwitchedOff = (text) => {
         const hit = modifierHit(text, match);
         if (hit !== null) hits.push(hit);
     }
+    const ownNames = new Set();
+    for (const match of text.matchAll(OWN_PREFIXED_NAME)) ownNames.add(match[1]);
     for (const match of text.matchAll(PREFIXED_CALL)) {
+        if (ownNames.has(match[1])) continue;
         const hit = { index: match.index, label: match[1] };
         hits.push(
             match[1].startsWith('f') ? { ...hit, focused: true } : { ...hit, unconditional: true }
@@ -1348,26 +1532,45 @@ const TEST_CALL = /(?<![.\w])(?:test|it)\s*\(/g;
  * becomes checkable: a suite over its ceiling is a finding, and so is a ceiling more than twice the
  * measurement, because a ceiling that far above the number stops flagging anything.
  */
+const measureSuite = (root, suite) => {
+    const dir = path.join(root, suite.dir);
+    if (!existsSync(dir)) return null;
+    const pattern = new RegExp(suite.match);
+    const files = listFilesRecursively(dir).filter((file) => pattern.test(file));
+    if (suite.count === 'files') return { measured: files.length, unit: 'file(s)' };
+    const calls = files.reduce(
+        (total, file) => total + (readFileSync(file, 'utf8').match(TEST_CALL)?.length ?? 0),
+        0
+    );
+    return { measured: calls, unit: 'test(s)' };
+};
+
+/** What each suite measures against its ceiling, one line a run (`suites.e2e: 9 test(s) of 10`), so the number is read here and never typed into gate-tiers.json. */
+export const suiteNotes = ({ root, suites }) =>
+    Object.entries(suites).flatMap(([label, suite]) => {
+        if (label.startsWith('_')) return [];
+        const result = measureSuite(root, suite);
+        if (result === null) return [];
+        return [
+            `suites.${label}: ${String(result.measured)} ${result.unit} of ${String(suite.max)}`
+        ];
+    });
+
 export const checkSuiteBudgets = ({ root, suites }) => {
     const findings = [];
     for (const [label, suite] of Object.entries(suites)) {
         if (label.startsWith('_')) continue;
-        const dir = path.join(root, suite.dir);
-        if (!existsSync(dir)) {
+        if ('_measured' in suite) {
+            findings.push(
+                `gate-tiers.json § suites.${label}._measured: a hand-written measurement goes stale unseen — delete the key; docs:check prints the measurement on every run`
+            );
+        }
+        const result = measureSuite(root, suite);
+        if (result === null) {
             findings.push(`gate-tiers.json § suites.${label}: \`${suite.dir}\` does not exist`);
             continue;
         }
-        const pattern = new RegExp(suite.match);
-        const files = listFilesRecursively(dir).filter((file) => pattern.test(file));
-        const measured =
-            suite.count === 'files'
-                ? files.length
-                : files.reduce(
-                      (total, file) =>
-                          total + (readFileSync(file, 'utf8').match(TEST_CALL)?.length ?? 0),
-                      0
-                  );
-        const unit = suite.count === 'files' ? 'file(s)' : 'test(s)';
+        const { measured, unit } = result;
         if (measured > suite.max) {
             findings.push(
                 `gate-tiers.json § suites.${label}: ${String(measured)} ${unit} in \`${suite.dir}\` over the ceiling of ${String(suite.max)} — fold the new case into an existing invariant, or raise the ceiling with a measurement and a DECISIONS.md line`
@@ -1591,6 +1794,186 @@ export const checkGateChains = ({ checks, scripts }) => {
     return findings;
 };
 
+/** The words of a command; a quoted stretch stays inside its word, so `-t "a b"` and `NAME="a b"` are two words. */
+const COMMAND_WORD = /(?:[^\s"']|"(?:[^"\\]|\\.)*"|'[^']*')+/g;
+/** What ends a command inside a script: `&&`, `||`, `;` or a newline, but not the same characters inside quotes. */
+const COMMAND_END = /"(?:[^"\\]|\\.)*"|'[^']*'|(?<end>&&|\|\||[;\n])/g;
+const ASSIGNMENT_WORD = /^[A-Za-z_][A-Za-z0-9_]*=/;
+/** Commands that only start another one: `cross-env A=1 vitest`, `env A=1 vitest`, `npx vitest`. */
+const LAUNCHERS = new Set(['cross-env', 'env', 'npx']);
+/** The verbs of `npm run x` and `npm test` in the spellings npm documents (npm-run, npm-test). */
+const NPM_RUN_VERBS = new Set(['run', 'run-script', 'rum', 'urn']);
+const NPM_TEST_VERBS = new Set(['test', 'tst', 't']);
+
+/** The commands of one script line, each ended where the shell would end it. */
+const splitCommands = (line) => {
+    const commands = [];
+    let start = 0;
+    for (const match of line.matchAll(COMMAND_END)) {
+        if (match.groups.end === undefined) continue;
+        commands.push(line.slice(start, match.index));
+        start = match.index + match[0].length;
+    }
+    commands.push(line.slice(start));
+    return commands.map((command) => command.trim()).filter((command) => command.length > 0);
+};
+
+/** The words of a command with what only launches it taken off: `NAME=value` words, then `cross-env`, `env` or `npx` with its flags, as often as they stack. */
+const lookThrough = (command) => {
+    const words = command.match(COMMAND_WORD) ?? [];
+    for (;;) {
+        while (ASSIGNMENT_WORD.test(words[0] ?? '')) words.shift();
+        if (!LAUNCHERS.has(path.posix.basename(words[0] ?? ''))) return words;
+        words.shift();
+        while (words[0]?.startsWith('-')) words.shift();
+    }
+};
+
+/**
+ * The script an npm step runs (`npm run x`, `npm run-script x`, `npm test`, `npm t`; npm's own flags
+ * such as `--silent` are skipped) and the arguments it hands to that script: the words after its
+ * `--`. A flag before the `--` is npm's own and never reaches the script. Null for any other command.
+ */
+const npmHop = (command) => {
+    const words = lookThrough(command);
+    if (words[0] !== 'npm') return null;
+    const dash = words.indexOf('--');
+    const own = (dash === -1 ? words : words.slice(0, dash)).slice(1);
+    const [verb, script] = own.filter((word) => !word.startsWith('-'));
+    let target;
+    if (NPM_TEST_VERBS.has(verb)) target = 'test';
+    else if (NPM_RUN_VERBS.has(verb)) target = script;
+    if (target === undefined) return null;
+    return { script: target, passed: dash === -1 ? [] : words.slice(dash + 1) };
+};
+
+/**
+ * The commands the gate scripts run, each with the package.json script that holds it and the
+ * checks that reach it. Every script counts as registered here, so `scriptSteps` only unwraps the
+ * tracer and splits on `&&`; a command also ends at `||`, `;` and a newline (`splitCommands`).
+ * Each `npm run` step is followed to its script, and the arguments it passes after its own `--`
+ * land where npm puts them, on the end of that script's LAST command (the line npm builds is
+ * `<script> <arguments>`, so in `a && b` only `b` takes them). That command is judged as it runs
+ * (`judged`) and reported on the step that passes the arguments (`holder`, `command`), the line
+ * the reader has to change.
+ */
+const gateCommands = ({ checks, scripts }) => {
+    const literal = new Set(Object.keys(scripts));
+    const found = new Map();
+    const record = (holder, command, judged, check) => {
+        const key = `${holder}\0${command}\0${judged}`;
+        if (!found.has(key)) found.set(key, { holder, command, judged, from: new Set() });
+        found.get(key).from.add(check);
+    };
+    for (const check of Object.keys(checks)) {
+        const seen = new Set();
+        /* `carry` is what the step that led here handed over: the arguments, and that step's script
+           and text; null when it handed over none. */
+        const visit = (name, carry, depth) => {
+            const visited = `${name}\0${carry?.args.join(' ') ?? ''}`;
+            if (typeof scripts[name] !== 'string' || seen.has(visited) || depth > MAX_ALIAS_HOPS) {
+                return;
+            }
+            seen.add(visited);
+            const steps = scriptSteps({ scripts, name, registered: literal }).flatMap(
+                splitCommands
+            );
+            steps.forEach((step, index) => {
+                const takesArgs = carry && index === steps.length - 1;
+                const judged = takesArgs ? [step, ...carry.args].join(' ') : step;
+                const hop = npmHop(judged);
+                if (hop) {
+                    const next = { args: hop.passed, holder: name, command: judged };
+                    visit(hop.script, hop.passed.length > 0 ? next : null, depth + 1);
+                } else if (takesArgs) {
+                    record(carry.holder, carry.command, judged, check);
+                } else {
+                    record(name, step, step, check);
+                }
+            });
+        };
+        visit(check, null, 0);
+    }
+    return [...found.values()];
+};
+
+/** The tool a command runs and its arguments; what only launches it (see lookThrough) and the path to a binary are looked through. */
+const toolOf = (command) => {
+    const words = lookThrough(command);
+    return { tool: path.posix.basename(words[0] ?? ''), args: words.slice(1) };
+};
+
+/** What a flag ends on, as `--flag=v` or `--flag v` (a tool reads the last one); null when the flag is absent, '' when nothing follows it. */
+const lastValue = (args, flag) => {
+    let value = null;
+    args.forEach((arg, index) => {
+        if (arg === flag) value = args[index + 1] ?? '';
+        else if (arg.startsWith(`${flag}=`)) value = arg.slice(flag.length + 1);
+    });
+    return value;
+};
+
+const WATCH_FLAG = /^--watch(?:All)?(?:=true)?$/;
+/** Per tool, what a gate command must carry; each rule answers with the problem, or null. */
+const STRICT_FLAGS = new Map([
+    [
+        'eslint',
+        (args) => {
+            const value = lastValue(args, '--max-warnings');
+            if (value === '0') return null;
+            return value
+                ? `uses --max-warnings ${value} (the last one counts), so a lint warning passes the gate`
+                : 'lacks --max-warnings 0, so a lint warning passes the gate';
+        }
+    ],
+    [
+        'oxlint',
+        (args) =>
+            args.includes('--deny-warnings')
+                ? null
+                : 'lacks --deny-warnings, so a lint warning passes the gate'
+    ],
+    [
+        'vitest',
+        (args) =>
+            args.includes('run') || args.includes('--run')
+                ? null
+                : 'is not run-once (`vitest run`), so the gate would start watch mode'
+    ],
+    [
+        'jest',
+        (args) =>
+            args.some((arg) => WATCH_FLAG.test(arg))
+                ? 'runs in watch mode, so the gate would never finish'
+                : null
+    ]
+]);
+
+/**
+ * The strict flags of the gate. `checks.<name>.chain` compares package.json with a view derived
+ * from package.json, so a flag dropped from the script is dropped from the view the same way and
+ * both equality checks pass. This reads the commands themselves: every command of a script that is
+ * a gate check, or that an `npm run` step reaches from one, keeps the flags of STRICT_FLAGS, and
+ * `--passWithNoTests`, which turns "no test found" into a pass, stays inside the iterate chain
+ * (`iterate` is that check's name). What a `node scripts/*.mjs` step spawns is not read.
+ */
+export const checkGateFlags = ({ checks, scripts, iterate = 'verify:iter' }) => {
+    const findings = [];
+    for (const { holder, command, judged, from } of gateCommands({ checks, scripts })) {
+        const { tool, args } = toolOf(judged);
+        const problems = [STRICT_FLAGS.get(tool)?.(args) ?? null];
+        if (args.includes('--passWithNoTests') && [...from].some((check) => check !== iterate)) {
+            problems.push(
+                `carries --passWithNoTests outside the iterate chain (${iterate}), so a gate that finds no test passes`
+            );
+        }
+        for (const problem of problems.filter(Boolean)) {
+            findings.push(`package.json § scripts.${holder}: \`${command}\` ${problem}`);
+        }
+    }
+    return findings;
+};
+
 /** The traced script a name leads to through `npm run` aliases (`verify` where it only aliases `verify:enterprise` is that one), else null. */
 const tracedScript = (scripts, name) => {
     let current = name;
@@ -1606,7 +1989,7 @@ const tracedScript = (scripts, name) => {
 };
 
 /** A traced script is a moment's entry point (`verify`, `verify:ci`), not a stage of the gate. */
-const isEntryPoint = (scripts, name) => tracedScript(scripts, name) !== null;
+const isMomentEntry = (scripts, name) => tracedScript(scripts, name) !== null;
 
 /** The stages of the gate: the steps of every `verify*` chain, less the entry points those chains call. */
 export const gateStages = ({ checks, scripts }) => {
@@ -1618,7 +2001,7 @@ export const gateStages = ({ checks, scripts }) => {
         if (steps.length < 2) continue;
         for (const step of steps) {
             const stage = stageName(step);
-            if (!isEntryPoint(scripts, stage)) stages.add(stage);
+            if (!isMomentEntry(scripts, stage)) stages.add(stage);
         }
     }
     return stages;
@@ -1990,8 +2373,9 @@ export const run = ({ root, today }) => {
         readFileSync(path.join(root, file), 'utf8')
     ]);
     const tracked = trackedFiles(root);
+    const listed = listRepoFiles(root);
     const topDirs = new Set(
-        tracked.filter((file) => file.includes('/')).map((file) => file.split('/')[0])
+        [...(listed ?? [])].filter((file) => file.includes('/')).map((file) => file.split('/')[0])
     );
     const homeText = docs
         .filter(([file]) => file === 'AGENTS.md' || file === 'README.md')
@@ -2028,9 +2412,19 @@ export const run = ({ root, today }) => {
         allowlist: ciConfig.rulesetContextAllowlist ?? []
     });
     const notes = [...rulesetCheck.notes];
+    /* Without a file list topDirs is empty, so no token is read as a path and the path and
+       line-pointer checks judge nothing, bar a pointer into a file at the root, which the disk
+       alone still answers. Say so, and keep the summary from claiming the check; the run does not
+       fail on the missing list (CI always has git, a tarball does not). */
+    const skipped = listed === null ? ['paths'] : [];
+    if (listed === null) {
+        notes.unshift(
+            'paths: SKIPPED — git could not list the files here (no .git, or a broken repository), so the path checks and line pointers into nested paths did not run; a line pointer into a file at the root is still judged, by what is on disk'
+        );
+    }
 
     const findings = [
-        ...checkPathsAndScripts({ docs, root, scripts, topDirs }),
+        ...checkPathsAndScripts({ docs, root, scripts, topDirs, listed }),
         ...checkSentinels({ docs, sentinels: docsConfig.sentinels ?? [] }),
         ...checkMemoryImports(root),
         ...checkVersions({
@@ -2045,15 +2439,21 @@ export const run = ({ root, today }) => {
         }),
         ...checkDeadDocs({ docs, extraText: workflowText }),
         ...checkSectionPointers({
-            docs: listMarkdownFiles(root).map((file) => [
+            docs: listMarkdownFiles(root, listed).map((file) => [
                 file,
                 readFileSync(path.join(root, file), 'utf8')
             ])
         }),
+        ...checkDecisionShape({ docs }),
         ...checkCiRunSteps({ workflows, allowedRunSteps: ciConfig.allowedRunSteps ?? [] }),
         ...checkPullRequestReadPermission({ workflows }),
         ...rulesetCheck.findings,
         ...checkGateChains({ checks, scripts }),
+        ...checkGateFlags({
+            checks,
+            scripts,
+            iterate: tiers.moments?.iterate?.expected?.[0] ?? 'verify:iter'
+        }),
         ...checkStageWords({ stages, stageWords }),
         ...checkChainRetelling({
             sources: retellingSources({ docs, workflows, hooks, tiersText }),
@@ -2066,7 +2466,10 @@ export const run = ({ root, today }) => {
         readFileSync(path.join(root, file), 'utf8')
     ]);
     findings.push(...checkQuarantine({ tests, today }));
-    if (tiers.suites) findings.push(...checkSuiteBudgets({ root, suites: tiers.suites }));
+    if (tiers.suites) {
+        findings.push(...checkSuiteBudgets({ root, suites: tiers.suites }));
+        notes.push(...suiteNotes({ root, suites: tiers.suites }));
+    }
 
     const pushLabel = tiers.moments?.push?.expected?.[0] ?? 'verify:push';
 
@@ -2115,8 +2518,25 @@ export const run = ({ root, today }) => {
         );
     }
 
-    return { findings, budget, notes };
+    return { findings, budget, notes, skipped };
 };
+
+/** What a run without a finding vouches for, as its summary line names it; `run` lists the ones it skipped. */
+const SUMMARY_CHECKS = [
+    'paths',
+    'scripts',
+    'sentinels',
+    'versions',
+    'command tables',
+    'dead docs',
+    'section pointers',
+    'decisions shape',
+    'quarantines',
+    'suite ceilings',
+    'agent-memory imports',
+    'gate chains',
+    'gate flags'
+];
 
 const main = () => {
     const argv = process.argv.slice(2);
@@ -2124,16 +2544,15 @@ const main = () => {
     const root = rootFlag === -1 ? process.cwd() : path.resolve(argv[rootFlag + 1]);
     const weekly = argv.includes('--weekly');
     const today = new Date().toISOString().slice(0, 10);
-    const { findings, budget, notes } = run({ root, today });
+    const { findings, budget, notes, skipped } = run({ root, today });
 
     console.log(`docs:check${weekly ? ' (weekly)' : ''}`);
     console.log(`  ${budget.message}`);
     for (const note of notes) console.log(`  ${note}`);
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {
-        console.log(
-            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, section pointers, quarantines, suite ceilings, agent-memory imports, gate chains'
-        );
+        const vouched = SUMMARY_CHECKS.filter((check) => !skipped.includes(check));
+        console.log(`  ✔ no mechanical drift: ${vouched.join(', ')}`);
         process.exit(0);
     }
     console.log(
@@ -2142,6 +2561,6 @@ const main = () => {
     process.exit(1);
 };
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

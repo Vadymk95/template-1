@@ -1,7 +1,9 @@
 {
     "extends": "./tsconfig.app.json",
     "compilerOptions": {
+        "incremental": true,
+        "tsBuildInfoFile": "./.tsbuild/vitest.tsbuildinfo",
         "types": ["vitest/globals", "vitest/importMeta"]
     },
-    "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.config.ts"]
+    "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.config.ts", "public/locales/**/*.json"]
 }

@@ -33,6 +33,8 @@
 
 Use the shadcn CLI; primitives land under `src/components/ui/`. `components.json` targets Tailwind v4 (no separate JS theme file).
 
+Entries in `ui/` stay lowercase, as the generator writes them (`src/components/ui/ui-casing.test.ts` fails on a PascalCase entry or two names that differ only by case): a wrapper goes in `components/common/<Name>/`, never in a `ui/<Name>/` folder.
+
 ## State Boundaries
 
 ```
@@ -70,17 +72,21 @@ app start → i18next init → loads common + errors + <current page ns>
 
 ```
 src/index.css — single source of truth for Tailwind v4:
-  @import "tailwindcss"    — base + utilities
-  @import "tw-animate-css" — animation utilities
-  @custom-variant dark     — class-based dark mode
-  @theme inline {}         — maps TW utility names → CSS variables
-  :root / .dark {}         — HSL design tokens
+  @import "tailwindcss" source(none) — base + utilities; automatic file detection is off
+  @source lines                      — what is scanned: src, minus *.test.* / *.spec.* and src/test
+  @import "tw-animate-css"           — animation utilities
+  @custom-variant dark               — class-based dark mode
+  @theme inline {}                   — maps TW utility names → CSS variables
+  :root / .dark {}                   — HSL design tokens
 ```
+
+Automatic class detection is off, so a new top-level folder that holds class names needs its own `@source` line
+(`SKELETONS.md` § Tailwind v4).
 
 Dark mode toggle: `src/hooks/theme/useTheme.ts`
 
 - Modes: `'light' | 'dark' | 'system'` (system follows OS preference)
-- Toggles `.dark` class on `<html>`, persists to `localStorage` key `"theme"`
+- Toggles `.dark` class on `<html>`, persists to `localStorage` key `"theme"`; a refused read or write falls back to `system` or a session-only theme and logs a warning
 - Usage: `const { theme, setTheme } = useTheme()`
 
 To change brand color: update `--primary` and `--primary-hover` HSL values in `:root` and `.dark`;
@@ -109,7 +115,7 @@ To update after MSW upgrade: `npx msw init public/`.
 
 | Path | Role |
 | --- | --- |
-| `e2e/support/geometry.ts` | Pure layout-invariant predicates (overflow, touch target, narrow wrapped label) + the control/field selectors. No Playwright import, so it is unit-testable and shared by two specs. |
+| `e2e/support/geometry.ts` | Pure layout-invariant predicates (overflow on both axes, touch target, narrow wrapped label) + the control/field selectors. No Playwright import, so it is unit-testable and shared by two specs. |
 | `e2e/support/measure.ts` | The in-page measurement, one definition shared by both geometry specs. Serialised into the page by Playwright, so it references nothing from module scope. |
 | `e2e/support/control-targets.ts` | The two kit sizes accepted below the 44px touch floor, each with a reason and an exit condition. A ratchet, not an amnesty. |
 | `e2e/support/cross-browser.ts` | Which specs run on every engine, and the `CROSS_BROWSER` switch. |

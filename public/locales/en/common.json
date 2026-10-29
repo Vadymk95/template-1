@@ -19,8 +19,6 @@
     "success": "Success",
     "navigation": {
         "home": "Home",
-        "about": "About",
-        "contact": "Contact",
         "dashboard": "Dashboard"
     },
     "theme": {

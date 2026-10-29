@@ -109,7 +109,7 @@ describe('logger', () => {
 
             logger.info('loaded', context);
 
-            const args = spies.info.mock.calls[0];
+            const args = spies.info.mock.calls[0]!;
             expect(args.at(-1)).toBe(context);
             expect(args).toHaveLength(5);
         });
@@ -119,7 +119,7 @@ describe('logger', () => {
 
             logger.error('plain');
 
-            const args = spies.error.mock.calls[0];
+            const args = spies.error.mock.calls[0]!;
             expect(args).toHaveLength(4);
             expect(args.at(-1)).toBe('plain');
         });
@@ -130,7 +130,7 @@ describe('logger', () => {
 
             logger.debug('empty', context);
 
-            expect(spies.debug.mock.calls[0].at(-1)).toBe(context);
+            expect(spies.debug.mock.calls[0]!.at(-1)).toBe(context);
         });
     });
 
@@ -151,7 +151,7 @@ describe('logger', () => {
 
             expect(spies.warn).toHaveBeenCalledTimes(1);
             expect(spies.warn.mock.calls[0]).toHaveLength(1);
-            expect(JSON.parse(spies.warn.mock.calls[0][0] as string)).toEqual({
+            expect(JSON.parse(spies.warn.mock.calls[0]![0] as string)).toEqual({
                 level: 'warn',
                 message: 'slow response',
                 context: { ms: 1200 },
@@ -167,7 +167,7 @@ describe('logger', () => {
 
             expect(spies.error).toHaveBeenCalledTimes(1);
             expect(spies.error.mock.calls[0]).toHaveLength(1);
-            expect(JSON.parse(spies.error.mock.calls[0][0] as string)).toEqual({
+            expect(JSON.parse(spies.error.mock.calls[0]![0] as string)).toEqual({
                 level: 'error',
                 message: 'request failed',
                 context: { status: 503 },
@@ -181,7 +181,7 @@ describe('logger', () => {
 
             logger.error('no context');
 
-            const entry = JSON.parse(spies.error.mock.calls[0][0] as string) as Record<
+            const entry = JSON.parse(spies.error.mock.calls[0]![0] as string) as Record<
                 string,
                 unknown
             >;
@@ -193,7 +193,7 @@ describe('logger', () => {
 
             logger.warn('plain text');
 
-            expect(spies.warn.mock.calls[0][0]).not.toContain('%c');
+            expect(spies.warn.mock.calls[0]![0]).not.toContain('%c');
         });
     });
 });

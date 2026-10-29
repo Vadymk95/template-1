@@ -19,6 +19,8 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));
 
 /** Pure plan builder so the step composition is testable without paying for a build. */
@@ -67,6 +69,6 @@ const main = () => {
     }
 };
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

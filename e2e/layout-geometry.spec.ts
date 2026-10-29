@@ -4,6 +4,7 @@ import { isAcceptedControlTarget } from './support/control-targets';
 import {
     CONTROL_SELECTOR,
     FIELD_SELECTOR,
+    hasBlockOverflow,
     hasContentOverflow,
     hasDocumentOverflow,
     hasInsufficientControlTarget,
@@ -95,6 +96,22 @@ for (const width of VIEWPORT_WIDTHS) {
                 ) {
                     violations.push(
                         `${route.name} | ${String(width)}px | ${element.selector} | overflow=${String(element.scrollWidth)}-${String(element.clientWidth)}`
+                    );
+                }
+
+                // The block axis: content taller than its box, which the width check above cannot see.
+                if (
+                    !element.isField &&
+                    hasBlockOverflow({
+                        clientHeight: element.clientHeight,
+                        display: element.display,
+                        fontSize: element.fontSize,
+                        overflowY: element.overflowY,
+                        scrollHeight: element.scrollHeight
+                    })
+                ) {
+                    violations.push(
+                        `${route.name} | ${String(width)}px | ${element.selector} | block-spill=${String(element.scrollHeight)}-${String(element.clientHeight)}`
                     );
                 }
 

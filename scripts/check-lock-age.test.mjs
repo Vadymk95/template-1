@@ -17,6 +17,7 @@ import {
     parseMinReleaseAge,
     run
 } from './check-lock-age.mjs';
+import { quietPort } from './quiet-ports.mjs';
 
 const { describe, it } = globalThis.describe ? globalThis : await import('node:test');
 
@@ -791,8 +792,9 @@ describe('the CLI against a real git history and a local registry', () => {
             response.writeHead(200, { 'content-type': 'application/json' });
             response.end(JSON.stringify({ time: docs[name] }));
         });
-        await new Promise((resolve) => {
-            server.listen(0, '127.0.0.1', resolve);
+        await new Promise((resolve, reject) => {
+            server.once('error', reject);
+            server.listen(quietPort('check-lock-age'), '127.0.0.1', resolve);
         });
         return {
             url: `http://127.0.0.1:${String(server.address().port)}`,
@@ -855,6 +857,17 @@ describe('the CLI against a real git history and a local registry', () => {
             JSON.stringify(lockWith(next(version)))
         );
     };
+
+    it('serves the registry from a port below every ephemeral range', async () => {
+        // `listen(0)` hands out an OS port from the ephemeral range, where parallel tests and the
+        // preflight's looks meet each other's sockets (scripts/quiet-ports.mjs).
+        const registry = await startRegistry({});
+        try {
+            assert.ok(Number(new URL(registry.url).port) < 32_768, registry.url);
+        } finally {
+            await registry.close();
+        }
+    });
 
     it('exits 1 on a young bump, naming the package and the cooldown', async () => {
         const root = makeRepo();

@@ -54,6 +54,8 @@ export default defineConfig({
     },
     use: {
         baseURL,
+        // `page.route` cannot see a request a service worker answers (MSW's does in dev).
+        serviceWorkers: 'block',
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
         video: usePreview ? 'retain-on-failure' : 'off'
@@ -107,6 +109,8 @@ export default defineConfig({
           }
         : {
               command: `npm run dev -- --host 127.0.0.1 --port ${String(port)} --strictPort`,
+              // MSW cannot start under blocked service workers: off, so no failed start is logged.
+              env: { VITE_ENABLE_MSW: 'false' },
               url: baseURL,
               reuseExistingServer: true,
               timeout: 120_000,

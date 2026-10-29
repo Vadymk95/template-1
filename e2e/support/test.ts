@@ -3,7 +3,8 @@ import { expect, test as base } from '@playwright/test';
 import {
     CSP_REPORT_FUNCTION,
     formatCspViolation,
-    isCspViolation,
+    isCspConsoleFinding,
+    isCspEventFinding,
     listenForCspViolations,
     type CspViolationEvent
 } from './csp-guard';
@@ -18,6 +19,10 @@ import {
  * is forwarded to Node through an exposed function, which survives navigations, unlike an array
  * kept on `window`.
  *
+ * One engine-specific exclusion, decided per engine in `./csp-guard.ts` (`isCspEventFinding`,
+ * `isCspConsoleFinding`): WebKit reports its own native `<select>` as a refused inline style, which
+ * is not a finding. Every other violation still fails the test in every engine.
+ *
  * Under `vite preview` the policy is the shipped one (`vite-plugins/security-headers.ts`), so a
  * change that needs something the policy forbids (an inline script, a third-party font, a new API
  * origin) turns red here instead of in production. Against the dev server there is no policy and
@@ -25,15 +30,17 @@ import {
  */
 export const test = base.extend<{ cspGuard: undefined }>({
     cspGuard: [
-        async ({ page }, use) => {
+        async ({ page, browserName }, use) => {
             const violations: string[] = [];
             page.on('console', (message) => {
-                if (isCspViolation(message.type(), message.text())) {
+                if (isCspConsoleFinding(browserName, message.type(), message.text())) {
                     violations.push(message.text());
                 }
             });
             await page.exposeFunction(CSP_REPORT_FUNCTION, (event: CspViolationEvent) => {
-                violations.push(formatCspViolation(event));
+                if (isCspEventFinding(browserName, event)) {
+                    violations.push(formatCspViolation(event));
+                }
             });
             await page.addInitScript(listenForCspViolations, CSP_REPORT_FUNCTION);
 

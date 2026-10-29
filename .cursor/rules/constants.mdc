@@ -50,5 +50,5 @@ export type Status = (typeof STATUS)[keyof typeof STATUS];
 
 - ❌ `enum` — use `as const` + type derivation instead.
 - ❌ Duplicated string literals across files.
-- ❌ Magic numbers in business logic without named constants.
+- ❌ Magic numbers in business logic without named constants. A numeric literal type declared as an alias (`type Gap = 3 | 5`) is not counted; the same union written inline in a property type (`max?: 4 | 5`) still is, so name it as an alias.
 - ❌ Boolean flags as function params — use options object or named constants.

@@ -7,7 +7,12 @@
 // `new Function` under a CSP that forbids it. The unit test of the module cannot see that, because
 // Vitest does not tree-shake. This test bundles a consumer that builds a schema while it loads, with
 // the tree-shaking settings of `vite.config.ts`, and reads the output.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+//
+// The mutation tester copies the project into a sandbox and instruments `src/lib/zod.ts` there, so this
+// test reads a rewritten file when the scheduled mutation job runs it. The instrumented call is wrapped in
+// mutant switches and no longer matches, so the dry run fails before a single mutant is scored. The call
+// therefore carries a disable directive; the second test below keeps it from being dropped.
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -72,4 +77,20 @@ describe('zod in the production bundle', () => {
         expect(schema, 'the consumer schema is not in the bundle').not.toBeNull();
         expect(call?.index).toBeLessThan(schema?.index ?? -1);
     }, 60_000);
+});
+
+describe('zod under the mutation tester', () => {
+    it('tells it to leave the jitless call as written, because the bundle test reads that call as text', () => {
+        const source = readFileSync(ZOD_MODULE, 'utf8');
+        const call = /z\.config\(\s*\{\s*jitless:\s*true\s*\}\s*\)/.exec(source);
+
+        expect(call, 'the jitless call is not in src/lib/zod.ts').not.toBeNull();
+
+        const lineAbove = source
+            .slice(0, call?.index ?? 0)
+            .trimEnd()
+            .split('\n')
+            .at(-1);
+        expect(lineAbove).toMatch(/Stryker disable next-line all/);
+    });
 });

@@ -24,6 +24,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { resolveLogPath } from './gate-trace.mjs';
+import { isEntryPoint } from './is-entry-point.mjs';
 
 const EXIT_CODE_PATTERN = /^-?\d+$/;
 const LOG_FIELD_NAMES = [
@@ -270,6 +271,6 @@ const main = () => {
     }
 };
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

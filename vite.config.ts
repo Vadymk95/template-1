@@ -127,6 +127,13 @@ export default defineConfig(({ command, mode }) => ({
                 codeSplitting: {
                     groups: [
                         {
+                            // zod is about three times the size of the app code in the entry chunk
+                            // (brotli), so left inside it the entry budget measured zod, not the app.
+                            // Apart, an app change and a zod bump each move their own budget.
+                            name: 'schema-vendor',
+                            test: /[\\/]node_modules[\\/](?:\.pnpm[\\/][^\\/]+[\\/]node_modules[\\/])?zod[\\/]/
+                        },
+                        {
                             name: 'state-vendor',
                             test: /[\\/]node_modules[\\/](?:\.pnpm[\\/][^\\/]+[\\/]node_modules[\\/])?(?:zustand[\\/]|@tanstack[\\/]react-query[\\/]|@tanstack[\\/]query-core[\\/])/
                         },

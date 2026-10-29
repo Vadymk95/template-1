@@ -184,6 +184,19 @@ export const git = (cwd, ...args) =>
         { cwd, env: gitEnvironment(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
     ).trim();
 
+// The checker passes `--no-renames`, `--no-prefix`, `--no-color` and `-c core.quotepath=off` so its
+// answer does not depend on the machine it runs on. A test guards such a flag only while git would
+// otherwise do the opposite, and that depends on the developer's global config: under
+// `diff.renames=false` a deleted `--no-renames` passes the suite unseen. Each fixture repository
+// therefore sets what every flag overrides; repo-local config beats the global one, and the
+// checker's own git reads it too.
+const GIT_DEFAULTS = [
+    ['diff.renames', 'true'],
+    ['diff.noprefix', 'false'],
+    ['core.quotepath', 'true'],
+    ['color.diff', 'always']
+];
+
 export const tempRoots = [];
 
 // Registered on import: the repositories a test created are removed after that test.
@@ -198,6 +211,7 @@ export const createRepo = (files = BASE_FILES) => {
     const root = mkdtempSync(path.join(tmpdir(), 'gate-integrity-'));
     tempRoots.push(root);
     git(root, 'init', '-q', '--initial-branch=main');
+    for (const [key, value] of GIT_DEFAULTS) git(root, 'config', key, value);
     const repo = {
         root,
         commit: (changes, message = 'change') => {

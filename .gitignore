@@ -23,6 +23,8 @@ reports
 .eslintcache
 .prettiercache
 *.tsbuildinfo
+# TypeScript incremental state: one build-info file per tsconfig project, kept outside node_modules
+.tsbuild/
 
 # Environment variables
 .env

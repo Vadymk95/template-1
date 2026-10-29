@@ -17,6 +17,8 @@
  */
 import { spawnSync } from 'node:child_process';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 /**
  * Vitest's own wording, copied from a measured run rather than guessed. Both halves must be present:
  * "Failed to parse" alone also appears in ordinary test failures.
@@ -68,6 +70,6 @@ const main = () => {
 };
 
 // Guarded so importing this module for a test does not run the suite.
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

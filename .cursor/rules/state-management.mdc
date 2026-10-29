@@ -49,6 +49,7 @@ useUserStore.use.username()       // auto-selector via createSelectors
 - **Config root**: `src/lib/queryClient.ts` — configure `defaultOptions` here (retry, staleTime, etc.).
 - **Query hooks**: in `src/hooks/<domain>/` — wrapping API functions from `src/lib/api/`.
 - **Query keys**: Use factory pattern — always arrays, never strings.
+- **Multi-tenant apps**: put the membership or tenant id first in every query key; handle a 401 once, at the transport (`src/lib/api/`), not per query; drop the whole cache (`queryClient.clear()`) when the active membership changes and on logout. The starter ships none of the three.
 - **Mutations**: `onSuccess` → invalidate or update cache. `onError` → log with context.
 
 ## 4. Integration Rules

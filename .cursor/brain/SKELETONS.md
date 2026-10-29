@@ -7,6 +7,11 @@
 - Adding TW config file will conflict with `@tailwindcss/vite` plugin
 - Dark mode is `@custom-variant dark`, NOT `darkMode: 'class'` in JS config
 - `container` is no longer configured via JS — apply utilities directly
+- Class detection is an allowlist: `src/index.css` turns automatic detection off and `@source` lines name what
+  is scanned (`src/` minus tests and test helpers), so a class quoted in a test, a script or a doc page ships no
+  CSS. A new top-level folder that holds class names needs its own `@source` line, or its utilities silently do
+  not ship; so does `index.html` the day it carries a utility class. `scripts/tailwind-sources.test.mjs` pins the
+  lines.
 
 ## i18n Init Race
 
@@ -103,8 +108,10 @@ CI and lint-staged also run **Oxlint** (`.oxlintrc.json`) before ESLint — fast
   (tests included), so the order modules load in cannot matter; `scripts/lint-guards.test.mjs` pins the rule.
   The production build would drop that module, which only re-exports `z`, under `treeshake.moduleSideEffects:
   false`, and the call with it; `vite.config.ts` exempts `src/lib/zod.ts` (`hasSideEffects`) and
-  `scripts/zod-config-bundle.test.mjs` builds a consumer and fails if the call is missing. Moving the file means
-  editing both. Never add `'unsafe-eval'` to the policy.
+  `scripts/zod-config-bundle.test.mjs` builds a consumer and fails if the call is missing. The mutation job
+  instruments that file in its sandbox and the same test reads the call as text, so the call carries a
+  `Stryker disable next-line all` directive (a second test fails without it) that moves with the file. Moving
+  the file means editing both. Never add `'unsafe-eval'` to the policy.
 
 ## Known deviation: a `<button>` nested inside a `<NavLink>`
 

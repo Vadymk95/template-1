@@ -1,5 +1,5 @@
 import { fireEvent, render } from '@testing-library/react';
-import { useEffect, useRef, type FunctionComponent } from 'react';
+import { StrictMode, useEffect, useRef, type FunctionComponent } from 'react';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
@@ -64,5 +64,40 @@ describe('useRouteFocus', () => {
             fireEvent.blur(main);
         }
         expect(main).not.toHaveAttribute('data-route-focus');
+    });
+
+    // The dev server renders the app inside StrictMode (`src/main.tsx`), which runs each effect on
+    // mount, cleans it up and runs it again. A hook that tells its first run apart with a flag reads
+    // that replay as a navigation and pulls focus to the main landmark on the first load, in
+    // development only, where the tests above never render it.
+    describe('under StrictMode, as the dev server renders it', () => {
+        it('does not move focus on the first load', () => {
+            render(
+                <StrictMode>
+                    <MemoryRouter initialEntries={['/']}>
+                        <Routes>
+                            <Route path="/" element={<Harness />} />
+                        </Routes>
+                    </MemoryRouter>
+                </StrictMode>
+            );
+
+            expect(document.activeElement).toBe(document.body);
+        });
+
+        it('still moves focus to the main landmark after a route change', () => {
+            render(
+                <StrictMode>
+                    <MemoryRouter initialEntries={['/']}>
+                        <Routes>
+                            <Route path="/" element={<Harness navigateTo="/next" />} />
+                            <Route path="/next" element={<Harness />} />
+                        </Routes>
+                    </MemoryRouter>
+                </StrictMode>
+            );
+
+            expect(document.activeElement).toBe(document.querySelector('[data-testid="main"]'));
+        });
     });
 });

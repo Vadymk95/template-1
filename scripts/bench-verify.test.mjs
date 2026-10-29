@@ -72,6 +72,28 @@ describe('parseVerifySteps', () => {
         }
     });
 
+    // `tsc -b` calls a project up to date from its root files alone, the ones `include` matches. A
+    // changed type file inside `node_modules` is not one of them, so a plain run stays green over a
+    // dependency whose types changed; `--force` re-checks every project. The push tiers pay for that
+    // once, the iterate chain runs per change and keeps the incremental run.
+    it('runs the forced type check in verify and verify:scaffold, the incremental one while iterating', () => {
+        const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+
+        expect(manifest.scripts['typecheck:force']).toBe('tsc -b --force');
+        for (const name of ['verify:inner', 'verify:scaffold']) {
+            const labels = parseVerifySteps(resolveScript(manifest.scripts, name)).map(
+                (step) => step.label
+            );
+            expect(labels, name).toContain('typecheck:force');
+            expect(labels, name).not.toContain('typecheck');
+        }
+
+        // The raw steps, not parsed ones: this chain ends in `vitest run`, a shape the benchmark refuses.
+        const iterate = resolveScript(manifest.scripts, 'verify:iter').split(/\s+&&\s+/);
+        expect(iterate, 'verify:iter').toContain('npm run typecheck');
+        expect(iterate, 'verify:iter').not.toContain('npm run typecheck:force');
+    });
+
     it('keeps the sibling-test range check inside verify and verify:scaffold, never only in the network tier', () => {
         // The raw script, not the parsed steps: the benchmark keeps only a step's file, never its flags.
         const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));

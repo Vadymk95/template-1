@@ -13,6 +13,8 @@
  */
 import { execFileSync } from 'node:child_process';
 
+import { isEntryPoint } from './is-entry-point.mjs';
+
 const CONFIGS = ['playwright.config.ts', 'playwright.dev.config.ts'];
 
 /**
@@ -115,6 +117,6 @@ const main = () => {
 };
 
 // Guarded so importing this module for a test does not shell out to Playwright.
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (isEntryPoint(import.meta.url)) {
     main();
 }

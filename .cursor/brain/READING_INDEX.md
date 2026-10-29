@@ -21,9 +21,14 @@ Why it exists: `AGENTS.md` § Start here.
   and which tokens govern them.
 - `npm run probe -- <route>` — LOOK at the result at three widths before reasoning about it; one
   measurement replaces a round of inference. It keeps classic scrollbars (Playwright's headless
-  default hides them) and prints their width as `scrollbar Npx`; a Mac shows overlay ones.
+  default hides them) and prints their width as `scrollbar Npx`; a Mac shows overlay ones. `--signed-in`
+  and `--theme=light|dark|system` reach a protected route or a theme; when the page lands on another route
+  the table says `requested X, landed on Y`; controls and headings are counted inside `main`, so a skeleton
+  behind the shell is not reported as rendered.
 - `.cursor/brain/SKELETONS.md` "Tailwind v4 — NO tailwind.config.ts" — the theme lives in CSS; a JS
   config is the wrong instinct here.
+- `.cursor/brain/EXTENSIONS.md` "Appendix — traps when a fork adds Storybook or a Radix-based UI kit" —
+  read it BEFORE adding a story runner or a Radix widget: what a fork measured, none of it exercised here.
 
 ## 3. About to add or change a page or a route
 

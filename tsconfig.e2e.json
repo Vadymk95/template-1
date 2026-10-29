@@ -1,0 +1,9 @@
+{
+    "extends": "./tsconfig.app.json",
+    "compilerOptions": {
+        "incremental": true,
+        "tsBuildInfoFile": "./.tsbuild/e2e.tsbuildinfo",
+        "types": ["node"]
+    },
+    "include": ["e2e/**/*.ts", "playwright.config.ts", "playwright.dev.config.ts"]
+}
