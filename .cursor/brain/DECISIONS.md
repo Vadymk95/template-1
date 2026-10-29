@@ -122,9 +122,12 @@ run that watches, or a "no tests found" pass is a gate that approves what it did
 the gate overrides (`diff.renames`, `diff.noprefix`, `core.quotepath`, `color.diff`). That config beats the
 developer's global one, and the gate's own git reads it too.
 
-**Why:** a flag's test is red on removal only while git would otherwise do the other thing. Measured under a global
-`diff.renames=false`: deleting `--no-renames`, `--no-prefix` or the quotepath override left the suite green; with
-the fixture defaults each deletion turns tests red.
+**Why:** a flag's test is red on removal only while git would otherwise do the other thing, and a developer's global
+config can make git do that thing on one machine only. Measured on a scratch copy of the checker, one flag deleted at
+a time, under a global config that agrees with the flags (`diff.renames=false`, `diff.noprefix=true`,
+`core.quotepath=false`): deleting `--no-renames`, `--no-prefix` or the quotepath override left the suite green; with
+the fixture defaults those deletions fail 2, 81 and 2 tests. Deleting `--no-color` fails 85 tests under the fixtures'
+`color.diff=always` and no global config; without that default it fails none, because git does not colour a pipe.
 
 **Evidence:** `scripts/check-gate-integrity.fixtures.mjs`.
 
@@ -132,8 +135,8 @@ the fixture defaults each deletion turns tests red.
 
 **Status:** in force.
 
-**Decision:** `scripts/check-hooks.mjs`, the first step of every gate chain, refuses an app whose folder is not the
-git root, CI included, and says so in three lines.
+**Decision:** `scripts/check-hooks.mjs`, the first step of `verify:iter`, `verify` and `verify:scaffold` (the other
+chains run those), refuses an app whose folder is not the git root, CI included, and says so in three lines.
 
 **Why:** the gate scripts read git paths relative to the repository root (staged names, the hooks path,
 `ref:path`). From a subfolder they match nothing and say nothing, and the hooks check itself resolved the hooks
@@ -907,8 +910,9 @@ reuses one handler list for Node and browser, and lets mocks be turned off witho
 The `import.meta.env.DEV` guard and the dynamic import must stay: dropping them ships the MSW chunk
 to production (the total-JS budget turns red). Playwright blocks service workers in both configs
 (`serviceWorkers: 'block'`, pinned by `e2e/support/playwright-config.test.ts`) because `page.route` cannot see a
-request a worker answers; under Playwright the worker then does not start on the dev server, which `main.tsx` logs
-as an error that no dev-server spec reads.
+request a worker answers. Playwright starts the dev server with `VITE_ENABLE_MSW=false` (pinned by the same test),
+because the worker cannot start under that block and `main.tsx` would log a failed start on every page; a dev server
+you started yourself and Playwright reuses (`reuseExistingServer`) still runs MSW and logs the failed start.
 
 **Evidence:** https://github.com/Vadymk95/template-1/commit/b6be82f
 

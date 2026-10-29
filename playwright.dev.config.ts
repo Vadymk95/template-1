@@ -67,6 +67,8 @@ export default defineConfig({
     ],
     webServer: {
         command: `npm run dev -- --host 127.0.0.1 --port ${String(PORT)} --strictPort`,
+        // MSW cannot start under blocked service workers: off, so no failed start is logged.
+        env: { VITE_ENABLE_MSW: 'false' },
         /*
          * A Vite dev server answers the SPA fallback before its module graph is warm, and this app also
          * hides the document while i18next loads, so "the port responds" is NOT "the fixture rendered".

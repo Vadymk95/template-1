@@ -46,4 +46,34 @@ describe.each(CONFIGS)('%s', (_file, load) => {
             );
         }
     });
+
+    // The block leaves the dev server's MSW worker unable to start: Playwright swaps
+    // `ServiceWorkerContainer.prototype.register` for a no-op, `worker.start()` rejects, and the
+    // app logs `[msw] Failed to start browser worker` on every page it serves. A dev server that
+    // Playwright starts therefore gets `VITE_ENABLE_MSW=false` in its own environment, which Vite
+    // reads from the process environment, so the worker is never asked to start. Playwright merges
+    // a webServer `env` over `process.env`; a dev server started by hand and attached through
+    // `reuseExistingServer` never sees it. Every server command has to be recognised as the dev or
+    // the preview server, so a renamed script cannot turn this case into one that checks nothing.
+    it.each(MODES)('starts the dev server with the MSW worker off in a $name', async ({ env }) => {
+        vi.resetModules();
+        for (const key of MODE_KEYS) vi.stubEnv(key, undefined);
+        for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+
+        const { webServer } = (await load()).default;
+        const servers = [webServer ?? []].flat();
+        const devServers = servers.filter(({ command }) => /\bnpm run dev\b/.test(command));
+        const unknownServers = servers.filter(
+            ({ command }) => !/\bnpm run (dev|preview)\b/.test(command)
+        );
+
+        expect(servers.length, 'the config starts a web server').toBeGreaterThan(0);
+        expect(
+            unknownServers.map(({ command }) => command),
+            'a web server command that is neither the dev nor the preview server'
+        ).toEqual([]);
+        for (const server of devServers) {
+            expect(server.env?.VITE_ENABLE_MSW, `dev server \`${server.command}\``).toBe('false');
+        }
+    });
 });

@@ -437,6 +437,33 @@ describe('the command line against a real repository', () => {
             expect(result.stderr).toContain('src/lib/added.ts');
             expect(result.stderr).not.toContain('src/lib/starter.ts');
         });
+
+        // The first-commit exemption is "HEAD does not resolve", and that is just as true of a
+        // folder that is no repository and of a repository whose index cannot be read. Both
+        // refusals have to come first: past them the gate would pass where it can see nothing.
+        it('refuses a folder outside any git repository, never reading it as a first commit', () => {
+            const outside = mkdtempSync(path.join(tmpdir(), 'test-siblings-outside-'));
+            repos.push(outside);
+
+            // The ceiling stops git from walking up out of the temp folder into a repository
+            // around it, which would be read as that repository's first commit.
+            const result = cli(outside, [], { GIT_CEILING_DIRECTORIES: path.dirname(outside) });
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toMatch(/not inside a git repository/);
+            expect(result.stdout).not.toMatch(/the first commit/);
+        });
+
+        it('refuses an index it cannot read, even before the first commit', () => {
+            const root = initRepo('test-siblings-index-');
+            write(root, '.git/index', 'not an index');
+
+            const result = cli(root);
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toMatch(/cannot read the git index/);
+            expect(result.stdout).not.toMatch(/the first commit/);
+        });
     });
 
     describe('range mode', () => {
