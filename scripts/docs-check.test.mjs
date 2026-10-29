@@ -223,6 +223,152 @@ describe('checkPathsAndScripts', () => {
                 'README.md:1: `scripts/missing.mjs:3` does not exist in the tree'
             ]);
         });
+
+        describe('into a file at the root', () => {
+            /** A throwaway folder holding the named empty files (nested names too); `check(root)` runs inside it. */
+            const withFiles = (names, check) => {
+                const root = mkdtempSync(path.join(tmpdir(), 'docs-check-root-'));
+                try {
+                    for (const name of names) {
+                        mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+                        writeFileSync(path.join(root, name), '');
+                    }
+                    check(root);
+                } finally {
+                    rmSync(root, { recursive: true, force: true });
+                }
+            };
+
+            it('is a finding on a file the root holds, in a doc and in a history file', () => {
+                const names = ['eslint.config.js', 'package.json'];
+                withFiles(names, (root) => {
+                    const docs = [
+                        ['AGENTS.md', 'the rules sit at `eslint.config.js:393`'],
+                        ['.cursor/brain/DECISIONS.md', 'read `package.json:12`']
+                    ];
+                    expect(judge(docs, { root, listed: new Set(names) })).toEqual([
+                        finding('AGENTS.md', 'eslint.config.js:393'),
+                        finding('.cursor/brain/DECISIONS.md', 'package.json:12')
+                    ]);
+                });
+            });
+
+            it('is a finding on a range into a file the root holds', () => {
+                const names = ['playwright.config.ts'];
+                withFiles(names, (root) => {
+                    const docs = [
+                        ['README.md', 'the projects start at `playwright.config.ts:49-60`']
+                    ];
+                    expect(judge(docs, { root, listed: new Set(names) })).toEqual([
+                        finding('README.md', 'playwright.config.ts:49-60')
+                    ]);
+                });
+            });
+
+            it('reads a leading ./ and a trailing colon as it does on a path', () => {
+                const names = ['package.json'];
+                withFiles(names, (root) => {
+                    const docs = [['AGENTS.md', 'see `./package.json:12` and `package.json:12:`']];
+                    expect(judge(docs, { root, listed: new Set(names) })).toEqual([
+                        finding('AGENTS.md', './package.json:12'),
+                        finding('AGENTS.md', 'package.json:12:')
+                    ]);
+                });
+            });
+
+            it('leaves a file the root holds alone when it is named without a line', () => {
+                const names = ['eslint.config.js', 'package.json'];
+                withFiles(names, (root) => {
+                    const docs = [['AGENTS.md', 'open `eslint.config.js` or `package.json`']];
+                    expect(judge(docs, { root, listed: new Set(names) })).toEqual([]);
+                });
+            });
+
+            it('leaves a host with a port, a specifier and a time alone', () => {
+                const names = ['package.json'];
+                withFiles(names, (root) => {
+                    const docs = [
+                        [
+                            'AGENTS.md',
+                            'serve on `localhost:3000` or `127.0.0.1:4173`, use `node:24` at `10:30`'
+                        ]
+                    ];
+                    expect(judge(docs, { root, listed: new Set(names) })).toEqual([]);
+                });
+            });
+
+            it('leaves a name alone that is not a file at the root, nested or missing', () => {
+                const names = ['package.json', 'scripts/docs-check.mjs'];
+                withFiles(names, (root) => {
+                    const docs = [['AGENTS.md', 'see `docs-check.mjs:12` or `vite.config.ts:49`']];
+                    expect(judge(docs, { root, listed: new Set(names) })).toEqual([]);
+                });
+            });
+
+            it('judges what git lists: an ignored file on disk and a listed one that is gone', () => {
+                withFiles(['package.json', 'ignored.config.js'], (root) => {
+                    const listed = new Set(['package.json', 'gone.config.js']);
+                    const docs = [
+                        [
+                            'AGENTS.md',
+                            'at `package.json:1`, `ignored.config.js:2` and `gone.config.js:3`'
+                        ]
+                    ];
+                    expect(judge(docs, { root, listed })).toEqual([
+                        finding('AGENTS.md', 'package.json:1')
+                    ]);
+                });
+            });
+
+            it('reads the files a real repository lists: a tracked root file, not an ignored one', () => {
+                const tree = {
+                    '.gitignore': 'local.config.js\n',
+                    'local.config.js': '',
+                    'package.json': '{}'
+                };
+                withGitRepo(tree, (root) => {
+                    const docs = [['AGENTS.md', 'at `package.json:3` and `local.config.js:2`']];
+                    expect(judge(docs, { root, listed: listRepoFiles(root) })).toEqual([
+                        finding('AGENTS.md', 'package.json:3')
+                    ]);
+                });
+            });
+
+            it('lets the disk decide when git cannot list, and leaves a nested name alone', () => {
+                withFiles(['eslint.config.js', 'src/kept/a.ts'], (root) => {
+                    const docs = [
+                        [
+                            'AGENTS.md',
+                            'at `eslint.config.js:393`, `missing.config.js:5` and `src/kept/a.ts:3`'
+                        ]
+                    ];
+                    expect(judge(docs, { root, listed: null, topDirs: new Set() })).toEqual([
+                        finding('AGENTS.md', 'eslint.config.js:393')
+                    ]);
+                });
+            });
+
+            it('does not take a folder for a file, so a host named like one stays alone', () => {
+                const names = ['server/index.ts'];
+                withFiles(names, (root) => {
+                    const docs = [['AGENTS.md', 'the service answers on `server:3000`']];
+                    expect(judge(docs, { root, listed: new Set(names) })).toEqual([]);
+                    expect(judge(docs, { root, listed: null })).toEqual([]);
+                });
+            });
+
+            it('keeps flagging an anchored path beside it, in the order the doc names them', () => {
+                const names = ['package.json', 'src/main.ts'];
+                withFiles(names, (root) => {
+                    const docs = [['AGENTS.md', 'see `package.json:12` then `src/main.ts:7`']];
+                    const extra = { root, listed: new Set(names), topDirs: new Set(['src']) };
+                    expect(judge(docs, extra)).toEqual([
+                        finding('AGENTS.md', 'package.json:12'),
+                        finding('AGENTS.md', 'src/main.ts:7')
+                    ]);
+                });
+            });
+        });
     });
 });
 
@@ -2804,7 +2950,7 @@ describe('run: a tree git cannot list', () => {
     // URL scheme, so a URL-relative path cannot work there.
     const SCRIPT = path.resolve(process.cwd(), 'scripts/docs-check.mjs');
     const SKIPPED =
-        'paths: SKIPPED — git could not list the files here (no .git, or a broken repository), so the path and line-pointer checks did not run';
+        'paths: SKIPPED — git could not list the files here (no .git, or a broken repository), so the path checks and line pointers into nested paths did not run; a line pointer into a file at the root is still judged, by what is on disk';
     const files = {
         'scripts/gate-tiers.json': '{}',
         'package.json': '{"scripts":{}}',
@@ -2851,6 +2997,17 @@ describe('run: a tree git cannot list', () => {
             const { findings, notes } = run({ root, today: '2026-10-09' });
             expect(findings).toEqual([]);
             expect(notes).toEqual([SKIPPED]);
+        });
+    });
+
+    it('still judges a line pointer into a file at the root, by the disk, and the note says so', () => {
+        const text = 'Cites `src/gone.ts`, `src/kept/a.ts:3` and `package.json:3`.\n';
+        withoutGit({ ...files, 'AGENTS.md': text }, (root) => {
+            const { findings, notes } = run({ root, today: '2026-10-09' });
+            expect(notes).toEqual([SKIPPED]);
+            expect(findings).toEqual([
+                'AGENTS.md:1: `package.json:3` cites a line number — name the symbol instead, a line moves with every edit'
+            ]);
         });
     });
 

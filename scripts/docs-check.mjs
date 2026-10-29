@@ -15,7 +15,8 @@
  *              ignored) or to a folder holding one, so an emptied folder and an ignored file are
  *              gone, here as on a clean checkout; bare file names, routes, package subpaths and
  *              build output are not judged. A path that ends in `:12` or `:12-20` is a finding
- *              too: cite the symbol, a line moves with every edit
+ *              too, and so is the name of a file at the root (`name.ext:12`; a host with a port is
+ *              no file): cite the symbol, a line moves with every edit
  *   scripts    a backticked `npm run x` or `family:name` token whose family is one of package.json's
  *              script families must exist in package.json
  *   sentinels  the tier-law sentinel sentences (gate-tiers.json → docs.sentinels) appear only in
@@ -247,8 +248,27 @@ export const pathExists = (root, value, listed = null) =>
         return ext === '' && holdsListedFile(root, listed, target);
     });
 
-/** `:12` or `:12-20` closing a path token: a pointer into a file's lines, which move with every edit. */
+/**
+ * `:12` or `:12-20` closing a path token or the name of a file at the root: a pointer into a file's
+ * lines, which move with every edit.
+ */
 const LINE_POINTER = /:\d+(?:-\d+)?$/;
+
+/**
+ * A file at the repository root, the one place a pointer has no directory (`name.ext:12`), so
+ * classifyToken never calls it a path. Like pathExists, a file counts when git lists it and it is on
+ * disk, and without a file list the disk alone decides. A name with a slash is no root file, and a
+ * folder is no file: a host with a port (`server:3000`) stays alone even where a `server/` folder
+ * exists. One stat, never an existence check first: that two-step form is a file-system race.
+ */
+const isRootFile = (root, name, listed) => {
+    if (name.includes('/') || (listed !== null && !listed.has(name))) return false;
+    try {
+        return statSync(path.join(root, name)).isFile();
+    } catch {
+        return false;
+    }
+};
 
 export const checkPathsAndScripts = ({ docs, root, scripts, topDirs, listed = null }) => {
     const findings = [];
@@ -258,12 +278,16 @@ export const checkPathsAndScripts = ({ docs, root, scripts, topDirs, listed = nu
         const history = HISTORY_FILES.includes(file);
         for (const { token, line } of extractTokens(text)) {
             const { kind, value } = classifyToken(token, { topDirs, families });
+            const citesLine = LINE_POINTER.test(token.replace(/[:,.]+$/, ''));
+            if (
+                citesLine &&
+                (kind === 'path' || (kind === 'other' && isRootFile(root, value, listed)))
+            ) {
+                findings.push(
+                    `${file}:${line}: \`${token}\` cites a line number — name the symbol instead, a line moves with every edit`
+                );
+            }
             if (kind === 'path') {
-                if (LINE_POINTER.test(token.replace(/[:,.]+$/, ''))) {
-                    findings.push(
-                        `${file}:${line}: \`${token}\` cites a line number — name the symbol instead, a line moves with every edit`
-                    );
-                }
                 if (!pathExists(root, value, listed)) {
                     findings.push(`${file}:${line}: \`${token}\` does not exist in the tree`);
                 }
@@ -2389,12 +2413,13 @@ export const run = ({ root, today }) => {
     });
     const notes = [...rulesetCheck.notes];
     /* Without a file list topDirs is empty, so no token is read as a path and the path and
-       line-pointer checks judge nothing. Say so, and keep the summary from claiming the check; the
-       run does not fail on it (CI always has git, a tarball does not). */
+       line-pointer checks judge nothing, bar a pointer into a file at the root, which the disk
+       alone still answers. Say so, and keep the summary from claiming the check; the run does not
+       fail on the missing list (CI always has git, a tarball does not). */
     const skipped = listed === null ? ['paths'] : [];
     if (listed === null) {
         notes.unshift(
-            'paths: SKIPPED — git could not list the files here (no .git, or a broken repository), so the path and line-pointer checks did not run'
+            'paths: SKIPPED — git could not list the files here (no .git, or a broken repository), so the path checks and line pointers into nested paths did not run; a line pointer into a file at the root is still judged, by what is on disk'
         );
     }
 

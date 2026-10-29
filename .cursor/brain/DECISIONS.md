@@ -88,9 +88,9 @@ never acted on.
 
 **Decision:** a path in a doc resolves only to a file git lists (tracked, or new and not ignored) that is on disk,
 or to a folder holding one; this file is judged the same way, so an evidence link that points nowhere is red. A
-path that ends in a line number is red: cite the symbol. This file also keeps its shape: one index row per entry
-heading, at most 30 lines after a heading. A browser suite's measurement is printed on every run, and no suite
-carries a hand-written count.
+path that ends in a line number is red, a file at the root included: cite the symbol. This file also keeps its shape:
+one index row per entry heading, at most 30 lines after a heading. A browser suite's measurement is printed on every
+run, and no suite carries a hand-written count.
 
 **Why:** the disk alone answers differently on a machine that kept an emptied folder or an ignored file than on a
 clean checkout, so the same docs were green here and red in CI. A line number moves with every edit and nothing can
