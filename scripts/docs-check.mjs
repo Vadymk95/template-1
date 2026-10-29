@@ -52,10 +52,13 @@
  *              runs, equals the chain derived from that script in package.json (the tracer wrapper
  *              unwrapped, `&&` split); a multi-step script without a chain, or a chain for a script
  *              that is not one, is a finding too
- *   flags      the commands the gate scripts run, expanded through their `npm run` steps, keep
- *              their strict flags: eslint `--max-warnings 0`, oxlint `--deny-warnings`, vitest run
- *              once (`run`), jest not watching, and `--passWithNoTests` only inside the iterate
- *              chain. The chain view cannot judge this: it compares package.json with itself
+ *   flags      the commands of the package.json scripts that are gate checks, or that an `npm run`
+ *              step reaches from one (the arguments a step passes after its own `--` included),
+ *              keep their strict flags: eslint `--max-warnings 0` (the last value counts), oxlint
+ *              `--deny-warnings`, vitest run once (`run`), jest not watching, and
+ *              `--passWithNoTests` only inside the iterate chain. A command ends at `&&`, `||`,
+ *              `;` or a newline, and what a `node scripts/*.mjs` step spawns is not read. The chain
+ *              view cannot judge this: it compares package.json with itself
  *   stageWords every key of `docs.stageWords` is a stage of the `verify*` chains
  *   retelling  no line outside that view retells the gate chain. A line does when it names
  *              RETELLING_MIN_STAGES or more distinct stages (the stage names derived from
@@ -1767,43 +1770,123 @@ export const checkGateChains = ({ checks, scripts }) => {
     return findings;
 };
 
+/** The words of a command; a quoted stretch stays inside its word, so `-t "a b"` and `NAME="a b"` are two words. */
+const COMMAND_WORD = /(?:[^\s"']|"(?:[^"\\]|\\.)*"|'[^']*')+/g;
+/** What ends a command inside a script: `&&`, `||`, `;` or a newline, but not the same characters inside quotes. */
+const COMMAND_END = /"(?:[^"\\]|\\.)*"|'[^']*'|(?<end>&&|\|\||[;\n])/g;
+const ASSIGNMENT_WORD = /^[A-Za-z_][A-Za-z0-9_]*=/;
+/** Commands that only start another one: `cross-env A=1 vitest`, `env A=1 vitest`, `npx vitest`. */
+const LAUNCHERS = new Set(['cross-env', 'env', 'npx']);
+/** The verbs of `npm run x` and `npm test` in the spellings npm documents (npm-run, npm-test). */
+const NPM_RUN_VERBS = new Set(['run', 'run-script', 'rum', 'urn']);
+const NPM_TEST_VERBS = new Set(['test', 'tst', 't']);
+
+/** The commands of one script line, each ended where the shell would end it. */
+const splitCommands = (line) => {
+    const commands = [];
+    let start = 0;
+    for (const match of line.matchAll(COMMAND_END)) {
+        if (match.groups.end === undefined) continue;
+        commands.push(line.slice(start, match.index));
+        start = match.index + match[0].length;
+    }
+    commands.push(line.slice(start));
+    return commands.map((command) => command.trim()).filter((command) => command.length > 0);
+};
+
+/** The words of a command with what only launches it taken off: `NAME=value` words, then `cross-env`, `env` or `npx` with its flags, as often as they stack. */
+const lookThrough = (command) => {
+    const words = command.match(COMMAND_WORD) ?? [];
+    for (;;) {
+        while (ASSIGNMENT_WORD.test(words[0] ?? '')) words.shift();
+        if (!LAUNCHERS.has(path.posix.basename(words[0] ?? ''))) return words;
+        words.shift();
+        while (words[0]?.startsWith('-')) words.shift();
+    }
+};
+
+/**
+ * The script an npm step runs (`npm run x`, `npm run-script x`, `npm test`, `npm t`; npm's own flags
+ * such as `--silent` are skipped) and the arguments it hands to that script: the words after its
+ * `--`. A flag before the `--` is npm's own and never reaches the script. Null for any other command.
+ */
+const npmHop = (command) => {
+    const words = lookThrough(command);
+    if (words[0] !== 'npm') return null;
+    const dash = words.indexOf('--');
+    const own = (dash === -1 ? words : words.slice(0, dash)).slice(1);
+    const [verb, script] = own.filter((word) => !word.startsWith('-'));
+    let target;
+    if (NPM_TEST_VERBS.has(verb)) target = 'test';
+    else if (NPM_RUN_VERBS.has(verb)) target = script;
+    if (target === undefined) return null;
+    return { script: target, passed: dash === -1 ? [] : words.slice(dash + 1) };
+};
+
 /**
  * The commands the gate scripts run, each with the package.json script that holds it and the
  * checks that reach it. Every script counts as registered here, so `scriptSteps` only unwraps the
- * tracer and splits on `&&`, and each `npm run` step is followed on its own.
+ * tracer and splits on `&&`; a command also ends at `||`, `;` and a newline (`splitCommands`).
+ * Each `npm run` step is followed to its script, and the arguments it passes after its own `--`
+ * land where npm puts them, on the end of that script's LAST command (the line npm builds is
+ * `<script> <arguments>`, so in `a && b` only `b` takes them). That command is judged as it runs
+ * (`judged`) and reported on the step that passes the arguments (`holder`, `command`), the line
+ * the reader has to change.
  */
 const gateCommands = ({ checks, scripts }) => {
     const literal = new Set(Object.keys(scripts));
     const found = new Map();
+    const record = (holder, command, judged, check) => {
+        const key = `${holder}\0${command}\0${judged}`;
+        if (!found.has(key)) found.set(key, { holder, command, judged, from: new Set() });
+        found.get(key).from.add(check);
+    };
     for (const check of Object.keys(checks)) {
         const seen = new Set();
-        const visit = (name) => {
-            if (seen.has(name) || typeof scripts[name] !== 'string') return;
-            seen.add(name);
-            for (const command of scriptSteps({ scripts, name, registered: literal })) {
-                const hop = NPM_STEP.exec(command);
-                if (hop) {
-                    visit(hop[1]);
-                    continue;
-                }
-                const key = `${name}\0${command}`;
-                if (!found.has(key)) found.set(key, { holder: name, command, from: new Set() });
-                found.get(key).from.add(check);
+        /* `carry` is what the step that led here handed over: the arguments, and that step's script
+           and text; null when it handed over none. */
+        const visit = (name, carry, depth) => {
+            const visited = `${name}\0${carry?.args.join(' ') ?? ''}`;
+            if (typeof scripts[name] !== 'string' || seen.has(visited) || depth > MAX_ALIAS_HOPS) {
+                return;
             }
+            seen.add(visited);
+            const steps = scriptSteps({ scripts, name, registered: literal }).flatMap(
+                splitCommands
+            );
+            steps.forEach((step, index) => {
+                const takesArgs = carry && index === steps.length - 1;
+                const judged = takesArgs ? [step, ...carry.args].join(' ') : step;
+                const hop = npmHop(judged);
+                if (hop) {
+                    const next = { args: hop.passed, holder: name, command: judged };
+                    visit(hop.script, hop.passed.length > 0 ? next : null, depth + 1);
+                } else if (takesArgs) {
+                    record(carry.holder, carry.command, judged, check);
+                } else {
+                    record(name, step, step, check);
+                }
+            });
         };
-        visit(check);
+        visit(check, null, 0);
     }
     return [...found.values()];
 };
 
-/** The tool a command runs and its arguments; environment assignments, `npx` with its flags and the path to a binary are looked through. */
+/** The tool a command runs and its arguments; what only launches it (see lookThrough) and the path to a binary are looked through. */
 const toolOf = (command) => {
-    const words = command.replace(ENV_ASSIGNMENTS, '').split(/\s+/).filter(Boolean);
-    if (words[0] === 'npx') {
-        words.shift();
-        while (words[0]?.startsWith('-')) words.shift();
-    }
+    const words = lookThrough(command);
     return { tool: path.posix.basename(words[0] ?? ''), args: words.slice(1) };
+};
+
+/** What a flag ends on, as `--flag=v` or `--flag v` (a tool reads the last one); null when the flag is absent, '' when nothing follows it. */
+const lastValue = (args, flag) => {
+    let value = null;
+    args.forEach((arg, index) => {
+        if (arg === flag) value = args[index + 1] ?? '';
+        else if (arg.startsWith(`${flag}=`)) value = arg.slice(flag.length + 1);
+    });
+    return value;
 };
 
 const WATCH_FLAG = /^--watch(?:All)?(?:=true)?$/;
@@ -1811,14 +1894,13 @@ const WATCH_FLAG = /^--watch(?:All)?(?:=true)?$/;
 const STRICT_FLAGS = new Map([
     [
         'eslint',
-        (args) =>
-            args.some(
-                (arg, index) =>
-                    arg === '--max-warnings=0' ||
-                    (arg === '--max-warnings' && args[index + 1] === '0')
-            )
-                ? null
-                : 'lacks --max-warnings 0, so a lint warning passes the gate'
+        (args) => {
+            const value = lastValue(args, '--max-warnings');
+            if (value === '0') return null;
+            return value
+                ? `uses --max-warnings ${value} (the last one counts), so a lint warning passes the gate`
+                : 'lacks --max-warnings 0, so a lint warning passes the gate';
+        }
     ],
     [
         'oxlint',
@@ -1846,14 +1928,15 @@ const STRICT_FLAGS = new Map([
 /**
  * The strict flags of the gate. `checks.<name>.chain` compares package.json with a view derived
  * from package.json, so a flag dropped from the script is dropped from the view the same way and
- * both equality checks pass. This reads the commands themselves: every command the gate scripts run
- * keeps the flags of STRICT_FLAGS, and `--passWithNoTests`, which turns "no test found" into a
- * pass, stays inside the iterate chain (`iterate` is that check's name).
+ * both equality checks pass. This reads the commands themselves: every command of a script that is
+ * a gate check, or that an `npm run` step reaches from one, keeps the flags of STRICT_FLAGS, and
+ * `--passWithNoTests`, which turns "no test found" into a pass, stays inside the iterate chain
+ * (`iterate` is that check's name). What a `node scripts/*.mjs` step spawns is not read.
  */
 export const checkGateFlags = ({ checks, scripts, iterate = 'verify:iter' }) => {
     const findings = [];
-    for (const { holder, command, from } of gateCommands({ checks, scripts })) {
-        const { tool, args } = toolOf(command);
+    for (const { holder, command, judged, from } of gateCommands({ checks, scripts })) {
+        const { tool, args } = toolOf(judged);
         const problems = [STRICT_FLAGS.get(tool)?.(args) ?? null];
         if (args.includes('--passWithNoTests') && [...from].some((check) => check !== iterate)) {
             problems.push(
@@ -2305,6 +2388,15 @@ export const run = ({ root, today }) => {
         allowlist: ciConfig.rulesetContextAllowlist ?? []
     });
     const notes = [...rulesetCheck.notes];
+    /* Without a file list topDirs is empty, so no token is read as a path and the path and
+       line-pointer checks judge nothing. Say so, and keep the summary from claiming the check; the
+       run does not fail on it (CI always has git, a tarball does not). */
+    const skipped = listed === null ? ['paths'] : [];
+    if (listed === null) {
+        notes.unshift(
+            'paths: SKIPPED — git could not list the files here (no .git, or a broken repository), so the path and line-pointer checks did not run'
+        );
+    }
 
     const findings = [
         ...checkPathsAndScripts({ docs, root, scripts, topDirs, listed }),
@@ -2401,8 +2493,25 @@ export const run = ({ root, today }) => {
         );
     }
 
-    return { findings, budget, notes };
+    return { findings, budget, notes, skipped };
 };
+
+/** What a run without a finding vouches for, as its summary line names it; `run` lists the ones it skipped. */
+const SUMMARY_CHECKS = [
+    'paths',
+    'scripts',
+    'sentinels',
+    'versions',
+    'command tables',
+    'dead docs',
+    'section pointers',
+    'decisions shape',
+    'quarantines',
+    'suite ceilings',
+    'agent-memory imports',
+    'gate chains',
+    'gate flags'
+];
 
 const main = () => {
     const argv = process.argv.slice(2);
@@ -2410,16 +2519,15 @@ const main = () => {
     const root = rootFlag === -1 ? process.cwd() : path.resolve(argv[rootFlag + 1]);
     const weekly = argv.includes('--weekly');
     const today = new Date().toISOString().slice(0, 10);
-    const { findings, budget, notes } = run({ root, today });
+    const { findings, budget, notes, skipped } = run({ root, today });
 
     console.log(`docs:check${weekly ? ' (weekly)' : ''}`);
     console.log(`  ${budget.message}`);
     for (const note of notes) console.log(`  ${note}`);
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {
-        console.log(
-            '  ✔ no mechanical drift: paths, scripts, sentinels, versions, command tables, dead docs, section pointers, decisions shape, quarantines, suite ceilings, agent-memory imports, gate chains, gate flags'
-        );
+        const vouched = SUMMARY_CHECKS.filter((check) => !skipped.includes(check));
+        console.log(`  ✔ no mechanical drift: ${vouched.join(', ')}`);
         process.exit(0);
     }
     console.log(

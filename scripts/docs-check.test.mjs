@@ -2799,6 +2799,95 @@ describe('run: the suite measurement', () => {
     });
 });
 
+describe('run: a tree git cannot list', () => {
+    // Resolved from the repo root, not from `import.meta.url`: vitest serves this module over its own
+    // URL scheme, so a URL-relative path cannot work there.
+    const SCRIPT = path.resolve(process.cwd(), 'scripts/docs-check.mjs');
+    const SKIPPED =
+        'paths: SKIPPED — git could not list the files here (no .git, or a broken repository), so the path and line-pointer checks did not run';
+    const files = {
+        'scripts/gate-tiers.json': '{}',
+        'package.json': '{"scripts":{}}',
+        'package-lock.json': '{"packages":{}}',
+        'AGENTS.md': 'Cites `src/gone.ts` and `src/kept/a.ts:3`.\n',
+        'README.md': '# Readme\n',
+        'src/kept/a.ts': 'export {};\n'
+    };
+    const clean = { ...files, 'AGENTS.md': '# Agents\n' };
+
+    /**
+     * `files` in a throwaway folder git cannot list: no repository in it, and none above it
+     * (GIT_CEILING_DIRECTORIES stops the search at the temp dir). GIT_* leaves process.env for the
+     * call, as in withGitRepo.
+     */
+    const withoutGit = (tree, check) => {
+        const root = mkdtempSync(path.join(tmpdir(), 'docs-check-nogit-'));
+        const saved = Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'));
+        try {
+            for (const [file, text] of Object.entries(tree)) {
+                mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+                writeFileSync(path.join(root, file), text);
+            }
+            for (const [key] of saved) delete process.env[key];
+            process.env.GIT_CEILING_DIRECTORIES = tmpdir();
+            check(root);
+        } finally {
+            delete process.env.GIT_CEILING_DIRECTORIES;
+            for (const [key, value] of saved) process.env[key] = value;
+            rmSync(root, { recursive: true, force: true });
+        }
+    };
+
+    /** The script's output lines; a non-zero exit makes execFileSync throw, so returning means exit 0. */
+    const cli = (root) =>
+        execFileSync(process.execPath, [SCRIPT, '--root', root], {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe']
+        }).split('\n');
+    const summaryOf = (lines) => lines.find((line) => line.includes('no mechanical drift'));
+
+    it('says in a note that the path checks were skipped, and fails nothing', () => {
+        withoutGit(files, (root) => {
+            const { findings, notes } = run({ root, today: '2026-10-09' });
+            expect(findings).toEqual([]);
+            expect(notes).toEqual([SKIPPED]);
+        });
+    });
+
+    it('still judges the npm script tokens, the part of the summary that stays', () => {
+        withoutGit({ ...files, 'AGENTS.md': 'Runs `npm run nope`.\n' }, (root) => {
+            expect(run({ root, today: '2026-10-09' }).findings).toEqual([
+                'AGENTS.md:1: `npm run nope` names an npm script that package.json does not have'
+            ]);
+        });
+    });
+
+    it('prints the skip, and a summary that leaves the paths out, with exit 0', () => {
+        withoutGit(files, (root) => {
+            const lines = cli(root);
+            expect(lines).toContain(`  ${SKIPPED}`);
+            expect(summaryOf(lines)).toContain('scripts, sentinels');
+            expect(summaryOf(lines)).not.toContain('paths');
+        });
+    });
+
+    it('judges the same docs and claims the paths where git can list the files', () => {
+        withGitRepo(files, (root) => {
+            const { findings, notes } = run({ root, today: '2026-10-09' });
+            expect(notes).toEqual([]);
+            expect(findings).toEqual([
+                'AGENTS.md:1: `src/gone.ts` does not exist in the tree',
+                'AGENTS.md:1: `src/kept/a.ts:3` cites a line number — name the symbol instead, a line moves with every edit'
+            ]);
+        });
+        withGitRepo(clean, (root) => {
+            const lines = cli(root);
+            expect(lines.some((line) => line.includes('paths: SKIPPED'))).toBe(false);
+            expect(summaryOf(lines)).toContain('paths, scripts, sentinels');
+        });
+    });
+});
+
 describe('checkMemoryImports', () => {
     /** Scans a temp repo: `text` is the whole CLAUDE.md or AGENTS.md, `files` are the real files. */
     const scan = (text, { file = 'AGENTS.md', files = ['x.md'] } = {}) => {
@@ -3378,6 +3467,138 @@ describe('checkGateFlags', () => {
         const ghost = { ...checks, ghost: {} };
         const gone = { 'verify:inner': 'npm run nope && npm run lint' };
         expect(checkGateFlags({ checks: ghost, scripts: { ...scripts, ...gone } })).toEqual([]);
+    });
+
+    describe('a flag the expansion must not lose', () => {
+        const watch = 'is not run-once (`vitest run`), so the gate would start watch mode';
+        const outside =
+            'carries --passWithNoTests outside the iterate chain (verify:iter), so a gate that finds no test passes';
+        const uses = (value) =>
+            `uses --max-warnings ${value} (the last one counts), so a lint warning passes the gate`;
+        // Strict on their own (test = `vitest run`, lint = `eslint . --max-warnings 0`), so a finding
+        // comes from the step under test.
+        const setup = { test: 'vitest run', lint: 'eslint . --max-warnings 0' };
+        const inner = (command) => flags({ ...setup, 'verify:inner': command });
+
+        it('judges what a step passes on through an npm run hop', () => {
+            const test = 'npm run test -- --passWithNoTests';
+            const lint = 'npm run lint -- --max-warnings 999';
+            expect(inner(`${test} && ${lint}`)).toEqual([
+                lacking('verify:inner', test, outside),
+                lacking('verify:inner', lint, uses('999'))
+            ]);
+        });
+
+        it('hands the arguments to the last command of the script, the way npm appends them', () => {
+            const step = 'npm run check -- --max-warnings 999';
+            const eslintLast = { check: 'vitest run && eslint . --max-warnings 0' };
+            const vitestLast = { check: 'eslint . --max-warnings 0 && vitest run' };
+            expect(flags({ ...eslintLast, 'verify:inner': step })).toEqual([
+                lacking('verify:inner', step, uses('999'))
+            ]);
+            expect(flags({ ...vitestLast, 'verify:inner': step })).toEqual([]);
+        });
+
+        it('leaves a flag with no `--` before it to npm, which reads it itself', () => {
+            expect(
+                inner('npm run test --passWithNoTests && npm run lint --max-warnings 999')
+            ).toEqual([]);
+        });
+
+        it('carries the arguments through a hop that has a `--` of its own', () => {
+            const outer = { outer: 'npm run lint -- --cache' };
+            expect(
+                flags({ ...outer, 'verify:inner': 'npm run outer -- --max-warnings 999' })
+            ).toHaveLength(1);
+        });
+
+        it('stops at a script that hands its arguments on to itself', () => {
+            expect(flags({ 'verify:inner': 'npm run loop', loop: 'npm run loop -- --x' })).toEqual(
+                []
+            );
+        });
+
+        it('ends a command at a semicolon, a double bar, a tight `&&` and a newline', () => {
+            const finding = lacking('verify:inner', 'vitest --coverage', watch);
+            for (const chained of [
+                'tsc; vitest --coverage',
+                'tsc;vitest --coverage',
+                'tsc || vitest --coverage',
+                'tsc||vitest --coverage',
+                'tsc&&vitest --coverage',
+                'tsc\nvitest --coverage'
+            ]) {
+                expect(inner(chained), chained).toEqual([finding]);
+            }
+            expect(inner('npm run lint; vitest || jest --watch')).toEqual([
+                lacking('verify:inner', 'vitest', watch),
+                lacking(
+                    'verify:inner',
+                    'jest --watch',
+                    'runs in watch mode, so the gate would never finish'
+                )
+            ]);
+        });
+
+        it('keeps a quoted separator inside its command', () => {
+            const double = 'vitest run -t "a;b || c" --passWithNoTests';
+            expect(inner(double)).toEqual([lacking('verify:inner', double, outside)]);
+            expect(inner("vitest run -t 'a;b || c' --passWithNoTests")).toHaveLength(1);
+        });
+
+        it('looks through cross-env, env and bare assignments to the tool', () => {
+            for (const launch of ['cross-env CI=1', 'env CI=1', 'CI=1', 'npx cross-env CI=1 A=2']) {
+                const command = `${launch} vitest`;
+                expect(flags({ test: command }), command).toEqual([
+                    lacking('test', command, watch)
+                ]);
+            }
+            expect(flags({ test: 'cross-env CI=1 vitest run' })).toEqual([]);
+            expect(flags({ lint: 'cross-env CI=1 eslint .' })).toHaveLength(1);
+            const hop = 'cross-env CI=1 npm run lint -- --max-warnings 999';
+            expect(inner(hop)).toEqual([lacking('verify:inner', hop, uses('999'))]);
+        });
+
+        it('follows npm test, npm t and npm run-script like npm run', () => {
+            // Only `verify` is a check here, so `test` is reached through the hop or not at all.
+            const reached = (command) =>
+                checkGateFlags({
+                    checks: { verify: {} },
+                    scripts: { ...scripts, test: 'vitest', 'verify:inner': command }
+                });
+            for (const command of [
+                'npm test',
+                'npm t',
+                'npm tst',
+                'npm run-script test',
+                'npm rum test',
+                'npm urn test',
+                'npm run --silent test',
+                'npm -s run test'
+            ]) {
+                expect(reached(command), command).toEqual([lacking('test', 'vitest', watch)]);
+            }
+            const passing = 'npm test -- --passWithNoTests';
+            expect(inner(passing)).toEqual([lacking('verify:inner', passing, outside)]);
+        });
+
+        it('takes the last --max-warnings as the value eslint uses', () => {
+            const raised = 'eslint . --max-warnings 0 --max-warnings 999';
+            expect(flags({ lint: raised })).toEqual([lacking('lint', raised, uses('999'))]);
+            expect(flags({ lint: 'eslint . --max-warnings=0 --max-warnings=5' })).toHaveLength(1);
+            expect(flags({ lint: 'eslint . --max-warnings 0 --max-warnings=5' })).toHaveLength(1);
+            expect(flags({ lint: 'eslint . --max-warnings 5 --max-warnings 0' })).toEqual([]);
+            expect(flags({ lint: 'eslint . --max-warnings=5 --max-warnings=0' })).toEqual([]);
+        });
+
+        it('lets the iterate chain pass --passWithNoTests through a hop, and no other chain', () => {
+            const step = 'npm run test -- --passWithNoTests';
+            const iterate = { 'verify:iter:inner': `npm run lint:oxlint && ${step}` };
+            expect(flags(iterate)).toEqual([]);
+            expect(flags({ ...iterate, 'verify:inner': `npm run lint:oxlint && ${step}` })).toEqual(
+                [lacking('verify:inner', step, outside)]
+            );
+        });
     });
 });
 
