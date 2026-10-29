@@ -86,7 +86,7 @@ Automatic class detection is off, so a new top-level folder that holds class nam
 Dark mode toggle: `src/hooks/theme/useTheme.ts`
 
 - Modes: `'light' | 'dark' | 'system'` (system follows OS preference)
-- Toggles `.dark` class on `<html>`, persists to `localStorage` key `"theme"`
+- Toggles `.dark` class on `<html>`, persists to `localStorage` key `"theme"`; a refused read or write falls back to `system` or a session-only theme and logs a warning
 - Usage: `const { theme, setTheme } = useTheme()`
 
 To change brand color: update `--primary` and `--primary-hover` HSL values in `:root` and `.dark`;

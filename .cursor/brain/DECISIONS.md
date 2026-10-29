@@ -161,8 +161,13 @@ after touching one file under `src/` (app and vitest both read it).
 **Consequences:**
 
 - A plain `tsc -b` does not see a dependency changed in `node_modules`: a changed type file in a dependency left
-  it at exit 0 (fresh or old modification time) while `tsc -b --force` exited 2 with the real error. The gate
-  scripts run the plain check, so after `npm ci` or a lockfile change run `npx tsc -b --force` once.
+  it at exit 0 (fresh or old modification time) while `tsc -b --force` exited 2 with the real error. The push
+  tiers run the forced check (`typecheck:force`); the iterate chain, the pre-commit hook and `build` keep the
+  plain one, so after `npm ci` or a lockfile change an iterate run wants `npx tsc -b --force` once.
+- The locale JSON joined the `include` of the app and unit-test projects. Before that, after a green run,
+  deleting a used locale key gave exit 0 from a plain `tsc -b` and TS2345 from `tsc -b --force`; listed, the
+  plain run fails too. Other inputs outside an include are seen only at the push.
+- The forced run costs 4.0 s against 0.2 s for the plain one (one measurement); only the push tiers pay it.
 - The first run after a clone, or after removing `.tsbuild/`, costs the cold time.
 
 ## [2026-10] Block-axis spill is measured with a font-size allowance
@@ -277,8 +282,8 @@ copy of a package with an unchanged version (the package's files are not hashed)
 **Decision:** `@import 'tailwindcss' source(none)` turns automatic detection off, `@source '.'` scans the
 stylesheet's own folder (`src`), and two `@source not` lines keep `*.test.*` and `*.spec.*` files and `src/test`
 out. An allowlist, not a deny list: a deny list scans every folder added later until someone names it, an
-allowlist scans nothing until someone does. Utility classes live only in `src`; `index.html` carries custom
-classes only, defined in the stylesheet.
+allowlist scans nothing until someone does. Utility classes live only in `src`; `index.html` carries no
+utility class, only plain class names.
 
 **Why:** Tailwind emits a rule for every class-shaped string in every file it scans, and with automatic detection
 that is every file under the project root, hidden folders and Markdown included (the test's control build ships a

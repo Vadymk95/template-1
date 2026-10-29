@@ -9,7 +9,7 @@ tier law stay in `AGENTS.md`. The numbers below were measured in a fork: startin
   and line as read at the base commit.
 - Name the one heading or line of any other file the lane may open. A plan or spec is opened at a
   named place, never whole.
-- State the write boundary: a lane writes only inside its worktree and its report folder. A change to
+- State the write boundary: a lane writes only inside its worktree and its scratch folder. A change to
   a planner file or a gate file goes in the report as exact lines; the lead applies it with the
   operator.
 - Change no package. If one looks necessary, stop that item and report the package and version.

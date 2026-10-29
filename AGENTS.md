@@ -118,8 +118,8 @@ moments, blown budgets, gate runs from a worktree). After a push, gate output in
 the contract: **silence is a failure, not a pass** - a push that printed no gate ran no gate, whatever the
 exit code says.
 
-**Ports.** A busy port means MOVE, never kill a server you did not start; the single-spec, measure
-and probe scripts take the next free port. Only the push gate clears its own port.
+**Ports.** A busy port means MOVE, never kill a server you did not start; every script that starts its
+own server takes the next free port. Only the push gate clears its own port.
 
 ### Lanes - who runs what
 
@@ -128,7 +128,7 @@ and probe scripts take the next free port. Only the push gate clears its own por
   with `node_modules` symlinked from the main checkout. Iterate and measure only; the gate never runs from a
   worktree. The lead removes the worktree, checks the branch out in the main checkout and pushes from there,
   so the gate runs once, at the push, for every writer. A lane never waits on a prompt: it writes only in its
-  worktree and report folder (a planner or gate file change goes in the report as exact lines, which the lead
+  worktree and its scratch folder (a planner or gate file change goes in the report as exact lines, which the lead
   applies with the operator), reads with Read and Grep, and runs `git -C <dir>` and `npm run --prefix <dir>`
   instead of `cd`, with no shell variable or `;` chain. Lane rules: `.cursor/templates/LANE.md`.
 - **Copilot coding agent.** Hand-over is a fully specified issue (goal as behaviour, paths in scope,

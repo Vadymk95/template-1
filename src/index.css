@@ -11,9 +11,10 @@
  * this folder minus its tests and test helpers. Paths resolve from this file.
  *
  * A new top-level folder that holds class names needs its own `@source` line, or its utilities
- * silently do not ship. So does `index.html` the day it carries a utility class: today it holds
- * custom classes only, defined below. `src/pages/DevPlayground` is dev-only but stays scanned,
- * because the dev server needs its utilities. `scripts/tailwind-sources.test.mjs` pins these lines.
+ * silently do not ship. So does `index.html` the day it carries a utility class: today it carries
+ * none, only plain class names (`i18n-boot` is styled below). `src/pages/DevPlayground` is
+ * dev-only but stays scanned, because the dev server needs its utilities.
+ * `scripts/tailwind-sources.test.mjs` pins these lines.
  */
 @source '.';
 @source not './**/*.{test,spec}.*';

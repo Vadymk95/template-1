@@ -531,7 +531,12 @@ describe('clearScreenshots', () => {
     });
 
     it('keeps the record inside the folder the repository already ignores', () => {
+        const ignored = readFileSync(resolve(process.cwd(), '.gitignore'), 'utf8')
+            .split('\n')
+            .map((line) => line.trim());
+
         expect(dirname(GROUP_FILE)).toBe(OUT_DIR);
+        expect(ignored).toContain(`${OUT_DIR}/`);
     });
 });
 
@@ -756,6 +761,29 @@ describe('withServer', () => {
 
             expect(sent()).toEqual([[-PID, 'SIGTERM']]);
             expect(proc.exit).toHaveBeenCalledExactlyOnceWith(code);
+        });
+
+        /* A Ctrl-C while the server ignores SIGTERM: ending the process before the stop is over leaves
+           the group running and its record on disk, for the next run to settle. */
+        it('ends the process only after the stop is over, SIGKILL and the record included', async () => {
+            const { options, sent, proc, disk } = setup({ endsOn: 'SIGKILL' });
+            let atExit;
+            proc.exit.mockImplementation(() => {
+                atExit = { sent: sent(), record: disk.has(RECORD) };
+            });
+
+            await withServer(options, () => {
+                proc.emit('SIGINT');
+                return Promise.resolve();
+            });
+
+            expect(atExit).toEqual({
+                sent: [
+                    [-PID, 'SIGTERM'],
+                    [-PID, 'SIGKILL']
+                ],
+                record: false
+            });
         });
 
         it('signals the group the moment the process is ending, and keeps the record while the group is still there', async () => {
@@ -1081,5 +1109,28 @@ describe('startedServerAnswers', () => {
             startedServerAnswers({ exitCode: null, signalCode: 'SIGKILL' }, answers)
         ).rejects.toThrow(/SIGKILL/);
         expect(answers).not.toHaveBeenCalled();
+    });
+});
+
+describe('the wiring of run, read as text', () => {
+    /* `run` starts a real server and a real browser, so no case calls it, and the pieces it joins are
+       pinned one by one above. What joins them is read from its own body in the source. */
+    const source = readFileSync(resolve(process.cwd(), 'scripts/probe.mjs'), 'utf8');
+    const body = /\nconst run = async \(\) => \{\n([\s\S]*?)\n\};\n/.exec(source)?.[1];
+
+    it('clears the screenshots and never the whole folder, which also holds the server record', () => {
+        expect(body).toMatch(/^\s*clearScreenshots\(\);$/m);
+        expect(body).not.toMatch(/\brmSync\(\s*OUT_DIR/);
+    });
+
+    it('gives the browser context the color scheme of the theme that was asked for', () => {
+        expect(body).toMatch(/\bnewContext\(\{[^}]*\bcolorScheme:\s*colorSchemeFor\(theme\)/);
+    });
+
+    it('seeds the storage from the flags through the init script of the context', () => {
+        expect(body).toMatch(
+            /\bconst storageSeed = buildStorageSeed\(\{\s*signedIn,\s*theme\s*\}\)/
+        );
+        expect(body).toMatch(/\baddInitScript\(\s*seedStorage,\s*storageSeed\s*\)/);
     });
 });
