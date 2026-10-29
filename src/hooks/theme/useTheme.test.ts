@@ -42,6 +42,35 @@ describe('useTheme', () => {
         expect(document.documentElement.classList.contains('dark')).toBe(true);
     });
 
+    // The boot script in `public/theme-boot.js` reads any stored value other than `dark` and `light`
+    // as the OS preference. A hook that handed the raw string on resolved it to neither theme, so the
+    // page painted dark from the script and then flipped to light once React mounted.
+    it.each(['blue', '', 'Dark'])('reads the unknown stored value %j as system', (stored) => {
+        const { matchMedia } = buildMatchMedia(true);
+        vi.stubGlobal('matchMedia', matchMedia);
+        localStorage.setItem('theme', stored);
+
+        const { result } = renderHook(() => useTheme());
+
+        expect(result.current.theme).toBe('system');
+        expect(document.documentElement.classList.contains('dark')).toBe(true);
+    });
+
+    it.each([
+        { stored: 'light', dark: false },
+        { stored: 'dark', dark: true },
+        { stored: 'system', dark: true }
+    ])('keeps the valid stored value $stored over the OS preference', ({ stored, dark }) => {
+        const { matchMedia } = buildMatchMedia(true);
+        vi.stubGlobal('matchMedia', matchMedia);
+        localStorage.setItem('theme', stored);
+
+        const { result } = renderHook(() => useTheme());
+
+        expect(result.current.theme).toBe(stored);
+        expect(document.documentElement.classList.contains('dark')).toBe(dark);
+    });
+
     it('persists explicit theme to localStorage and toggles html.dark', () => {
         const { matchMedia } = buildMatchMedia(false);
         vi.stubGlobal('matchMedia', matchMedia);

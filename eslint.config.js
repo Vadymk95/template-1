@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 import js from '@eslint/js';
 import queryPlugin from '@tanstack/eslint-plugin-query';
@@ -17,6 +19,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 import { cssFingerprint } from './scripts/css-fingerprint.mjs';
+import hookLocation from './scripts/eslint-hook-location.mjs';
 
 /** The stylesheet both Tailwind lint rule families read (their settings and the cache fingerprint below). */
 const TAILWIND_ENTRY = './src/index.css';
@@ -39,6 +42,11 @@ const parentRelativeImportPatternGroup = {
 // probe then comes back, the shipped CSP blocks it and the browser reports it.
 const zodImportMessage =
     "Import `z` from '@/lib/zod', not from 'zod': that module turns zod's JIT off before any schema is built, and a direct import can run first (the shipped CSP has no 'unsafe-eval').";
+
+// The folders an exported hook may live in, relative to this file: hooks by domain, a page's own
+// hook, a hook beside its component, the hook of a store. This list is the `ignores` of the rule
+// block below, and the rule prints it in its message.
+const HOOK_HOMES = ['src/hooks/**', 'src/pages/*/**', 'src/components/**', 'src/store/*/**'];
 
 export default defineConfig([
     globalIgnores([
@@ -117,7 +125,10 @@ export default defineConfig([
                 createTypeScriptImportResolver({
                     alwaysTryTypes: true,
                     // Root solution tsconfig (`references` → app, node, vitest); one project = no multi-project warn.
-                    project: './tsconfig.json'
+                    // Anchored at this folder like `tsconfigRootDir` above: a relative path is read from
+                    // the directory lint started in, and from any other folder every `@/` import
+                    // stops resolving.
+                    project: path.join(import.meta.dirname, 'tsconfig.json')
                 })
             ]
         },
@@ -157,6 +168,8 @@ export default defineConfig([
             // ─── Magic numbers — extract to a constants file (exempt below) ───
             // Cheap models scatter literals; force named constants. Universal
             // units (60 s/min, 1000 ms/s, 100 %) and trivial (-1,0,1,2) ignored.
+            // `type Gap = 3 | 5` is a name already, so a numeric literal type declared as an alias
+            // passes; the same union written inline in a property type still counts: name it as an alias.
             '@typescript-eslint/no-magic-numbers': [
                 'error',
                 {
@@ -165,7 +178,8 @@ export default defineConfig([
                     ignoreReadonlyClassProperties: true,
                     ignoreArrayIndexes: true,
                     ignoreDefaultValues: true,
-                    ignoreTypeIndexes: true
+                    ignoreTypeIndexes: true,
+                    ignoreNumericLiteralTypes: true
                 }
             ],
 
@@ -314,6 +328,16 @@ export default defineConfig([
                 }
             ]
         }
+    },
+    // ─── Hooks are exported from the folders that hold hooks ──────────────────
+    // The rule reads exports (`scripts/eslint-hook-location.mjs`); where a hook may live is the one
+    // list above, used here as `ignores`, so ESLint resolves it from this folder whatever directory
+    // lint starts in. Tests and `src/test/` are exempt, as in the complexity ratchet below.
+    {
+        files: ['src/**/*.{ts,tsx}'],
+        ignores: [...HOOK_HOMES, '**/*.test.*', 'src/test/**'],
+        plugins: { local: hookLocation },
+        rules: { 'local/hook-location': ['error', { homes: HOOK_HOMES }] }
     },
     // ─── A suppression must carry its reason ─────────────────────────────────
     // Measured gap: `// eslint-disable-next-line <rule>` with no reason passed the whole gate, so a

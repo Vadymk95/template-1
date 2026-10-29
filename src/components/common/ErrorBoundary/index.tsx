@@ -74,7 +74,7 @@ class ErrorBoundaryComponent extends Component<ErrorBoundaryProps, ErrorBoundary
         return { hasError: true, error };
     }
 
-    componentDidCatch(error: Error, info: ErrorInfo): void {
+    override componentDidCatch(error: Error, info: ErrorInfo): void {
         logger.error('React ErrorBoundary caught an error', {
             message: error.message,
             stack: error.stack,
@@ -91,7 +91,7 @@ class ErrorBoundaryComponent extends Component<ErrorBoundaryProps, ErrorBoundary
         window.location.reload();
     };
 
-    render(): ReactNode {
+    override render(): ReactNode {
         if (this.state.hasError) {
             return (
                 <ErrorFallback

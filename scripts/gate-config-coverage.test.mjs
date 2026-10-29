@@ -77,9 +77,12 @@ export const readJsonLinks = (source) => relativeOnly(capture(source, JSON_LINK)
 /** The repository file a relative specifier names, or null when it names no tracked file. */
 export const resolveLink = (from, specifier, files) => {
     const base = path.posix.normalize(path.posix.join(path.posix.dirname(from), specifier));
+    // tsc reads a folder named by a tsconfig as the tsconfig.json inside it; an import never does.
+    const folderConfig = TSCONFIG.test(path.posix.basename(from)) ? [`${base}/tsconfig.json`] : [];
     const candidates = [
         base,
         ...EXTENSIONS.map((extension) => `${base}${extension}`),
+        ...folderConfig,
         ...EXTENSIONS.map((extension) => `${base}/index${extension}`)
     ];
     return candidates.find((candidate) => files.has(candidate)) ?? null;
@@ -172,6 +175,18 @@ describe('reading the links out of a config', () => {
         assert.equal(resolveLink('x/y.ts', '../lib', files), 'lib/index.ts');
         assert.equal(resolveLink('vite.config.ts', './package.json', files), 'package.json');
         assert.equal(resolveLink('x.ts', './missing', files), null);
+    });
+
+    it('resolves a folder a tsconfig references to the tsconfig inside it, and only for a tsconfig', () => {
+        const files = new Set(['.storybook/tsconfig.json', 'pkg/tsconfig.json', 'pkg/index.ts']);
+
+        assert.equal(
+            resolveLink('tsconfig.json', './.storybook', files),
+            '.storybook/tsconfig.json'
+        );
+        assert.equal(resolveLink('tsconfig.app.json', './pkg', files), 'pkg/tsconfig.json');
+        assert.equal(resolveLink('vite.config.ts', './pkg', files), 'pkg/index.ts');
+        assert.equal(resolveLink('tsconfig.json', './empty', files), null);
     });
 });
 

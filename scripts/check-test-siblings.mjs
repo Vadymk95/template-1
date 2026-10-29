@@ -17,7 +17,8 @@
 // The range's base is `HEAD~1` under CI (the pull-request merge commit's first parent, which is why
 // ci.yml checks out with `fetch-depth: 2`), and the merge base with origin/master or origin/main
 // elsewhere. A shallow clone with no parent to compare with fails loud: judging nothing is not a
-// pass. The very first commit of a full clone has no base and is not judged (the index guards it).
+// pass. The very first commit has nothing earlier to compare with and is not judged, staged (no
+// HEAD yet) or in a range (no base): a fork's first commit is the whole template.
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
@@ -150,9 +151,21 @@ const readStaged = (git) => {
     const changed = git(['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR']);
     const tracked = git(['ls-files', '-z']);
     if (changed === null || tracked === null) return { error: 'cannot read the git index' };
+
+    const trackedFiles = new Set(splitNul(tracked));
+
+    // No HEAD means no commit yet: everything staged is new, a fork's first commit carries the whole
+    // template, and judging it would fail on every starter file that has no sibling.
+    if (git(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']) === null) {
+        return {
+            files: [],
+            tracked: trackedFiles,
+            note: 'no commit yet (the first commit): nothing to check'
+        };
+    }
     return {
         files: splitNul(changed),
-        tracked: new Set(splitNul(tracked)),
+        tracked: trackedFiles,
         subject: 'staged source files',
         remedy: 'a test that is not `git add`ed does not count'
     };
@@ -172,8 +185,8 @@ const readRange = ({ git, env, baseRef, head }) => {
     const remedy = 'commit the test with the source; a test only on disk does not count';
 
     // The first commit has nothing to compare with, and a template's own first commit is exactly
-    // that: judging it would fail a fork's first push on the template's existing files. The index
-    // still guards that commit when the hooks are installed.
+    // that: judging it would fail a fork's first push on the template's existing files. The staged
+    // check leaves that commit alone for the same reason.
     if (base.root) {
         return {
             files: [],

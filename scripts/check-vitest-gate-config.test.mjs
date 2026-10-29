@@ -1,9 +1,15 @@
 // @vitest-environment node
 //
-// Guards one property of the unit-test config: a focused test (`.only`) must fail the run on a
-// developer machine too, not only in CI. Vitest's own default is `allowOnly: !isCI`, so without an
-// explicit `false` a stray `.only` skips every other test in its file and the local gate, the
-// pre-commit hook and the push gate all stay green; only the first CI run would object.
+// Guards two properties of the unit-test config.
+//
+// A focused test (`.only`) must fail the run on a developer machine too, not only in CI. Vitest's own
+// default is `allowOnly: !isCI`, so without an explicit `false` a stray `.only` skips every other test
+// in its file and the local gate, the pre-commit hook and the push gate all stay green; only the first
+// CI run would object.
+//
+// A mock is reset before each test. Vitest's default keeps a mock's calls and its implementation from
+// one test to the next, so a test that passes alone can pass or fail depending on which test ran
+// before it, and a call count asserted in one test includes the calls of the last.
 //
 // The config reads `process.env` at import time through the shared Vite config, so each case takes a
 // fresh module instance (`vi.resetModules()` plus a re-import), as the Playwright config guard does.
@@ -39,5 +45,13 @@ describe('vitest.config.ts allowOnly', () => {
         const config = await importConfig();
 
         expect(config.test.allowOnly).toBe(false);
+    });
+});
+
+describe('vitest.config.ts mockReset', () => {
+    it('resets every mock before each test', async () => {
+        const config = await importConfig();
+
+        expect(config.test.mockReset).toBe(true);
     });
 });

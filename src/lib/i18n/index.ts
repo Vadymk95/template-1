@@ -54,7 +54,7 @@ const i18nInitPromise = i18next
                       return namespaces
                           .map(
                               (ns: string) =>
-                                  `/${LOCALES_DIR}/${lngs[0]}/${ns}.json?v=${String(timestamp)}`
+                                  `/${LOCALES_DIR}/${lngs[0] ?? DEFAULT_LANGUAGE}/${ns}.json?v=${String(timestamp)}`
                           )
                           .join(',');
                   }

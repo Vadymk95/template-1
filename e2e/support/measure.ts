@@ -25,9 +25,11 @@ export interface MeasureSelectors {
 
 export interface MeasuredElement {
     chWidth: number;
+    clientHeight: number;
     clientWidth: number;
     contentWidth: number;
     display: string;
+    fontSize: number;
     hasTextLabel: boolean;
     height: number;
     isControl: boolean;
@@ -35,6 +37,8 @@ export interface MeasuredElement {
     label: string;
     lineCount: number;
     overflowX: string;
+    overflowY: string;
+    scrollHeight: number;
     scrollWidth: number;
     selector: string;
     width: number;
@@ -100,11 +104,13 @@ export const measureSubtree = (
     };
 
     const getVisibleText = (element: HTMLElement): string => {
-        // A field's own value or placeholder IS its visible text; it has no text child nodes, so walking
-        // children would report every input as unlabelled — and an unlabelled control is then held to the
-        // icon-only width rule, which a full-width field cannot fail meaningfully.
+        // A field's own value, its placeholder or the text of the `<label>` bound to it IS its visible
+        // text; it has no text child nodes, so walking children would report every input as unlabelled —
+        // and an unlabelled control is then held to the icon-only width rule, which a full-width field
+        // cannot fail meaningfully. A field with no placeholder is still named by its bound label.
         if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-            return (element.value || element.placeholder).trim();
+            const boundLabels = Array.from(element.labels ?? [], (label) => label.textContent);
+            return (element.value || element.placeholder || boundLabels.join(' ')).trim();
         }
         if (element instanceof HTMLSelectElement) {
             return (element.selectedOptions[0]?.textContent ?? '').trim();
@@ -157,6 +163,7 @@ export const measureSubtree = (
             const visibleText = isControl ? getVisibleText(element) : '';
             return {
                 chWidth: isControl ? measureCh(element) : 0,
+                clientHeight: element.clientHeight,
                 clientWidth: element.clientWidth,
                 contentWidth: Math.max(
                     0,
@@ -165,6 +172,7 @@ export const measureSubtree = (
                         Number.parseFloat(style.paddingRight)
                 ),
                 display: style.display,
+                fontSize: Number.parseFloat(style.fontSize),
                 hasTextLabel: visibleText.length > 0,
                 height: rect.height,
                 isControl,
@@ -172,6 +180,8 @@ export const measureSubtree = (
                 label: visibleText,
                 lineCount: isControl ? getTextLineCount(element) : 0,
                 overflowX: style.overflowX,
+                overflowY: style.overflowY,
+                scrollHeight: element.scrollHeight,
                 scrollWidth: element.scrollWidth,
                 selector:
                     element.dataset.slot ??

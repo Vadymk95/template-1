@@ -27,7 +27,8 @@ import { useTheme } from '@/hooks/theme/useTheme';
 const order = ['light', 'dark', 'system'] as const;
 type Theme = (typeof order)[number];
 
-const nextTheme = (current: Theme): Theme => order[(order.indexOf(current) + 1) % order.length];
+const nextTheme = (current: Theme): Theme =>
+    order[(order.indexOf(current) + 1) % order.length] ?? order[0];
 
 const iconByTheme: Record<Theme, FunctionComponent<{ className?: string }>> = {
     light: Sun,

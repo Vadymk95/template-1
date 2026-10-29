@@ -20,7 +20,12 @@ describe('cross-browser spec selection', () => {
     it('refuses a spec that is not a layout spec', () => {
         // The accepting direction alone would pass with a pattern of `/\.spec\.ts$/`, which would drag
         // the whole suite onto three engines.
-        for (const spec of ['smoke.spec.ts', 'routes.spec.ts', 'content-stress.test.ts']) {
+        for (const spec of [
+            'smoke.spec.ts',
+            'routes.spec.ts',
+            'content-stress.test.ts',
+            'csp-guard.test.ts'
+        ]) {
             expect(LAYOUT_SPEC_PATTERN.test(spec), `${spec} should not be selected`).toBe(false);
         }
     });

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    type BlockOverflowMeasurement,
     getLabelMeasureCh,
+    hasBlockOverflow,
     hasContentOverflow,
     hasDocumentOverflow,
     hasInsufficientControlTarget,
@@ -79,6 +81,76 @@ describe('layout invariants', () => {
                     scrollWidth: 176,
                     overflowX: 'visible'
                 }),
+                `${display} must not be exempt`
+            ).toBe(true);
+        }
+    });
+
+    // A 16px box that is 100px tall: the allowance below it is one pixel of rounding plus a quarter em.
+    const block = (overrides: Partial<BlockOverflowMeasurement>): BlockOverflowMeasurement => ({
+        clientHeight: 100,
+        display: 'block',
+        fontSize: 16,
+        overflowY: 'visible',
+        scrollHeight: 100,
+        ...overrides
+    });
+
+    it('flags content taller than its box, whether it paints past it or is clipped', () => {
+        // The inline-axis rule cannot see this: nothing is wider, so scrollWidth agrees with clientWidth.
+        // `hidden` is a violation too, because clipped content is lost content. At 16px the allowance
+        // is one pixel plus four, so 5px over passes and 6px over does not.
+        for (const overflowY of ['visible', 'hidden']) {
+            expect(
+                hasBlockOverflow(block({ overflowY, scrollHeight: 105 })),
+                `${overflowY} at the allowance`
+            ).toBe(false);
+            expect(
+                hasBlockOverflow(block({ overflowY, scrollHeight: 106 })),
+                `${overflowY} past the allowance`
+            ).toBe(true);
+        }
+    });
+
+    it('forgives the overhang of a tight line box in proportion to the font size, and no more', () => {
+        // Measured: Inter at 36px in the 40px line box of a heading reads a scrollHeight 2px over, and a
+        // flat one-pixel tolerance flagged every such heading. At 36px the allowance is 1 + 9.
+        expect(hasBlockOverflow(block({ clientHeight: 40, fontSize: 36, scrollHeight: 42 }))).toBe(
+            false
+        );
+        expect(hasBlockOverflow(block({ clientHeight: 40, fontSize: 36, scrollHeight: 50 }))).toBe(
+            false
+        );
+        expect(hasBlockOverflow(block({ clientHeight: 40, fontSize: 36, scrollHeight: 51 }))).toBe(
+            true
+        );
+        // The same 8px over is a spill on small text, where the allowance is 1 + 3.
+        expect(hasBlockOverflow(block({ clientHeight: 40, fontSize: 12, scrollHeight: 48 }))).toBe(
+            true
+        );
+        // A label that wrapped into a one-line box overflows by whole lines, at any size.
+        expect(hasBlockOverflow(block({ clientHeight: 24, fontSize: 16, scrollHeight: 288 }))).toBe(
+            true
+        );
+    });
+
+    it('lets an element that opted into vertical scrolling scroll', () => {
+        for (const overflowY of ['auto', 'scroll']) {
+            expect(
+                hasBlockOverflow(block({ overflowY, scrollHeight: 400 })),
+                `${overflowY} is a decision to scroll`
+            ).toBe(false);
+        }
+    });
+
+    it('exempts an inline box on the block axis too, and only an exactly inline one', () => {
+        // Same reason as the inline-axis rule: CSSOM gives an inline non-replaced box a clientHeight of 0.
+        expect(
+            hasBlockOverflow(block({ clientHeight: 0, display: 'inline', scrollHeight: 176 }))
+        ).toBe(false);
+        for (const display of ['inline-block', 'inline-flex', 'block', 'flex', 'grid']) {
+            expect(
+                hasBlockOverflow(block({ clientHeight: 0, display, scrollHeight: 176 })),
                 `${display} must not be exempt`
             ).toBe(true);
         }

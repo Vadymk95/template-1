@@ -104,6 +104,52 @@ describe('check-hooks', () => {
         expect(run(repo, { CI: 'true' }).code).toBe(0);
     });
 
+    describe('an app that sits in a subfolder of its git repository', () => {
+        /* The gate's scripts read git paths as relative to the repository root: staged names, the
+           hooks path, `ref:path`. From a subfolder they match nothing and say nothing, and this
+           check itself resolved .husky/_ against the folder it ran in, so a fully "installed" app
+           there passed while git ran no hook. The app sits at the root or the check refuses. */
+        const subfolderApp = () => {
+            repo = makeRepo();
+            const app = join(repo, 'app');
+            mkdirSync(join(app, '.husky/_'), { recursive: true });
+            execFileSync('git', ['config', 'core.hooksPath', '.husky/_'], {
+                cwd: app,
+                env: CLEAN_ENV,
+                stdio: CAPTURE
+            });
+            return app;
+        };
+
+        it('refuses, and says the app must sit at the git root', () => {
+            const verdict = run(subfolderApp());
+            expect(verdict.code).toBe(1);
+            expect(verdict.output).toContain('the app must sit at the git root');
+            expect(verdict.output).toContain('"app/"');
+        });
+
+        it('refuses on CI as well, the early exit does not come first', () => {
+            const verdict = run(subfolderApp(), { CI: 'true' });
+            expect(verdict.code).toBe(1);
+            expect(verdict.output).toContain('the app must sit at the git root');
+        });
+
+        it('answers for the CWD repo even when a hook-exported GIT_DIR points at another repo', () => {
+            const app = subfolderApp();
+            const otherRepo = makeRepo();
+            try {
+                const verdict = run(app, {
+                    GIT_DIR: join(otherRepo, '.git'),
+                    GIT_WORK_TREE: otherRepo
+                });
+                expect(verdict.code).toBe(1);
+                expect(verdict.output).toContain('the app must sit at the git root');
+            } finally {
+                rmSync(otherRepo, { recursive: true, force: true });
+            }
+        });
+    });
+
     it('answers for the CWD repo even when a hook-exported GIT_DIR points at another repo', () => {
         /* The GIT_DIR leak, reproduced: without the env strip, `git config` reads the OTHER
            repo's config and this check both lies and (in the write direction) mutates the wrong

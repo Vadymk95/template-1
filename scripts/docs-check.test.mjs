@@ -23,7 +23,9 @@ import {
     checkCiRunSteps,
     checkCommandTable,
     checkDeadDocs,
+    checkDecisionShape,
     checkGateChains,
+    checkGateFlags,
     checkMemoryImports,
     checkQuarantine,
     checkPathsAndScripts,
@@ -47,6 +49,7 @@ import {
     gateVocabulary,
     isPullRequestTriggered,
     listMarkdownFiles,
+    listRepoFiles,
     listTestFiles,
     normalizeHeading,
     parseTraceRows,
@@ -59,7 +62,8 @@ import {
     scriptSteps,
     stageName,
     stagesNamed,
-    stepLabel
+    stepLabel,
+    suiteNotes
 } from './docs-check.mjs';
 
 const ctx = {
@@ -124,23 +128,101 @@ describe('scriptFamilies', () => {
     });
 });
 
+const gitEnvironment = () =>
+    Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+
+/**
+ * A throwaway git repository holding `files` (path -> text), staged; `check(root, git)` runs inside it.
+ * GIT_* leaves process.env for the call: a hook chain exports them, and a child git that inherits
+ * them answers for the real repository instead of this one.
+ */
+const withGitRepo = (files, check) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'docs-check-git-'));
+    const git = (...args) =>
+        execFileSync('git', args, { cwd: root, env: gitEnvironment(), stdio: 'ignore' });
+    const saved = Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'));
+    try {
+        git('init', '-q');
+        for (const [file, text] of Object.entries(files)) {
+            mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+            writeFileSync(path.join(root, file), text);
+        }
+        git('add', '-A');
+        for (const [key] of saved) delete process.env[key];
+        check(root, git);
+    } finally {
+        for (const [key, value] of saved) process.env[key] = value;
+        rmSync(root, { recursive: true, force: true });
+    }
+};
+
 describe('checkPathsAndScripts', () => {
-    it('flags a missing script and a missing anchored path, skips history files', () => {
-        const docs = [
-            ['README.md', 'run `npm run nope` then open `scripts/missing.mjs` or `PLAN.md`'],
-            ['AGENTS.md', '`npm run verify:*` is fine, `npm run gone:*` is not'],
-            ['.cursor/brain/DECISIONS.md', 'old `scripts/gone.mjs`']
-        ];
-        const findings = checkPathsAndScripts({
+    const judge = (docs, extra = {}) =>
+        checkPathsAndScripts({
             docs,
             root: '/nowhere',
             scripts: { 'verify:iter': 'x' },
-            topDirs: new Set(['scripts'])
+            topDirs: new Set(['scripts']),
+            ...extra
         });
+
+    it('flags a missing script and a missing anchored path', () => {
+        const docs = [
+            ['README.md', 'run `npm run nope` then open `scripts/missing.mjs` or `PLAN.md`'],
+            ['AGENTS.md', '`npm run verify:*` is fine, `npm run gone:*` is not']
+        ];
+        const findings = judge(docs);
         expect(findings).toHaveLength(3);
         expect(findings[0]).toContain('npm run nope');
         expect(findings[1]).toContain('scripts/missing.mjs');
         expect(findings[2]).toContain('npm run gone:*');
+    });
+
+    it('judges the paths a history file cites and leaves its scripts alone', () => {
+        const docs = [
+            [
+                '.cursor/brain/DECISIONS.md',
+                'old `scripts/gone.mjs`, `npm run gone` and `npm run gone:*`'
+            ]
+        ];
+        expect(judge(docs)).toEqual([
+            '.cursor/brain/DECISIONS.md:1: `scripts/gone.mjs` does not exist in the tree'
+        ]);
+    });
+
+    describe('a line pointer', () => {
+        const here = { root: process.cwd() };
+        const finding = (file, token) =>
+            `${file}:1: \`${token}\` cites a line number — name the symbol instead, a line moves with every edit`;
+
+        it('is a finding on an anchored path, a range too, in a doc and in a history file', () => {
+            const docs = [
+                ['AGENTS.md', 'see `scripts/docs-check.mjs:12` and `scripts/docs-check.mjs:12-20`'],
+                ['.cursor/brain/DECISIONS.md', 'read `scripts/docs-check.mjs:7`']
+            ];
+            expect(judge(docs, here)).toEqual([
+                finding('AGENTS.md', 'scripts/docs-check.mjs:12'),
+                finding('AGENTS.md', 'scripts/docs-check.mjs:12-20'),
+                finding('.cursor/brain/DECISIONS.md', 'scripts/docs-check.mjs:7')
+            ]);
+        });
+
+        it('leaves a path without one, a bare file name and a host with a port alone', () => {
+            const docs = [
+                [
+                    'AGENTS.md',
+                    'open `scripts/docs-check.mjs`, `docs-check.mjs:12` or `localhost:5173`'
+                ]
+            ];
+            expect(judge(docs, here)).toEqual([]);
+        });
+
+        it('is reported beside a missing path, so one run shows both', () => {
+            expect(judge([['README.md', 'at `scripts/missing.mjs:3`']])).toEqual([
+                finding('README.md', 'scripts/missing.mjs:3'),
+                'README.md:1: `scripts/missing.mjs:3` does not exist in the tree'
+            ]);
+        });
     });
 });
 
@@ -149,6 +231,59 @@ describe('pathExists', () => {
         expect(pathExists(process.cwd(), 'scripts/docs-check')).toBe(true);
         expect(pathExists(process.cwd(), 'scripts/docs-check.mjs')).toBe(true);
         expect(pathExists(process.cwd(), 'scripts/nope')).toBe(false);
+    });
+
+    describe('against the files git lists', () => {
+        it('rejects a folder that holds no listed file, one whose files were deleted too', () => {
+            const files = { 'src/kept/a.ts': 'export {};\n', 'src/gone/b.ts': 'export {};\n' };
+            withGitRepo(files, (root) => {
+                mkdirSync(path.join(root, 'src/emptied'), { recursive: true });
+                // Deleted but not staged: the index still lists it, the disk no longer has it.
+                rmSync(path.join(root, 'src/gone/b.ts'));
+                const listed = listRepoFiles(root);
+                expect(pathExists(root, 'src/kept', listed)).toBe(true);
+                expect(pathExists(root, 'src/kept/', listed)).toBe(true);
+                expect(pathExists(root, 'src/emptied', listed)).toBe(false);
+                expect(pathExists(root, 'src/gone', listed)).toBe(false);
+                expect(pathExists(root, 'src/gone/b.ts', listed)).toBe(false);
+                // The same folders still resolve from the disk alone, which is the gap this closes.
+                expect(pathExists(root, 'src/emptied')).toBe(true);
+            });
+        });
+
+        it('counts a new file that is not staged yet and refuses one git ignores', () => {
+            withGitRepo({ '.gitignore': 'ignored/\n', 'src/a.ts': 'export {};\n' }, (root) => {
+                mkdirSync(path.join(root, 'ignored'), { recursive: true });
+                writeFileSync(path.join(root, 'ignored/c.ts'), 'export {};\n');
+                writeFileSync(path.join(root, 'src/fresh.ts'), 'export {};\n');
+                const listed = listRepoFiles(root);
+                expect(pathExists(root, 'src/fresh.ts', listed)).toBe(true);
+                expect(pathExists(root, 'ignored/c.ts', listed)).toBe(false);
+                expect(pathExists(root, 'ignored', listed)).toBe(false);
+            });
+        });
+
+        it('still resolves a module without its extension and a folder by its index', () => {
+            const files = { 'src/lib/logger.ts': 'x', 'src/pages/home/index.tsx': 'x' };
+            withGitRepo(files, (root) => {
+                const listed = listRepoFiles(root);
+                expect(pathExists(root, 'src/lib/logger', listed)).toBe(true);
+                expect(pathExists(root, 'src/pages/home', listed)).toBe(true);
+                expect(pathExists(root, 'src/lib/nope', listed)).toBe(false);
+            });
+        });
+
+        it('falls back to the disk when git cannot list', () => {
+            const root = mkdtempSync(path.join(tmpdir(), 'docs-check-nogit-'));
+            try {
+                writeFileSync(path.join(root, 'a.ts'), 'export {};\n');
+                expect(listRepoFiles(root)).toBeNull();
+                expect(pathExists(root, 'a.ts', null)).toBe(true);
+                expect(pathExists(root, 'b.ts', null)).toBe(false);
+            } finally {
+                rmSync(root, { recursive: true, force: true });
+            }
+        });
     });
 });
 
@@ -419,6 +554,125 @@ describe('listMarkdownFiles', () => {
     });
 });
 
+describe('checkDecisionShape', () => {
+    const FILE = '.cursor/brain/DECISIONS.md';
+    /** A decisions file: an index table of `rows`, then one entry per [title, the lines after its heading]. */
+    const decisions = ({ rows, entries, indexHeading = false }) =>
+        [
+            '# Architectural Decisions',
+            '',
+            ...(indexHeading ? ['## Index', ''] : []),
+            '| Entry | Date | Status |',
+            '| ----- | ---- | ------ |',
+            ...rows.map((title) => `| ${title} | 2026-10 | in force |`),
+            '',
+            ...entries.flatMap(([title, lines]) => [`## [2026-10] ${title}`, ...lines, ''])
+        ].join('\n');
+    const body = (count) => Array.from({ length: count }, (_, index) => `line ${index + 1}`);
+    const shape = (text) => checkDecisionShape({ docs: [[FILE, text]] });
+    const lineOf = (text, needle) =>
+        text.split('\n').findIndex((line) => line.includes(needle)) + 1;
+
+    it('accepts one index row per entry heading', () => {
+        const text = decisions({
+            rows: ['Alpha', 'Beta'],
+            entries: [
+                ['Alpha', body(2)],
+                ['Beta', body(2)]
+            ]
+        });
+        expect(shape(text)).toEqual([]);
+    });
+
+    it('flags an entry heading that has no index row, at the heading', () => {
+        const text = decisions({
+            rows: ['Alpha'],
+            entries: [
+                ['Alpha', body(1)],
+                ['Beta', body(1)]
+            ]
+        });
+        expect(shape(text)).toEqual([
+            `${FILE}:${lineOf(text, '## [2026-10] Beta')}: entry "Beta" has no row in the index table — add one that repeats the heading without its [YYYY-MM] prefix`
+        ]);
+    });
+
+    it('flags an index row that has no entry heading, at the row', () => {
+        const text = decisions({
+            rows: ['Alpha', 'Gamma'],
+            entries: [['Alpha', body(1)]]
+        });
+        expect(shape(text)).toEqual([
+            `${FILE}:${lineOf(text, '| Gamma |')}: index row "Gamma" names no entry — a row repeats an entry heading without its [YYYY-MM] prefix; fix or drop it`
+        ]);
+    });
+
+    it('compares the titles without their [YYYY-MM] prefix, on both sides', () => {
+        const text = decisions({
+            rows: ['[2026-10] Alpha'],
+            entries: [['Alpha', body(1)]]
+        });
+        expect(shape(text)).toEqual([]);
+    });
+
+    it('matches every heading to one row, so a second heading of the same title needs its own', () => {
+        const entries = [
+            ['Alpha', body(1)],
+            ['Alpha', body(1)]
+        ];
+        const once = decisions({ rows: ['Alpha'], entries });
+        expect(shape(once)).toHaveLength(1);
+        expect(shape(once)[0]).toContain('entry "Alpha" has no row');
+        expect(shape(decisions({ rows: ['Alpha', 'Alpha'], entries }))).toEqual([]);
+    });
+
+    it('allows an entry 30 lines after its heading and flags 31', () => {
+        const entry = (lines) => decisions({ rows: ['Alpha'], entries: [['Alpha', lines]] });
+        expect(shape(entry(body(30)))).toEqual([]);
+        const long = entry(body(31));
+        expect(shape(long)).toEqual([
+            `${FILE}:${lineOf(long, '## [2026-10] Alpha')}: entry "Alpha" runs 31 lines after its heading, over the cap of 30 — keep what is true today and point at the evidence for the rest`
+        ]);
+    });
+
+    it('counts the blank lines inside an entry, the one after the heading included', () => {
+        const entry = (lines) => decisions({ rows: ['Alpha'], entries: [['Alpha', lines]] });
+        expect(shape(entry(['', ...body(29)]))).toEqual([]);
+        expect(shape(entry(['', ...body(30)]))).toHaveLength(1);
+        expect(shape(entry([...body(15), '', ...body(14)]))).toEqual([]);
+        expect(shape(entry([...body(15), '', ...body(15)]))).toHaveLength(1);
+    });
+
+    it('does not count the blank lines that end an entry', () => {
+        const text = decisions({
+            rows: ['Alpha'],
+            entries: [['Alpha', [...body(30), '', '', '', '']]]
+        });
+        expect(shape(text)).toEqual([]);
+    });
+
+    it('ignores an Index heading and the table under it, however long', () => {
+        const titles = Array.from({ length: 35 }, (_, index) => `Entry ${index + 1}`);
+        const text = decisions({
+            rows: titles,
+            entries: titles.map((title) => [title, body(1)]),
+            indexHeading: true
+        });
+        expect(shape(text)).toEqual([]);
+    });
+
+    it('reads headings outside fenced code only', () => {
+        const fenced = ['```md', '## [2026-10] Not an entry', '```', ...body(1)];
+        const text = decisions({ rows: ['Alpha'], entries: [['Alpha', fenced]] });
+        expect(shape(text)).toEqual([]);
+    });
+
+    it('reads the decisions file and no other', () => {
+        const text = decisions({ rows: [], entries: [['Alpha', body(40)]] });
+        expect(checkDecisionShape({ docs: [['README.md', text]] })).toEqual([]);
+    });
+});
+
 describe('run: section pointers', () => {
     const withRepo = (agents, check) => {
         const root = mkdtempSync(path.join(tmpdir(), 'docs-check-run-'));
@@ -446,6 +700,57 @@ describe('run: section pointers', () => {
     it('passes when every section pointer resolves', () => {
         withRepo('See `README.md` § Setup.\n', (findings) => {
             expect(findings).toEqual([]);
+        });
+    });
+});
+
+describe('run: the files and the decisions file the checks read', () => {
+    const DECISIONS = '.cursor/brain/DECISIONS.md';
+    const table = ['| Entry | Date | Status |', '| ----- | ---- | ------ |'];
+    /** A repo whose docs are `docs` (path -> text), plus the files every run needs; `check(root, findings)` runs on it. */
+    const inRepo = (docs, check) => {
+        const files = {
+            'scripts/gate-tiers.json': '{}',
+            'package.json': '{"scripts":{}}',
+            'package-lock.json': '{"packages":{}}',
+            'README.md': '# Readme\n',
+            'src/kept/a.ts': 'export {};\n',
+            ...docs
+        };
+        withGitRepo(files, (root, git) => {
+            check(root, () => run({ root, today: '2026-10-09' }).findings, git);
+        });
+    };
+
+    it('judges a cited folder against the files git lists, not against the disk', () => {
+        inRepo({ 'AGENTS.md': 'Cites `src/kept/` and `src/emptied/`.\n' }, (root, findingsOf) => {
+            mkdirSync(path.join(root, 'src/emptied'), { recursive: true });
+            expect(findingsOf()).toEqual([
+                'AGENTS.md:1: `src/emptied/` does not exist in the tree'
+            ]);
+        });
+    });
+
+    it('fails the check on a decision whose evidence path is gone', () => {
+        const text = [...table, '| Alpha | 2026-10 | in force |', '', '## [2026-10] Alpha', ''];
+        const docs = {
+            'AGENTS.md': 'History: `.cursor/brain/DECISIONS.md`.\n',
+            [DECISIONS]: `${text.join('\n')}**Evidence:** \`src/gone.ts\`, \`src/kept/a.ts\`.\n`
+        };
+        inRepo(docs, (_root, findingsOf) => {
+            expect(findingsOf()).toEqual([
+                `${DECISIONS}:6: \`src/gone.ts\` does not exist in the tree`
+            ]);
+        });
+    });
+
+    it('fails the check on an entry that has no index row', () => {
+        const text = [...table, '', '## [2026-10] Alpha', '', 'Body.', ''].join('\n');
+        const docs = { 'AGENTS.md': 'History: `.cursor/brain/DECISIONS.md`.\n', [DECISIONS]: text };
+        inRepo(docs, (_root, findingsOf) => {
+            expect(findingsOf()).toEqual([
+                `${DECISIONS}:4: entry "Alpha" has no row in the index table — add one that repeats the heading without its [YYYY-MM] prefix`
+            ]);
         });
     });
 });
@@ -2439,6 +2744,59 @@ describe('checkSuiteBudgets', () => {
         expect(findings).toHaveLength(1);
         expect(findings[0]).toContain('test(s)');
     });
+    it('rejects a hand-written _measured count, which goes stale unseen', () => {
+        const stale = { ...suite, max: count + 1, _measured: '7 on 2026-09-13' };
+        const findings = checkSuiteBudgets({ root, suites: { unit: stale } });
+        expect(findings).toHaveLength(1);
+        expect(findings[0]).toContain('suites.unit._measured');
+        expect(findings[0]).toContain('docs:check prints the measurement');
+    });
+
+    describe('suiteNotes', () => {
+        it('reports what each suite measures against its ceiling, inside it or over it', () => {
+            const suites = { _description: 'not a suite', unit: { ...suite, max: count + 1 } };
+            expect(suiteNotes({ root, suites })).toEqual([
+                `suites.unit: ${count} file(s) of ${count + 1}`
+            ]);
+            expect(suiteNotes({ root, suites: { unit: { ...suite, max: 1 } } })).toEqual([
+                `suites.unit: ${count} file(s) of 1`
+            ]);
+        });
+        it('counts test calls when the suite is counted in tests', () => {
+            const calls = {
+                dir: 'scripts',
+                match: 'docs-check\\.test\\.mjs$',
+                count: 'tests',
+                max: 99999
+            };
+            expect(suiteNotes({ root, suites: { calls } })).toEqual([
+                expect.stringMatching(/^suites\.calls: \d+ test\(s\) of 99999$/)
+            ]);
+        });
+        it('has no note for a suite whose directory is missing, which is a finding already', () => {
+            const gone = { gone: { dir: 'nowhere', match: '.', count: 'files', max: 1 } };
+            expect(suiteNotes({ root, suites: gone })).toEqual([]);
+        });
+    });
+});
+
+describe('run: the suite measurement', () => {
+    it('prints the measurement of the browser suite as a note', () => {
+        const suites = { e2e: { dir: 'e2e', match: '\\.spec\\.ts$', count: 'tests', max: 4 } };
+        const files = {
+            'scripts/gate-tiers.json': JSON.stringify({ suites }),
+            'package.json': '{"scripts":{}}',
+            'package-lock.json': '{"packages":{}}',
+            'AGENTS.md': '# Agents\n',
+            'README.md': '# Readme\n',
+            'e2e/a.spec.ts': "test('a', () => {});\ntest('b', () => {});\ntest('c', () => {});\n"
+        };
+        withGitRepo(files, (root) => {
+            const { findings, notes } = run({ root, today: '2026-10-09' });
+            expect(findings).toEqual([]);
+            expect(notes).toEqual(['suites.e2e: 3 test(s) of 4']);
+        });
+    });
 });
 
 describe('checkMemoryImports', () => {
@@ -2900,6 +3258,126 @@ describe('the gate chain view', () => {
             expect(named('a.b')).toEqual(['typecheck']);
             expect(named('axb')).toEqual([]);
         });
+    });
+});
+
+describe('checkGateFlags', () => {
+    const scripts = {
+        verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
+        'verify:inner': 'npm run lint:oxlint && npm run lint && npm run test:coverage',
+        'verify:iter': 'node scripts/gate-trace.mjs verify:iter -- npm run verify:iter:inner',
+        'verify:iter:inner': 'npm run lint:oxlint && vitest run --changed --passWithNoTests',
+        'lint:oxlint': 'oxlint --config .oxlintrc.json --deny-warnings .',
+        lint: 'eslint . --max-warnings 0 --cache',
+        'test:coverage': 'node scripts/check-coverage.mjs',
+        test: 'vitest run',
+        'test:watch': 'vitest'
+    };
+    const checks = { verify: {}, 'verify:iter': {}, lint: {}, test: {} };
+    const flags = (over = {}, extra = {}) =>
+        checkGateFlags({ checks, scripts: { ...scripts, ...over }, ...extra });
+    const lacking = (holder, command, problem) =>
+        `package.json § scripts.${holder}: \`${command}\` ${problem}`;
+
+    it('accepts the strict flags the gate carries, and leaves a script no gate reaches alone', () => {
+        // `test:watch` is plain `vitest` on purpose: it is a desk tool, no check reaches it.
+        expect(flags()).toEqual([]);
+    });
+
+    it('asks every eslint command in a gate for --max-warnings 0', () => {
+        const problem = 'lacks --max-warnings 0, so a lint warning passes the gate';
+        // `lint` is a check of its own and a step of `verify`: one finding, not two.
+        expect(flags({ lint: 'eslint . --cache' })).toEqual([
+            lacking('lint', 'eslint . --cache', problem)
+        ]);
+        expect(flags({ lint: 'eslint . --max-warnings 5' })).toHaveLength(1);
+        expect(flags({ lint: 'eslint . --max-warnings' })).toHaveLength(1);
+        expect(flags({ lint: 'eslint . --max-warnings 0 --fix' })).toEqual([]);
+        expect(flags({ lint: 'eslint . --max-warnings=0' })).toEqual([]);
+    });
+
+    it('catches what the chain view cannot: package.json and the view drift together', () => {
+        const raw = {
+            ...scripts,
+            'verify:inner': 'npm run lint:oxlint && eslint . && npm run test'
+        };
+        const registered = new Set(Object.keys(checks));
+        const view = Object.fromEntries(
+            Object.keys(checks).map((name) => [
+                name,
+                { chain: deriveChain({ scripts: raw, name, registered }) ?? undefined }
+            ])
+        );
+        expect(checkGateChains({ checks: view, scripts: raw })).toEqual([]);
+        expect(checkGateFlags({ checks: view, scripts: raw })).toEqual([
+            lacking(
+                'verify:inner',
+                'eslint .',
+                'lacks --max-warnings 0, so a lint warning passes the gate'
+            )
+        ]);
+    });
+
+    it('asks every oxlint command in a gate for --deny-warnings', () => {
+        const problem = 'lacks --deny-warnings, so a lint warning passes the gate';
+        expect(flags({ 'lint:oxlint': 'oxlint .' })).toEqual([
+            lacking('lint:oxlint', 'oxlint .', problem)
+        ]);
+        expect(flags({ 'lint:oxlint': 'npx --no-install oxlint .' })).toHaveLength(1);
+        expect(flags({ 'lint:oxlint': 'npx --no-install oxlint --deny-warnings .' })).toEqual([]);
+    });
+
+    it('reads through environment assignments, npx and its flags, and a path to the binary', () => {
+        expect(flags({ lint: 'NODE_ENV=ci npx --no-install eslint .' })).toHaveLength(1);
+        expect(flags({ lint: 'NODE_ENV=ci npx -y eslint . --max-warnings 0' })).toEqual([]);
+        expect(flags({ lint: './node_modules/.bin/eslint .' })).toHaveLength(1);
+        expect(flags({ lint: 'eslint-plugin-check .' })).toEqual([]);
+    });
+
+    it('asks vitest in a gate to run once and jest not to watch', () => {
+        const watch = 'is not run-once (`vitest run`), so the gate would start watch mode';
+        expect(flags({ test: 'vitest' })).toEqual([lacking('test', 'vitest', watch)]);
+        expect(flags({ test: 'CI=1 vitest --coverage' })).toHaveLength(1);
+        expect(flags({ test: 'vitest --run' })).toEqual([]);
+        expect(flags({ test: 'vitest related src/a.ts --run' })).toEqual([]);
+        expect(flags({ test: 'jest --watch' })).toEqual([
+            lacking('test', 'jest --watch', 'runs in watch mode, so the gate would never finish')
+        ]);
+        expect(flags({ test: 'jest --watchAll' })).toHaveLength(1);
+        expect(flags({ test: 'jest --ci' })).toEqual([]);
+    });
+
+    it('keeps --passWithNoTests to the iterate chain', () => {
+        const outside = 'vitest run --passWithNoTests';
+        const problem =
+            'carries --passWithNoTests outside the iterate chain (verify:iter), so a gate that finds no test passes';
+        expect(flags({ 'verify:inner': `npm run lint:oxlint && ${outside}` })).toEqual([
+            lacking('verify:inner', outside, problem)
+        ]);
+        expect(flags({ test: outside })).toEqual([lacking('test', outside, problem)]);
+    });
+
+    it('names the iterate chain from the moment it is given', () => {
+        const problem =
+            'carries --passWithNoTests outside the iterate chain (quick), so a gate that finds no test passes';
+        expect(flags({}, { iterate: 'quick' })).toEqual([
+            lacking('verify:iter:inner', 'vitest run --changed --passWithNoTests', problem)
+        ]);
+    });
+
+    it('flags --passWithNoTests in a script the iterate chain shares with another chain', () => {
+        const shared = { 'verify:inner': 'npm run lint:oxlint && npm run verify:iter:inner' };
+        const problem =
+            'carries --passWithNoTests outside the iterate chain (verify:iter), so a gate that finds no test passes';
+        expect(flags(shared)).toEqual([
+            lacking('verify:iter:inner', 'vitest run --changed --passWithNoTests', problem)
+        ]);
+    });
+
+    it('passes over a check with no script and a step that names no script', () => {
+        const ghost = { ...checks, ghost: {} };
+        const gone = { 'verify:inner': 'npm run nope && npm run lint' };
+        expect(checkGateFlags({ checks: ghost, scripts: { ...scripts, ...gone } })).toEqual([]);
     });
 });
 
@@ -3872,7 +4350,7 @@ describe('retellingSources', () => {
 
 describe('run: the gate chain', () => {
     /** A temp repo whose package.json defines `verify` and whose gate-tiers.json carries `tiers`. */
-    const withRepo = ({ tiers, readme }, check) => {
+    const withRepo = ({ tiers, readme, oxlint = 'oxlint --deny-warnings .' }, check) => {
         const root = mkdtempSync(path.join(tmpdir(), 'docs-check-chain-'));
         try {
             mkdirSync(path.join(root, 'scripts'));
@@ -3887,7 +4365,7 @@ describe('run: the gate chain', () => {
                         verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
                         'verify:inner':
                             'node scripts/check-hooks.mjs && npm run lint:oxlint && npm run build',
-                        'lint:oxlint': 'oxlint .',
+                        'lint:oxlint': oxlint,
                         build: 'vite build'
                     }
                 })
@@ -3909,6 +4387,15 @@ describe('run: the gate chain', () => {
     it('passes when the chain view matches and no doc retells it', () => {
         withRepo({ tiers: tiers(chain), readme: '# Readme\n\nSee the gate.\n' }, (findings) => {
             expect(findings).toEqual([]);
+        });
+    });
+
+    it('fails the check on a gate command that lost its strict flag', () => {
+        const withoutFlag = { tiers: tiers(chain), readme: '# Readme\n', oxlint: 'oxlint .' };
+        withRepo(withoutFlag, (findings) => {
+            expect(findings).toEqual([
+                'package.json § scripts.lint:oxlint: `oxlint .` lacks --deny-warnings, so a lint warning passes the gate'
+            ]);
         });
     });
 
@@ -3978,7 +4465,7 @@ describe('run: the files the retelling check reads', () => {
                         verify: 'node scripts/gate-trace.mjs verify -- npm run verify:inner',
                         'verify:inner':
                             'node scripts/check-hooks.mjs && npm run lint:oxlint && npm run build',
-                        'lint:oxlint': 'oxlint .',
+                        'lint:oxlint': 'oxlint --deny-warnings .',
                         build: 'vite build'
                     }
                 })
@@ -4073,7 +4560,7 @@ describe('run: compositions', () => {
         'verify:ci': 'node scripts/gate-trace.mjs verify:ci -- npm run verify:ci:inner',
         'verify:ci:inner': 'npm run audit:gate && npm run verify',
         'verify:native': 'npm run verify:ci && npm run doctor',
-        'lint:oxlint': 'oxlint .',
+        'lint:oxlint': 'oxlint --deny-warnings .',
         'audit:gate': 'node scripts/audit-gate.mjs',
         doctor: 'expo-doctor'
     };
@@ -4190,7 +4677,7 @@ describe('run: compositions', () => {
             'verify:enterprise':
                 'node scripts/gate-trace.mjs verify:enterprise -- npm run verify:enterprise:inner',
             'verify:enterprise:inner': 'node scripts/check-hooks.mjs && npm run lint:oxlint',
-            'lint:oxlint': 'oxlint .'
+            'lint:oxlint': 'oxlint --deny-warnings .'
         };
         const registered = {
             checks: {

@@ -21,7 +21,7 @@ Production-ready React 19 + Vite 8 + TypeScript 6 template with routing, Zustand
 ## 📋 Prerequisites
 
 - **Node.js v24.15+** (use `nvm` for version management; `npm run verify` fails if `engines.node` drops below what the lockfile needs)
-- **npm 11.10+** (Node 24.15 bundles 11.12). `.npmrc` sets `min-release-age`, which older npm ignores with only an `Unknown project config` warning; `engines.npm` plus `engine-strict` make the install refuse instead
+- **npm 11.10+** (Node.js v24.15 bundles 11.12). `.npmrc` sets `min-release-age`, which older npm ignores with only an `Unknown project config` warning; `engines.npm` plus `engine-strict` make the install refuse instead
 - **Git**
 - **lsof** (macOS ships it; Debian/Ubuntu: `apt-get install lsof`). The push gate uses it to free the e2e port; without it that step stops with the install line instead of continuing blind
 
@@ -34,7 +34,7 @@ Strict version pinning via `.nvmrc` and `package.json` engines.
 git clone <your-repo-url>
 cd <your-project-folder>
 
-# Activate Node.js v24.15+ (from .nvmrc)
+# Activate Node 24.16 (from .nvmrc)
 nvm use
 
 # Install dependencies, install git hooks once (lifecycle scripts are
@@ -175,7 +175,7 @@ src/
 | `tsconfig.json`    | TypeScript project references and path aliases  |
 | `eslint.config.js` | Linting rules (Flat Config) including jsx-a11y  |
 | `.oxlintrc.json`   | Oxlint rules for the fast pre-pass              |
-| `.nvmrc`           | Node.js version (v24.15)                        |
+| `.nvmrc`           | Node 24.16, the version `nvm use` activates     |
 | `.env`             | Optional local environment variables            |
 
 ### TypeScript Configuration

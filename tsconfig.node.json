@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
-        "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+        "incremental": true,
+        "tsBuildInfoFile": "./.tsbuild/node.tsbuildinfo",
         "target": "ES2023",
         "lib": ["ES2023"],
         "module": "ESNext",
@@ -16,6 +17,8 @@
 
         /* Linting */
         "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "erasableSyntaxOnly": true,

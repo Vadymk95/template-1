@@ -4,6 +4,7 @@ import { isAcceptedControlTarget } from '../support/control-targets';
 import {
     CONTROL_SELECTOR,
     FIELD_SELECTOR,
+    hasBlockOverflow,
     hasContentOverflow,
     hasDocumentOverflow,
     hasInsufficientControlTarget,
@@ -137,6 +138,22 @@ test.describe('content stress', () => {
                     ) {
                         violations.push(
                             `${component} | ${state} | ${width}px | ${element.selector} | overflow=${element.scrollWidth}-${element.clientWidth}`
+                        );
+                    }
+
+                    // The block axis: content taller than its box, which the width check above cannot see.
+                    if (
+                        !element.isField &&
+                        hasBlockOverflow({
+                            clientHeight: element.clientHeight,
+                            display: element.display,
+                            fontSize: element.fontSize,
+                            overflowY: element.overflowY,
+                            scrollHeight: element.scrollHeight
+                        })
+                    ) {
+                        violations.push(
+                            `${component} | ${state} | ${width}px | ${element.selector} | block-spill=${element.scrollHeight}-${element.clientHeight}`
                         );
                     }
 

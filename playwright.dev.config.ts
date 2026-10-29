@@ -42,6 +42,8 @@ export default defineConfig({
     },
     use: {
         baseURL,
+        // `page.route` cannot see a request a service worker answers (MSW's does in dev).
+        serviceWorkers: 'block',
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
         video: isCI ? 'retain-on-failure' : 'off'

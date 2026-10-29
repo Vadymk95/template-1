@@ -170,8 +170,7 @@
             "dir": "e2e",
             "match": "\\.spec\\.ts$",
             "count": "tests",
-            "max": 10,
-            "_measured": "7 on 2026-09-13"
+            "max": 10
         }
     },
     "moments": {

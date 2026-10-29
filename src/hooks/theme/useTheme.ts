@@ -2,9 +2,20 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { STORAGE_KEYS } from '@/store/keys';
 
-type Theme = 'light' | 'dark' | 'system';
+const THEMES = ['light', 'dark', 'system'] as const;
+
+type Theme = (typeof THEMES)[number];
 
 const STORAGE_KEY = STORAGE_KEYS.THEME;
+
+const isTheme = (value: string | null): value is Theme => THEMES.some((theme) => theme === value);
+
+// A stored value this app never writes (a hand edit, an older release) reads as the OS preference,
+// the way `public/theme-boot.js` reads it, so the hook and the boot script paint the same theme.
+const readStoredTheme = (): Theme => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return isTheme(stored) ? stored : 'system';
+};
 
 const getResolved = (theme: Theme): 'light' | 'dark' =>
     theme === 'system'
@@ -18,9 +29,7 @@ const applyTheme = (theme: Theme): void => {
 };
 
 export const useTheme = (): { theme: Theme; setTheme: (next: Theme) => void } => {
-    const [theme, setThemeState] = useState<Theme>(
-        () => (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'system'
-    );
+    const [theme, setThemeState] = useState<Theme>(readStoredTheme);
 
     useEffect(() => {
         applyTheme(theme);

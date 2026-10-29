@@ -15,7 +15,7 @@ const loadChildPaths = async (): Promise<(string | undefined)[]> => {
     const module = await import('./base.routes');
     const [root] = module.default;
 
-    return (root.children ?? []).map((child) => child.path);
+    return (root!.children ?? []).map((child) => child.path);
 };
 
 describe('base routes', () => {

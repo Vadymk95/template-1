@@ -33,6 +33,10 @@ export default mergeConfig(
             globals: true,
             // Vitest defaults this to `!isCI`, which lets a stray `.only` pass every local gate.
             allowOnly: false,
+            // Vitest keeps a mock's calls and implementation from one test to the next by default.
+            // Resetting before each test returns a mock to the implementation it was created with, so
+            // the order of the tests in a file cannot decide a verdict.
+            mockReset: true,
             environment: 'jsdom',
             setupFiles: ['./src/test/setup.ts'],
             // The runner adds `setupFiles` to this list itself, so the setup file is covered as well.

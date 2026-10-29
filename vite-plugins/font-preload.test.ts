@@ -50,7 +50,7 @@ const run = async (options: { base?: string; css?: string }): Promise<RunResult>
     if (!handler) throw new Error('generateBundle is not defined');
     await handler.call({ warn } as never, {} as never, bundle as never, true);
 
-    return { html: bundle['index.html'].source, warn };
+    return { html: bundle['index.html']!.source, warn };
 };
 
 const preloadFor = (href: string): string =>

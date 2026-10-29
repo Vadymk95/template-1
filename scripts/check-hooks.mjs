@@ -8,9 +8,46 @@
 // sibling repo had hooksPath pointing at its old location and no hook —
 // pre-commit, commit-msg, pre-push — had fired for weeks while this check
 // stayed green. So the config must RESOLVE to this repo's own .husky/_.
+//
+// The app also sits at the git root, CI included: every gate script reads git paths relative to
+// the repository root (staged names, the hooks path, `ref:path`), so from a subfolder they match
+// nothing and say nothing. A refusal here costs one sentence; supporting a subfolder costs every
+// script a rewrite and a test of its own.
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+// GIT_DIR/GIT_WORK_TREE may be exported by git itself when this runs inside a hook chain; a
+// child `git` call inheriting them answers for a DIFFERENT repo than the cwd this check is
+// about (the incident class: a test's tmp-repo git call once rewrote a real core.hooksPath).
+const gitEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+);
+
+// Empty at the root, and empty where git cannot answer (no repository: nothing to refuse here).
+let prefix;
+try {
+    prefix = execFileSync('git', ['rev-parse', '--show-prefix'], {
+        encoding: 'utf8',
+        env: gitEnv,
+        stdio: ['ignore', 'pipe', 'pipe']
+    }).trim();
+} catch {
+    prefix = '';
+}
+
+if (prefix !== '') {
+    console.error(
+        `This app sits in "${prefix}" of its git repository: the app must sit at the git root.`
+    );
+    console.error(
+        'The gate scripts read git paths relative to the repository root, so from a subfolder'
+    );
+    console.error(
+        'the hooks, the sibling-test check and the gate-integrity check match nothing, silently.'
+    );
+    process.exit(1);
+}
 
 if (process.env.CI) {
     process.exit(0);
@@ -23,13 +60,6 @@ if (!existsSync(expected)) {
     console.error('Run once after cloning: npm run prepare');
     process.exit(1);
 }
-
-// GIT_DIR/GIT_WORK_TREE may be exported by git itself when this runs inside a hook chain; a
-// child `git` call inheriting them answers for a DIFFERENT repo than the cwd this check is
-// about (the incident class: a test's tmp-repo git call once rewrote a real core.hooksPath).
-const gitEnv = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
-);
 
 let hooksPath;
 try {
