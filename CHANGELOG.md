@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.5](https://github.com/Vadymk95/template-1/compare/v3.3.4...v3.3.5) (2026-10-29)
+
+
+### Bug fixes
+
+* **gate:** lessons from a fork build: mutation, probe stop, docs rules, typed e2e ([#120](https://github.com/Vadymk95/template-1/issues/120)) ([0b3c181](https://github.com/Vadymk95/template-1/commit/0b3c181748b5b9bcb96b2337da1395ea69e69d3f))
+
 ## [3.3.4](https://github.com/Vadymk95/template-1/compare/v3.3.3...v3.3.4) (2026-10-24)
 
 
