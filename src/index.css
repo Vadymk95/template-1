@@ -1,8 +1,23 @@
 /* Web fonts are listed in `app.config.ts` (`webFontUrls`) and self-hosted at build time by
    vite-plugin-webfont-dl. Don't add `@import url('https://fonts.googleapis.com/...')` here: it
    would send a runtime request to Google despite the plugin's "zero external requests" promise. */
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
 @import 'tw-animate-css';
+
+/*
+ * Tailwind ships a rule for every class-shaped string in every file it scans, so a class quoted in
+ * a test, a spec, a script, a root config file or a doc page became CSS that no page uses.
+ * Automatic detection is off (`source(none)`): only the lines below name what is scanned, which is
+ * this folder minus its tests and test helpers. Paths resolve from this file.
+ *
+ * A new top-level folder that holds class names needs its own `@source` line, or its utilities
+ * silently do not ship. So does `index.html` the day it carries a utility class: today it holds
+ * custom classes only, defined below. `src/pages/DevPlayground` is dev-only but stays scanned,
+ * because the dev server needs its utilities. `scripts/tailwind-sources.test.mjs` pins these lines.
+ */
+@source '.';
+@source not './**/*.{test,spec}.*';
+@source not './test';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
