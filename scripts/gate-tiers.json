@@ -11,7 +11,7 @@
         "verify": {
             "class": "code",
             "description": "the offline gate: every check CI runs except the network-bound ones",
-            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> check-gate-env --kill-port -> lint:oxlint -> format:check -> typecheck -> lint -> test:coverage -> build -> verify:web-vitals-chunks -> size:check -> ensure-playwright -> test:e2e:prod"
+            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> check-gate-env --kill-port -> lint:oxlint -> format:check -> typecheck:force -> lint -> test:coverage -> build -> verify:web-vitals-chunks -> size:check -> ensure-playwright -> test:e2e:prod"
         },
         "verify:ci": {
             "class": "code",
@@ -30,7 +30,7 @@
         "verify:scaffold": {
             "class": "code",
             "description": "phase-0 offline gate: verify without the stages that need a build",
-            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> lint:oxlint -> format:check -> typecheck -> lint -> test:coverage"
+            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> lint:oxlint -> format:check -> typecheck:force -> lint -> test:coverage"
         },
         "verify:scaffold:push": {
             "class": "code",
@@ -125,6 +125,7 @@
             "lint:oxlint": ["oxlint"],
             "format:check": ["format", "prettier"],
             "typecheck": ["tsc", "type-check"],
+            "typecheck:force": ["tsc", "type-check"],
             "lint": ["eslint"],
             "test:coverage": ["coverage"],
             "verify:web-vitals-chunks": ["web-vitals chunks"],

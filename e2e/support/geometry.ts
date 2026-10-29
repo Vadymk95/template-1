@@ -118,7 +118,9 @@ export const hasContentOverflow = ({
  *
  * The tolerance is wider than on the inline axis, by `LINE_BOX_OVERHANG_EM` of the font size: a flat
  * pixel flagged every heading set in a tight line height, which is how the font is drawn, not content
- * that does not fit.
+ * that does not fit. The allowance follows the box's own font size, so a large heading is forgiven
+ * more than small text. A deliberate clamp (`line-clamp`, or a fixed height with `overflow: hidden`)
+ * needs an explicit exemption at the call site, never a wider tolerance.
  */
 export const hasBlockOverflow = ({
     clientHeight,

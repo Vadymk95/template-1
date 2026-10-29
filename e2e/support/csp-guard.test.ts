@@ -153,6 +153,26 @@ describe('isNativeSelectAttrReport', () => {
             ).toBe(false);
         }
     });
+
+    // The measured report blocks `inline` and has no source position; a select report that differs in
+    // either is not the native one.
+    it('does not recognise a select report that blocks anything but inline', () => {
+        for (const blockedURI of ['', 'eval', 'data', 'https://cdn.example.com/x.css']) {
+            expect(
+                isNativeSelectAttrReport({ ...nativeSelectReport, blockedURI }),
+                `blockedURI ${JSON.stringify(blockedURI)} on a select must stay a finding`
+            ).toBe(false);
+        }
+    });
+
+    it('does not recognise a select report that names a source file', () => {
+        expect(
+            isNativeSelectAttrReport({
+                ...nativeSelectReport,
+                sourceFile: 'http://127.0.0.1:4173/assets/index.js'
+            })
+        ).toBe(false);
+    });
 });
 
 describe('isCspEventFinding', () => {
@@ -165,6 +185,15 @@ describe('isCspEventFinding', () => {
 
     it('still fails every other violation in WebKit', () => {
         expect(isCspEventFinding('webkit', { ...nativeSelectReport, targetTag: 'div' })).toBe(true);
+        expect(isCspEventFinding('webkit', { ...nativeSelectReport, blockedURI: 'eval' })).toBe(
+            true
+        );
+        expect(
+            isCspEventFinding('webkit', {
+                ...nativeSelectReport,
+                sourceFile: 'http://127.0.0.1:4173/assets/index.js'
+            })
+        ).toBe(true);
         expect(
             isCspEventFinding('webkit', {
                 ...nativeSelectReport,

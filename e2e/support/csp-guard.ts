@@ -42,14 +42,26 @@ export const CSP_REPORT_FUNCTION = '__reportCspViolation';
  * can fix it, yet an inline style refused anywhere else (a `<div style>`, a `<style>` element) is a
  * real finding and keeps its own event, with its own target.
  *
- * One blind spot, known and accepted: a `style` attribute written on a `<select>` itself reports the
- * same way in WebKit and is hidden with it.
+ * The match asks for everything that was measured, not only the directive and the target: a select
+ * report that blocks anything but `inline`, or that names a source file, is not the native one and
+ * stays a finding.
+ *
+ * One blind spot, known and accepted: a `style` attribute written on a `<select>` itself that WebKit
+ * reports the same way (blocked inline, no source file) is hidden with it.
  */
 export const isNativeSelectAttrReport = ({
     effectiveDirective,
+    blockedURI,
+    sourceFile,
     targetTag
-}: Pick<CspViolationEvent, 'effectiveDirective' | 'targetTag'>): boolean =>
-    effectiveDirective === 'style-src-attr' && targetTag === 'select';
+}: Pick<
+    CspViolationEvent,
+    'effectiveDirective' | 'blockedURI' | 'sourceFile' | 'targetTag'
+>): boolean =>
+    effectiveDirective === 'style-src-attr' &&
+    blockedURI === 'inline' &&
+    sourceFile === '' &&
+    targetTag === 'select';
 
 const WEBKIT = 'webkit';
 

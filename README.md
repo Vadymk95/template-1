@@ -218,6 +218,7 @@ VITE_ENABLE_MSW=false
 | `npm run build`                    | Type-checked production build (Oxc + Brotli)                                               |
 | `npm run preview`                  | Serve production build locally                                                             |
 | `npm run typecheck`                | Runs `tsc -b` (no emit)                                                                    |
+| `npm run typecheck:force`          | Runs `tsc -b --force` (no emit): re-checks every project, ignoring incremental state       |
 | `npm run lint`                     | Run ESLint                                                                                 |
 | `npm run lint:oxlint`              | Fast Oxc-based lint pass (pre-ESLint)                                                      |
 | `npm run format`                   | Format codebase with Prettier                                                              |

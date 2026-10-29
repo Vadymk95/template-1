@@ -507,7 +507,9 @@ export default defineConfig([
             'no-restricted-syntax': 'off'
         }
     },
-    // Playwright — not part of app tsconfig project references; disable type-aware TS rules.
+    // Playwright — `tsc -b` type-checks these files in their own project (`tsconfig.e2e.json`, a
+    // reference of `tsconfig.json`), while ESLint reads them without type information: the type-aware
+    // TS rules are disabled for them here.
     {
         ...tseslint.configs.disableTypeChecked,
         files: ['e2e/**/*.ts', 'playwright.config.ts', 'playwright.dev.config.ts'],
