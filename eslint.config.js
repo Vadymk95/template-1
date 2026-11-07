@@ -13,6 +13,7 @@ import prettierRecommended from 'eslint-plugin-prettier/recommended';
 import pluginReact from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import reactWebApi from 'eslint-plugin-react-web-api';
 import tailwind from 'eslint-plugin-tailwindcss';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
@@ -86,7 +87,8 @@ export default defineConfig([
         plugins: {
             i18next,
             'jsx-a11y': jsxA11y,
-            react: pluginReact
+            react: pluginReact,
+            'react-web-api': reactWebApi
         },
         extends: [
             js.configs.recommended,
@@ -155,6 +157,22 @@ export default defineConfig([
                     'newlines-between': 'always'
                 }
             ],
+
+            // ─── Browser subscriptions started in an effect ──────────────────
+            // A listener, timer, observer or request that outlives its component keeps running after
+            // unmount and holds the component's state. Each rule names the one it catches.
+            // Catches an event listener added in an effect with no removal in the cleanup.
+            'react-web-api/no-leaked-event-listener': 'error',
+            // Catches a request started in an effect with no abort in the cleanup.
+            'react-web-api/no-leaked-fetch': 'error',
+            // Catches an IntersectionObserver started in an effect with no disconnect in the cleanup.
+            'react-web-api/no-leaked-intersection-observer': 'error',
+            // Catches a setInterval in an effect with no clearInterval in the cleanup.
+            'react-web-api/no-leaked-interval': 'error',
+            // Catches a ResizeObserver started in an effect with no disconnect in the cleanup.
+            'react-web-api/no-leaked-resize-observer': 'error',
+            // Catches a setTimeout in an effect with no clearTimeout in the cleanup.
+            'react-web-api/no-leaked-timeout': 'error',
 
             // ─── Console ─────────────────────────────────────────────────────
             // Use src/lib/logger.ts instead. console.* left in code = prod noise.
