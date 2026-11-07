@@ -617,7 +617,8 @@ in CI, both off on the desk run).
 **Status:** in force.
 
 **Decision:** `playwright.config.ts` caps `maxFailures` at 10 when `usePreview` is true (CI or
-`PLAYWRIGHT_USE_PREVIEW=1`); the desk run against the dev server stays uncapped. Each config writes
+`PLAYWRIGHT_USE_PREVIEW=1`); `playwright.dev.config.ts` caps at 10 when `CI` is set; the desk run
+against the dev server stays uncapped in both configs. Each config writes
 to its own `outputDir` (`test-results/e2e`, `test-results/dev`) so `--last-failed` never reads the
 other suite's record.
 

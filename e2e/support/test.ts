@@ -11,8 +11,10 @@ import {
 
 /**
  * `test` for every spec that runs against the built app. Identical to Playwright's, plus one
- * automatic fixture: any Content-Security-Policy violation the page reports while the test runs
- * fails that test, naming the directive and the blocked resource.
+ * automatic fixture: any Content-Security-Policy violation the browser context reports while the test
+ * runs fails that test, naming the directive and the blocked resource. The guard listens on the
+ * CONTEXT, not on the fixture's own page, so a popup or a page a spec opens with `context.newPage()` is
+ * covered too (`./test.test.ts` pins the wiring).
  *
  * Violations are collected from two sources, in every engine: the console, and the standard
  * `securitypolicyviolation` event (see `./csp-guard.ts` for why neither is enough alone). The event
@@ -30,19 +32,19 @@ import {
  */
 export const test = base.extend<{ cspGuard: undefined }>({
     cspGuard: [
-        async ({ page, browserName }, use) => {
+        async ({ context, browserName }, use) => {
             const violations: string[] = [];
-            page.on('console', (message) => {
+            context.on('console', (message) => {
                 if (isCspConsoleFinding(browserName, message.type(), message.text())) {
                     violations.push(message.text());
                 }
             });
-            await page.exposeFunction(CSP_REPORT_FUNCTION, (event: CspViolationEvent) => {
+            await context.exposeFunction(CSP_REPORT_FUNCTION, (event: CspViolationEvent) => {
                 if (isCspEventFinding(browserName, event)) {
                     violations.push(formatCspViolation(event));
                 }
             });
-            await page.addInitScript(listenForCspViolations, CSP_REPORT_FUNCTION);
+            await context.addInitScript(listenForCspViolations, CSP_REPORT_FUNCTION);
 
             await use(undefined);
 

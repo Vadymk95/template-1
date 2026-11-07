@@ -5,7 +5,8 @@
 // missing sibling so a model that skips tests cannot land untested logic.
 //
 // "Exists" means TRACKED, never "is on disk": a sibling the author wrote but did not
-// `git add` (or commit) satisfies nobody who later checks out the change. Staged mode
+// `git add` (or commit) satisfies nobody who later checks out the change. An intent-to-add entry
+// (`git add -N`) is listed by git but carries no content, so it does not count either. Staged mode
 // reads the git index; range mode reads the tree of the head commit.
 //
 // Usage:
@@ -146,26 +147,40 @@ export const resolveBase = ({ git, env, baseRef }) => {
     return { ref: null, root: true };
 };
 
-/** What is about to be committed, and which paths the index tracks. */
+/** What is about to be committed, and which paths the commit will carry. */
 const readStaged = (git) => {
     const changed = git(['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR']);
-    const tracked = git(['ls-files', '-z']);
-    if (changed === null || tracked === null) return { error: 'cannot read the git index' };
-
-    const trackedFiles = new Set(splitNul(tracked));
+    const listed = git(['ls-files', '-z']);
+    if (changed === null || listed === null) return { error: 'cannot read the git index' };
 
     // No HEAD means no commit yet: everything staged is new, a fork's first commit carries the whole
     // template, and judging it would fail on every starter file that has no sibling.
     if (git(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']) === null) {
         return {
             files: [],
-            tracked: trackedFiles,
+            tracked: new Set(splitNul(listed)),
             note: 'no commit yet (the first commit): nothing to check'
         };
     }
+
+    // `ls-files` also lists an intent-to-add entry (`git add -N`): a path with no staged content,
+    // which a commit leaves out. What the commit carries is what HEAD already holds plus the staged
+    // additions, minus the staged deletions (`git rm --cached` then `git add -N` on a path HEAD has
+    // reads as a deletion). `--no-renames` keeps a staged rename's new path in the additions.
+    const committed = git(['ls-tree', '-r', '-z', '--name-only', 'HEAD']);
+    const stagedDiff = (filter) =>
+        git(['diff', '--cached', '--no-renames', '--name-only', '-z', `--diff-filter=${filter}`]);
+    const added = stagedDiff('A');
+    const deleted = stagedDiff('D');
+    if (committed === null || added === null || deleted === null) {
+        return { error: 'cannot read the git index' };
+    }
+    const carried = new Set([...splitNul(committed), ...splitNul(added)]);
+    for (const file of splitNul(deleted)) carried.delete(file);
+
     return {
         files: splitNul(changed),
-        tracked: trackedFiles,
+        tracked: new Set(splitNul(listed).filter((file) => carried.has(file))),
         subject: 'staged source files',
         remedy: 'a test that is not `git add`ed does not count'
     };
