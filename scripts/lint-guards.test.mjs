@@ -25,7 +25,7 @@ const lint = (code, filePath, rules, plugins = {}) => {
         code,
         [
             {
-                files: ['**/*.ts'],
+                files: ['**/*.{ts,tsx}'],
                 plugins,
                 languageOptions: { parser: tseslint.parser, sourceType: 'module' },
                 rules
@@ -282,5 +282,229 @@ describe('hooks are exported from the folders that hold hooks', () => {
 
         expect(result.status, result.stderr).toBe(0);
         expect(JSON.parse(result.stdout)).toEqual({ home: false, outside: true });
+    });
+});
+
+describe('a browser subscription started in an effect is released by its cleanup', () => {
+    const PLUGIN = 'react-web-api';
+    const ERROR_SEVERITY = 2;
+
+    // Every rule of the family, with a component that starts the subscription and returns nothing, and
+    // the same component with the cleanup returned. A listener, a timer, an observer or a request that
+    // outlives its component keeps running after it unmounts and holds the component's state.
+    const CASES = [
+        {
+            rule: 'no-leaked-event-listener',
+            leaking: [
+                "import { useEffect } from 'react';",
+                'export const useResize = (onResize: () => void): void => {',
+                '    useEffect(() => {',
+                "        window.addEventListener('resize', onResize);",
+                '    }, [onResize]);',
+                '};'
+            ],
+            released: [
+                "import { useEffect } from 'react';",
+                'export const useResize = (onResize: () => void): void => {',
+                '    useEffect(() => {',
+                "        window.addEventListener('resize', onResize);",
+                "        return () => window.removeEventListener('resize', onResize);",
+                '    }, [onResize]);',
+                '};'
+            ]
+        },
+        {
+            rule: 'no-leaked-interval',
+            leaking: [
+                "import { useEffect } from 'react';",
+                'export const useTick = (onTick: () => void): void => {',
+                '    useEffect(() => {',
+                '        setInterval(onTick, 500);',
+                '    }, [onTick]);',
+                '};'
+            ],
+            released: [
+                "import { useEffect } from 'react';",
+                'export const useTick = (onTick: () => void): void => {',
+                '    useEffect(() => {',
+                '        const id = setInterval(onTick, 500);',
+                '        return () => clearInterval(id);',
+                '    }, [onTick]);',
+                '};'
+            ]
+        },
+        {
+            rule: 'no-leaked-timeout',
+            leaking: [
+                "import { useEffect } from 'react';",
+                'export const useDelay = (onDone: () => void): void => {',
+                '    useEffect(() => {',
+                '        setTimeout(onDone, 500);',
+                '    }, [onDone]);',
+                '};'
+            ],
+            released: [
+                "import { useEffect } from 'react';",
+                'export const useDelay = (onDone: () => void): void => {',
+                '    useEffect(() => {',
+                '        const id = setTimeout(onDone, 500);',
+                '        return () => clearTimeout(id);',
+                '    }, [onDone]);',
+                '};'
+            ]
+        },
+        {
+            rule: 'no-leaked-fetch',
+            leaking: [
+                "import { useEffect } from 'react';",
+                'export const useLoad = (url: string, onData: (data: unknown) => void): void => {',
+                '    useEffect(() => {',
+                '        void fetch(url).then((response) => response.json()).then(onData);',
+                '    }, [url, onData]);',
+                '};'
+            ],
+            released: [
+                "import { useEffect } from 'react';",
+                'export const useLoad = (url: string, onData: (data: unknown) => void): void => {',
+                '    useEffect(() => {',
+                '        const controller = new AbortController();',
+                '        void fetch(url, { signal: controller.signal })',
+                '            .then((response) => response.json())',
+                '            .then(onData);',
+                '        return () => controller.abort();',
+                '    }, [url, onData]);',
+                '};'
+            ]
+        },
+        {
+            rule: 'no-leaked-intersection-observer',
+            leaking: [
+                "import { useEffect } from 'react';",
+                'export const useSeen = (el: Element, onSeen: () => void): void => {',
+                '    useEffect(() => {',
+                '        const observer = new IntersectionObserver(onSeen);',
+                '        observer.observe(el);',
+                '    }, [el, onSeen]);',
+                '};'
+            ],
+            released: [
+                "import { useEffect } from 'react';",
+                'export const useSeen = (el: Element, onSeen: () => void): void => {',
+                '    useEffect(() => {',
+                '        const observer = new IntersectionObserver(onSeen);',
+                '        observer.observe(el);',
+                '        return () => observer.disconnect();',
+                '    }, [el, onSeen]);',
+                '};'
+            ]
+        },
+        {
+            rule: 'no-leaked-resize-observer',
+            leaking: [
+                "import { useEffect } from 'react';",
+                'export const useWatch = (el: Element, onSize: () => void): void => {',
+                '    useEffect(() => {',
+                '        const observer = new ResizeObserver(onSize);',
+                '        observer.observe(el);',
+                '    }, [el, onSize]);',
+                '};'
+            ],
+            released: [
+                "import { useEffect } from 'react';",
+                'export const useWatch = (el: Element, onSize: () => void): void => {',
+                '    useEffect(() => {',
+                '        const observer = new ResizeObserver(onSize);',
+                '        observer.observe(el);',
+                '        return () => observer.disconnect();',
+                '    }, [el, onSize]);',
+                '};'
+            ]
+        }
+    ];
+
+    const leaks = async (lines, rule, filePath = 'src/hooks/dom/useSubscription.tsx') => {
+        const { rules, plugins } = await eslint.calculateConfigForFile(filePath);
+        const id = `${PLUGIN}/${rule}`;
+        // A rule the config leaves off reports nothing, which must never read as a pass.
+        expect(rules[id], `${id} must be configured`).toBeDefined();
+        return lint(lines.join('\n'), filePath, { [id]: rules[id] }, { [PLUGIN]: plugins[PLUGIN] });
+    };
+
+    it.each(CASES)('$rule is an error', async ({ rule }) => {
+        const { rules } = await eslint.calculateConfigForFile('src/hooks/dom/useSubscription.tsx');
+
+        expect([rules[`${PLUGIN}/${rule}`]?.[0]]).toEqual([ERROR_SEVERITY]);
+    });
+
+    it.each(CASES)('$rule flags an effect that never releases it', async ({ rule, leaking }) => {
+        expect(await leaks(leaking, rule)).toHaveLength(1);
+    });
+
+    it.each(CASES)(
+        '$rule accepts the effect that returns the cleanup',
+        async ({ rule, released }) => {
+            expect(await leaks(released, rule)).toEqual([]);
+        }
+    );
+
+    it('covers a component outside src too, as the other React rules do', async () => {
+        const [{ rule, leaking }] = CASES;
+
+        expect(await leaks(leaking, rule, 'vite-plugins/x.tsx')).toHaveLength(1);
+    });
+});
+
+describe('state derived from other state is computed during render', () => {
+    const RULE = 'react-hooks/set-state-in-effect';
+
+    const derived = async (lines) => {
+        const { rules, plugins } = await eslint.calculateConfigForFile(
+            'src/hooks/state/useFullName.tsx'
+        );
+        expect(rules[RULE], `${RULE} must be configured`).toBeDefined();
+        return lint(
+            lines.join('\n'),
+            'src/hooks/state/useFullName.tsx',
+            { [RULE]: rules[RULE] },
+            { 'react-hooks': plugins['react-hooks'] }
+        );
+    };
+
+    // Covered by the rule the config already has: no second plugin is needed for this form.
+    it('flags a state value that an effect rebuilds from other values', async () => {
+        const found = await derived([
+            "import { useEffect, useState } from 'react';",
+            'export const useFullName = (first: string, last: string): string => {',
+            "    const [full, setFull] = useState('');",
+            '    useEffect(() => {',
+            "        setFull(first + ' ' + last);",
+            '    }, [first, last]);',
+            '    return full;',
+            '};'
+        ]);
+
+        expect(found).toHaveLength(1);
+    });
+
+    it('accepts the value computed while rendering', async () => {
+        const found = await derived([
+            "export const useFullName = (first: string, last: string): string => first + ' ' + last;"
+        ]);
+
+        expect(found).toEqual([]);
+    });
+
+    // Known gap, recorded as a test so a later rule that closes it turns this case red on purpose:
+    // a state copy of a prop with no effect at all is something no rule of the config reports.
+    it('does not flag a state copy of a prop that has no effect (known gap)', async () => {
+        const found = await derived([
+            "import { useState } from 'react';",
+            'export const useCopy = (props: { value: string }): string => {',
+            '    const [value] = useState(props.value);',
+            '    return value;',
+            '};'
+        ]);
+
+        expect(found).toEqual([]);
     });
 });

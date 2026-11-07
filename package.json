@@ -111,6 +111,7 @@
         "eslint-plugin-react": "^7.37.5",
         "eslint-plugin-react-hooks": "^7.1.1",
         "eslint-plugin-react-refresh": "^0.5.7",
+        "eslint-plugin-react-web-api": "5.28.8",
         "eslint-plugin-tailwindcss": "^4.2.0",
         "globals": "^17.13.0",
         "husky": "^9.1.7",
