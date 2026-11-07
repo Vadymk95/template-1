@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.6](https://github.com/Vadymk95/template-1/compare/v3.3.5...v3.3.6) (2026-11-07)
+
+
+### Bug fixes
+
+* **gate:** audit severity, intent-to-add siblings, CSP on the context, unjudgeable gate inputs ([#124](https://github.com/Vadymk95/template-1/issues/124)) ([e1599b2](https://github.com/Vadymk95/template-1/commit/e1599b2e848c3d4692fe4b54a65a21677cdf4344))
+
 ## [3.3.5](https://github.com/Vadymk95/template-1/compare/v3.3.4...v3.3.5) (2026-10-29)
 
 
