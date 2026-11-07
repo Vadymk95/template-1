@@ -22,7 +22,7 @@ Gate: a SKELETONS zone touched → flag the risk and propose mitigation before S
 
 ## Step 2: Simulation
 
-- A task over 3 steps: `sequential-thinking` (if available), `totalThoughts >= 3`, one thought adversarial ("what could break?").
+- A task over 3 steps: write the plan in the reply and run one adversarial pass over it before the first edit ("what could break?").
 - Critique: `@/` aliases, no cycles; Zustand for global state only, TanStack Query for server state only (`createSelectors`, direct store import, no `index.ts` re-export); no magic strings, implicit coupling or untyped contracts; every planned edit strictly necessary.
 - Trace 1–2 cases (happy path + edge) per non-trivial function; a surprise revises the plan before code.
 
@@ -55,8 +55,8 @@ npm run verify:measure                # need to LOOK at a built result? legal at
 
 Green means nothing until you know the gate can go red.
 
-1. Exit code without a pipe: `npm run verify:iter > /tmp/verify.log 2>&1; echo $?`. A pipe to `tail` returns the pipe's status, so a failed build reads as a pass.
-2. Mutation-check the tests in your head, not on disk: if reverting your change would leave the suite green, the test is worthless. Do not edit the code, run the tests and restore it; a physical mutation is for a NEW gate only (item 3), and a pure file move needs none.
+1. Exit code without a pipe: `npm run verify:iter > /tmp/verify.log 2>&1; echo $?`. A pipe to `tail` returns the pipe's status, so a failed build reads as a pass. Write a re-run to its own numbered log (`/tmp/verify-2.log`), never over the first red log, and quote that first red in the hand-back.
+2. Mutation-check the tests in your head, not on disk (the implementer's check; the reviewer's step is in `.claude/commands/review.md`): if reverting your change would leave the suite green, the test is worthless. Do not edit the code, run the tests and restore it; a physical mutation is for a NEW gate only (item 3), and a pure file move needs none.
 3. Prove a new gate gates: break it on purpose once (an expired `scripts/audit-allowlist.json` entry, a raw hex in a component, a staged `src` logic file with no `*.test.*` sibling), watch it refuse, revert.
 4. A check that reports success when it could not run is fail-open: ask what it does on a missing directory, an empty result, no network.
 5. Name the condition under which the green would have been RED; if you cannot, the check proved nothing. Real shapes here: a layout measurement taken while i18next still hides the document sees no element and passes vacuously; a Playwright `testMatch` matching nothing collects zero tests and exits 0; `vitest --coverage` prints `Excluding it from coverage` for a file it could not parse and exits 0.
@@ -65,7 +65,7 @@ Green means nothing until you know the gate can go red.
 
 ### 4.2 Root cause
 
-A failing check: no symptom patch. Trace to the origin (`sequential-thinking`), fix the cause, re-run the loop.
+A failing check: no symptom patch. Trace to the origin (write the trace out in the reply), fix the cause, re-run the loop.
 
 ### 4.3 Review pass
 

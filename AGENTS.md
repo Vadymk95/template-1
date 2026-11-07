@@ -118,8 +118,10 @@ moments, blown budgets, gate runs from a worktree). After a push, gate output in
 the contract: **silence is a failure, not a pass** - a push that printed no gate ran no gate, whatever the
 exit code says.
 
-**Ports.** A busy port means MOVE, never kill a server you did not start; every script that starts its
-own server takes the next free port. Only the push gate clears its own port.
+**Ports.** A busy port means MOVE, never kill a server you did not start. A script that goes through the
+free-port wrapper takes the next free port; a script that pins its port (a strictPort flag, or a fixed
+URL in a browser-test config) fails when the port is busy (free it by stopping YOUR server, never
+someone else's). Only the push gate clears its own port.
 
 ### Lanes - who runs what
 

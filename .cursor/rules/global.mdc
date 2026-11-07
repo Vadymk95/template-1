@@ -29,5 +29,5 @@ Cursor does NOT reliably auto-attach glob-scoped rules (`alwaysApply: false`). T
 
 - **Language:** English only in source, identifiers, comments, JSDoc, tests and Git messages. Brain docs under `.cursor/brain/` too.
 - **Authority:** code is ground truth, `AGENTS.md` the canonical guide, `.cursor/brain/` the depth layer (`AGENTS.md` § Source of truth); sync drift in the same session.
-- **Code:** strict TypeScript; existing libraries over custom logic; minimal code; no magic strings (constants or i18n keys); `sequential-thinking` (if available) for logic, `context7` for library docs.
+- **Code:** strict TypeScript; existing libraries over custom logic; minimal code; no magic strings (constants or i18n keys); a written plan with one adversarial pass for logic, `context7` for library docs.
 - **Git:** `type(scope): description`, English, max 96 chars, no "Co-authored-by" tags (`workflow.mdc` § Git Commits).

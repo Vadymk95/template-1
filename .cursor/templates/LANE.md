@@ -19,14 +19,16 @@ tier law stay in `AGENTS.md`. The numbers below were measured in a fork: startin
 
 - Batch independent reads, 3 to 5 per turn. Read no file over 300 lines whole: find the heading or
   the symbol with a search, then read that range.
-- Send command output to a log and print only the exit code and a tail.
+- Send command output to a log and print only the exit code and a tail. Give every run its own
+  numbered log, never overwrite the first red log, and quote the first red in the hand-back.
 - A lane never waits on a prompt, because nobody answers it: read with Read and Grep, run
   `npm run --prefix <dir>` and `git -C <dir>` instead of `cd`, and use no shell variable and no `;`
   chain.
 - A permission ask, a deny or a hook block is a stop for that one action. Report it with the path and
   the rule, never reach the same file another way (a shell redirect, a script, another tool), and
   continue with the rest.
-- Mutation checks are mental: if reverting the change would leave the suite green, the test is
+- Mutation checks are mental (the implementer's check; the reviewer's step is in
+  `.claude/commands/review.md`): if reverting the change would leave the suite green, the test is
   worthless. Break code on disk only to prove a NEW gate.
 - Keep short working notes in the scratch folder, so that a compaction costs one short re-read. The
   brief is self-contained: never read the lead's files.
