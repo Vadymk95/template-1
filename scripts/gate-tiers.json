@@ -92,6 +92,14 @@
                 "reason": "installs OS-level browser dependencies; not a check"
             },
             {
+                "run": ". /etc/os-release",
+                "reason": "reads the runner's Ubuntu release for the Playwright cache key; not a check"
+            },
+            {
+                "run": "echo \"id=${ID}-${VERSION_ID}\" >> \"$GITHUB_OUTPUT\"",
+                "reason": "hands that release to the cache step as a step output; not a check"
+            },
+            {
                 "run": "npm run build",
                 "reason": "the cross-browser job's own build for the geometry spec on Firefox/WebKit; not a check"
             },
