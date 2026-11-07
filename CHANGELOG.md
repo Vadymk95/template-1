@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.3.7](https://github.com/Vadymk95/template-1/compare/v3.3.6...v3.3.7) (2026-11-07)
+
+
+### Maintenance
+
+* **deps:** bump the minor-and-patch group across 1 directory with 32 updates ([#123](https://github.com/Vadymk95/template-1/issues/123)) ([b95a319](https://github.com/Vadymk95/template-1/commit/b95a31960d83c0aa649c65c67231ee0b744e6bf5))
+* **deps:** bump the size-limit group across 1 directory with 2 updates ([#122](https://github.com/Vadymk95/template-1/issues/122)) ([7f49932](https://github.com/Vadymk95/template-1/commit/7f499328fe41a22bee96c7615a4dc77bf894556b))
+
+
+### CI
+
+* **deps:** bump the actions group across 1 directory with 3 updates ([#113](https://github.com/Vadymk95/template-1/issues/113)) ([5192197](https://github.com/Vadymk95/template-1/commit/51921976ec09d393def23718755623ef8c49d9fa))
+* **workflows:** key the Playwright browser cache by the Ubuntu release ([#126](https://github.com/Vadymk95/template-1/issues/126)) ([82b8fcd](https://github.com/Vadymk95/template-1/commit/82b8fcde30aae516ea91f459baf4380c3b5dcec7))
+
 ## [3.3.6](https://github.com/Vadymk95/template-1/compare/v3.3.5...v3.3.6) (2026-11-07)
 
 
