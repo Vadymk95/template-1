@@ -48,6 +48,7 @@ import {
     gateStages,
     gateVocabulary,
     isPullRequestTriggered,
+    listDocFiles,
     listMarkdownFiles,
     listRepoFiles,
     listTestFiles,
@@ -105,6 +106,14 @@ describe('classifyToken', () => {
         expect(classifyToken('./src/env.ts', ctx)).toEqual({ kind: 'path', value: 'src/env.ts' });
         expect(classifyToken('src/env.ts:12', ctx)).toEqual({ kind: 'path', value: 'src/env.ts' });
         expect(classifyToken('src/env.ts:12-14', ctx)).toEqual({
+            kind: 'path',
+            value: 'src/env.ts'
+        });
+        expect(classifyToken('src/env.ts:12:5', ctx)).toEqual({
+            kind: 'path',
+            value: 'src/env.ts'
+        });
+        expect(classifyToken('./src/env.ts:12:5,', ctx)).toEqual({
             kind: 'path',
             value: 'src/env.ts'
         });
@@ -207,6 +216,27 @@ describe('checkPathsAndScripts', () => {
             ]);
         });
 
+        it('is a finding with a column too, `:12:5`, and still one for `:12` and `:12-14`', () => {
+            const docs = [
+                [
+                    'AGENTS.md',
+                    'see `scripts/docs-check.mjs:12:5`, `scripts/docs-check.mjs:12` and `scripts/docs-check.mjs:12-14`'
+                ]
+            ];
+            expect(judge(docs, here)).toEqual([
+                finding('AGENTS.md', 'scripts/docs-check.mjs:12:5'),
+                finding('AGENTS.md', 'scripts/docs-check.mjs:12'),
+                finding('AGENTS.md', 'scripts/docs-check.mjs:12-14')
+            ]);
+        });
+
+        it('reads a column pointer to a missing path as both findings, not as a different path', () => {
+            expect(judge([['README.md', 'at `scripts/missing.mjs:3:9`']])).toEqual([
+                finding('README.md', 'scripts/missing.mjs:3:9'),
+                'README.md:1: `scripts/missing.mjs:3:9` does not exist in the tree'
+            ]);
+        });
+
         it('leaves a path without one, a bare file name and a host with a port alone', () => {
             const docs = [
                 [
@@ -249,6 +279,16 @@ describe('checkPathsAndScripts', () => {
                     expect(judge(docs, { root, listed: new Set(names) })).toEqual([
                         finding('AGENTS.md', 'eslint.config.js:393'),
                         finding('.cursor/brain/DECISIONS.md', 'package.json:12')
+                    ]);
+                });
+            });
+
+            it('is a finding on a line and column into a file the root holds', () => {
+                const names = ['eslint.config.js'];
+                withFiles(names, (root) => {
+                    const docs = [['AGENTS.md', 'the rules sit at `eslint.config.js:393:7`']];
+                    expect(judge(docs, { root, listed: new Set(names) })).toEqual([
+                        finding('AGENTS.md', 'eslint.config.js:393:7')
                     ]);
                 });
             });
@@ -874,6 +914,48 @@ describe('run: the files and the decisions file the checks read', () => {
             expect(findingsOf()).toEqual([
                 'AGENTS.md:1: `src/emptied/` does not exist in the tree'
             ]);
+        });
+    });
+
+    it('reads a docs/ folder as docs, so a dead path in it is a finding', () => {
+        const docs = {
+            'AGENTS.md': 'Notes: `docs/notes.md`.\n',
+            'docs/notes.md': 'Cites `src/kept/a.ts` and `src/gone.ts`.\n'
+        };
+        inRepo(docs, (_root, findingsOf) => {
+            expect(findingsOf()).toEqual([
+                'docs/notes.md:1: `src/gone.ts` does not exist in the tree'
+            ]);
+        });
+    });
+
+    it('passes a docs/ folder whose paths all resolve, and a repo with no docs/ folder', () => {
+        inRepo(
+            {
+                'AGENTS.md': 'Notes: `docs/notes.md`.\n',
+                'docs/notes.md': 'Cites `src/kept/a.ts`.\n'
+            },
+            (_root, findingsOf) => {
+                expect(findingsOf()).toEqual([]);
+            }
+        );
+        inRepo({ 'AGENTS.md': '# Agents\n' }, (_root, findingsOf) => {
+            expect(findingsOf()).toEqual([]);
+        });
+    });
+
+    it('reads only the doc extensions of docs/, and only the files directly in it', () => {
+        const docs = {
+            'AGENTS.md': 'Notes: `docs/notes.md`.\n',
+            'docs/notes.md': 'Fine.\n',
+            'docs/data.json': '{"p": "`src/gone.ts`"}\n',
+            'docs/nested/deep.md': 'Cites `src/gone.ts`.\n'
+        };
+        inRepo(docs, (root, findingsOf) => {
+            expect(listDocFiles(root)).toContain('docs/notes.md');
+            expect(listDocFiles(root)).not.toContain('docs/data.json');
+            expect(listDocFiles(root)).not.toContain('docs/nested/deep.md');
+            expect(findingsOf()).toEqual([]);
         });
     });
 
@@ -2856,7 +2938,7 @@ describe('checkSuiteBudgets', () => {
     const suite = { dir: 'scripts', match: '\\.test\\.mjs$', count: 'files' };
     /* The fixture derives the count from this repo's own script suites: a hand-written number would go
        stale the next time a script test is added. */
-    const overCeiling = checkSuiteBudgets({ root, suites: { unit: { ...suite, max: 0 } } })[0];
+    const overCeiling = checkSuiteBudgets({ root, suites: { unit: { ...suite, max: 1 } } })[0];
     const count = Number(/: (\d+) file/.exec(overCeiling)?.[1] ?? 0);
     it('passes a suite inside its ceiling', () => {
         expect(count).toBeGreaterThan(0);
@@ -2884,7 +2966,7 @@ describe('checkSuiteBudgets', () => {
             root,
             suites: {
                 _description: 'not a suite',
-                calls: { dir: 'scripts', match: 'docs-check\\.test\\.mjs$', count: 'tests', max: 0 }
+                calls: { dir: 'scripts', match: 'docs-check\\.test\\.mjs$', count: 'tests', max: 1 }
             }
         });
         expect(findings).toHaveLength(1);
@@ -2896,6 +2978,76 @@ describe('checkSuiteBudgets', () => {
         expect(findings).toHaveLength(1);
         expect(findings[0]).toContain('suites.unit._measured');
         expect(findings[0]).toContain('docs:check prints the measurement');
+    });
+
+    describe('a suite that cannot be judged', () => {
+        const valid = { ...suite, max: count + 1 };
+        const finding = (suiteValue) =>
+            checkSuiteBudgets({ root, suites: { unit: suiteValue } }).join('\n');
+
+        it.each([
+            ['zero', 0],
+            ['negative', -1],
+            ['fractional', 1.5],
+            ['a string', '3'],
+            ['not a number', Number.NaN],
+            ['infinite', Number.POSITIVE_INFINITY],
+            ['null', null]
+        ])('refuses a `max` that is %s, and names the suite and the field', (_name, max) => {
+            const text = finding({ ...suite, max });
+            expect(text).toContain('suites.unit');
+            expect(text).toContain('`max`');
+            expect(text).toContain('positive integer');
+        });
+
+        it('refuses an absent `max`', () => {
+            const { max: _absent, ...withoutMax } = valid;
+            expect(finding(withoutMax)).toContain('`max`');
+        });
+
+        it.each(['dir', 'match', 'count'])('refuses a suite with no `%s`', (field) => {
+            const { [field]: _absent, ...partial } = valid;
+            const text = finding(partial);
+            expect(text).toContain('suites.unit');
+            expect(text).toContain(`\`${field}\``);
+        });
+
+        it.each([
+            ['dir', ''],
+            ['dir', 5],
+            ['match', ''],
+            ['match', '('],
+            ['count', 'lines']
+        ])('refuses a `%s` of %j', (field, value) => {
+            expect(finding({ ...valid, [field]: value })).toContain(`\`${field}\``);
+        });
+
+        it('refuses a suite that is not an object', () => {
+            expect(finding('e2e')).toContain('suites.unit');
+            expect(finding(null)).toContain('suites.unit');
+        });
+
+        it('names every bad field of one suite, and judges the others independently', () => {
+            const findings = checkSuiteBudgets({
+                root,
+                suites: { bad: { ...suite, max: 0, match: '' }, fine: valid }
+            });
+            expect(findings).toHaveLength(2);
+            expect(findings.every((line) => line.includes('suites.bad'))).toBe(true);
+        });
+
+        it('accepts a ceiling of exactly one and the whole number it measures', () => {
+            expect(finding({ ...valid, max: count + 1 })).toBe('');
+            expect(finding({ ...valid, max: count })).toBe('');
+        });
+
+        it('leaves the measurement note out for a suite it cannot read', () => {
+            const { dir: _absent, ...noDir } = valid;
+            expect(suiteNotes({ root, suites: { unit: noDir, other: valid } })).toEqual([
+                `suites.other: ${count} file(s) of ${count + 1}`
+            ]);
+            expect(suiteNotes({ root, suites: { unit: 'e2e' } })).toEqual([]);
+        });
     });
 
     describe('suiteNotes', () => {

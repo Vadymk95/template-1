@@ -24,7 +24,7 @@
         "lint:staged": "lint-staged",
         "audit:gate": "node scripts/audit-gate.mjs",
         "lock:age": "node scripts/check-lock-age.mjs",
-        "gate:integrity": "node scripts/check-gate-integrity.mjs --base origin/master",
+        "gate:integrity": "node scripts/check-gate-integrity.mjs",
         "verify": "node scripts/gate-trace.mjs verify -- npm run verify:inner",
         "verify:iter": "node scripts/gate-trace.mjs verify:iter -- npm run verify:iter:inner",
         "verify:ci": "node scripts/gate-trace.mjs verify:ci -- npm run verify:ci:inner",

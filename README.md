@@ -245,7 +245,7 @@ VITE_ENABLE_MSW=false
 | `npm run docs:check`               | Mechanical doc drift: paths, scripts, sentinels, versions, dead docs, agent-memory imports |
 | `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist                                |
 | `npm run lock:age`                 | Fails a lockfile version younger than `min-release-age` unless allowed (reason + expiry)   |
-| `npm run gate:integrity`           | Lists the gate files and suppressions this branch changes vs `origin/master` (CI: PR base) |
+| `npm run gate:integrity`           | Lists gate files and suppressions this branch changes vs the default branch (CI: PR base)  |
 | `npm run bench:verify`             | The gate step by step with timings                                                         |
 | `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job                                   |
 | `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                                           |

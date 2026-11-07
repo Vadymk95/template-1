@@ -153,8 +153,13 @@ describe('check-gate-integrity', () => {
             assert.equal(parseArguments(['--base', 'a', '--labels=']).values.labels, '');
         });
 
-        it('refuses a missing base, an unknown flag and a flag without a value', () => {
-            assert.match(parseArguments([]).error, /--base <ref> is required/);
+        it('leaves the base unset when no flag gives one, so the checker finds it itself', () => {
+            assert.deepEqual(parseArguments([]), { values: {} });
+            assert.deepEqual(parseArguments(['--head', 'x']), { values: { head: 'x' } });
+        });
+
+        it('refuses an empty base, an unknown flag and a flag without a value', () => {
+            assert.match(parseArguments(['--base=']).error, /--base needs a value/);
             assert.match(parseArguments(['--base', 'a', '--bogus', 'x']).error, /Unknown argument/);
             assert.match(parseArguments(['--base']).error, /--base needs a value/);
             assert.match(parseArguments(['--base', '--head', 'x']).error, /--base needs a value/);

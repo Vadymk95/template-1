@@ -1,5 +1,6 @@
 /**
- * audit-gate: `npm audit` fails on a high or critical advisory unless scripts/audit-allowlist.json
+ * audit-gate: `npm audit` fails on a high or critical advisory (judged by its own rating, not by the
+ * package it was reached through) unless scripts/audit-allowlist.json
  * carries a reasoned, dated allowance for it. It fails closed: an audit that cannot complete, a stale
  * allowance (its advisory is gone) and an expired allowance are all red.
  *
@@ -15,7 +16,9 @@ import { isEntryPoint } from './is-entry-point.mjs';
 const BLOCKING_SEVERITIES = new Set(['high', 'critical']);
 const GHSA_PATTERN = /GHSA-[\w-]+/i;
 
-const severityRank = (severity) => (severity === 'critical' ? 2 : 1);
+const SEVERITY_ORDER = ['info', 'low', 'moderate', 'high', 'critical'];
+
+const severityRank = (severity) => SEVERITY_ORDER.indexOf(severity);
 
 const readGhsaId = (url) => {
     const match = typeof url === 'string' ? url.match(GHSA_PATTERN) : null;
@@ -23,6 +26,19 @@ const readGhsaId = (url) => {
 };
 
 const normalizeId = (id) => id.toUpperCase();
+
+const keepHigher = (advisories, advisory) => {
+    const key = normalizeId(advisory.id);
+    const existing = advisories.get(key);
+    if (!existing || severityRank(advisory.severity) > severityRank(existing.severity)) {
+        advisories.set(key, advisory);
+    }
+};
+
+// An advisory carries its own rating; the package it was reached through only stands in for it
+// when npm printed none. Judging by the carrier would make a low advisory behind a high package red.
+const readOwnSeverity = (advisory) =>
+    typeof advisory.severity === 'string' && advisory.severity !== '' ? advisory.severity : null;
 
 const isRecord = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -50,7 +66,7 @@ const resolveRootAdvisories = (audit, packageName, seen = new Set()) => {
     for (const entry of vulnerability.via) {
         if (typeof entry === 'string') {
             for (const root of resolveRootAdvisories(audit, entry, nextSeen)) {
-                roots.set(normalizeId(root.id), root);
+                keepHigher(roots, root);
             }
             continue;
         }
@@ -61,7 +77,11 @@ const resolveRootAdvisories = (audit, packageName, seen = new Set()) => {
 
         const id = readGhsaId(entry.url);
         if (id) {
-            roots.set(normalizeId(id), { id, packageName });
+            keepHigher(roots, {
+                id,
+                packageName,
+                severity: readOwnSeverity(entry) ?? vulnerability.severity
+            });
         }
     }
 
@@ -77,10 +97,7 @@ const collectAdvisories = (audit) => {
         }
 
         const vulnerabilitySeverity = vulnerability.severity;
-        const ghsaEntries = resolveRootAdvisories(audit, packageName).map((root) => ({
-            ...root,
-            severity: vulnerabilitySeverity
-        }));
+        const ghsaEntries = resolveRootAdvisories(audit, packageName);
 
         if (ghsaEntries.length === 0 && BLOCKING_SEVERITIES.has(vulnerabilitySeverity)) {
             ghsaEntries.push({
@@ -91,10 +108,7 @@ const collectAdvisories = (audit) => {
         }
 
         for (const advisory of ghsaEntries) {
-            const existing = advisories.get(advisory.id);
-            if (!existing || severityRank(advisory.severity) > severityRank(existing.severity)) {
-                advisories.set(advisory.id, advisory);
-            }
+            keepHigher(advisories, advisory);
         }
     }
 

@@ -8,6 +8,7 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 
 | Entry                                                              | Date    | Status         |
 | ------------------------------------------------------------------ | ------- | -------------- |
+| Gate checks refuse a value they cannot judge                       | 2026-11 | in force       |
 | The probe stops its server, and the group a killed probe left      | 2026-10 | in force       |
 | docs:check reads the tree as a clean checkout does                 | 2026-10 | in force       |
 | The gate's strict flags are read from the commands                 | 2026-10 | in force       |
@@ -54,6 +55,30 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 | Component pattern: arrow function plus `FunctionComponent`         | 2026-04 | in force       |
 | Build stack: Tailwind v4, Vite 8 with Rolldown, `plugin-react` v6  | 2026-03 | in force       |
 | No FSD; Zustand for client state, TanStack Query for server state  | 2026-03 | in force       |
+
+## [2026-11] Gate checks refuse a value they cannot judge
+
+**Status:** in force.
+
+**Decision:**
+
+- `audit-gate` judges an advisory by its own rating; the package it was reached through stands in only when npm
+  printed none, and an advisory reached through two packages is listed once, at its highest rating. A low advisory
+  behind a high package is no longer red; a critical one behind a low package is.
+- `docs:check` refuses a suite in `gate-tiers.json` whose `max` is not a positive integer or that lacks `dir`, `match`
+  or `count`, reads `docs/` as a doc folder, and judges `file.ext:12:5` like `:12`.
+- `check-version-holds` takes a URL or the path of an existing file as evidence, never a path with a line number.
+- `gate:integrity` finds its base itself (`origin/master`, else `origin/main`) and exits 2 when neither exists; an
+  explicit `--base` is used as given.
+- A test pins `--no-renames` in the suppression read, and where a template has `.size-limit.json`, every entry must
+  carry a byte `limit` and `brotli: true`.
+
+**Why:** each gap let a gate pass, or fail, for the wrong reason. A comparison with an absent, NaN or string ceiling
+is false both ways, so the suite was never judged. size-limit enforces an entry only when it has a limit. A renamed
+file's added lines drop out of the `AM` diff filter unless rename detection is off. A hard-coded `origin/master` fails
+where the default branch is `main`. An advisory took the rating of whatever package it came through.
+
+**Evidence:** `scripts/audit-gate.test.mjs`, `scripts/docs-check.test.mjs`, `scripts/check-version-holds.test.mjs`, `scripts/check-gate-integrity.suppressions-3.test.mjs`, `scripts/size-limit-budgets.test.mjs`.
 
 ## [2026-10] The probe stops its server, and the group a killed probe left
 
