@@ -68,9 +68,11 @@
  * shrink its own net by editing the manifest in the same diff. The head manifest must match its
  * own path; one that does not, a file that is not valid, or no manifest at all is exit 2.
  *
- * Usage: node scripts/check-gate-integrity.mjs --base <ref> --head <ref> [--labels <list>]
+ * Usage: node scripts/check-gate-integrity.mjs [--base <ref>] --head <ref> [--labels <list>]
  *                                              [--root <dir>]
- *   --base    the base of the change (CI: the pull request's base sha); the merge base is used
+ *   --base    the base of the change (CI: the pull request's base sha); the merge base is used.
+ *             Absent, the first of origin/master and origin/main that exists, and exit 2 when
+ *             neither does; a given one is used as it stands, never swapped for a default
  *   --head    the end of the change, default HEAD
  *   --labels  the pull request's labels, either a JSON array of strings (what CI passes) or a
  *             comma-separated list; matched case-insensitively against `gate-change`
@@ -269,7 +271,7 @@ export const parseArguments = (argv) => {
         value ??= '';
         values[flag.slice(2)] = value;
     }
-    if (!values.base) return { error: '--base <ref> is required' };
+    if (values.base === '') return { error: '--base needs a value' };
     return { values };
 };
 
@@ -565,6 +567,12 @@ const verifyRef = (git, ref) => {
           };
 };
 
+/** Tried in this order when no --base is given: the default branch of a repository, whichever name it has. */
+const DEFAULT_BASES = ['origin/master', 'origin/main'];
+
+const defaultBase = (git) =>
+    DEFAULT_BASES.find((ref) => verifyRef(git, ref).error === undefined) ?? null;
+
 /**
  * A reader for `findSuppressions`: the lines of a file as it stands at `ref`, each file read once.
  * A file git cannot show is a check that cannot look, so it throws rather than reading as empty.
@@ -603,13 +611,19 @@ export const evaluate = ({ root, base, head = 'HEAD', labels = [] }) => {
     const git = makeGit(root);
     const failed = (message) => ({ code: 2, lines: [`gate-integrity: ${message}`] });
 
-    const resolvedBase = verifyRef(git, base);
+    const baseRef = base ?? defaultBase(git);
+    if (baseRef === null) {
+        return failed(
+            `No --base given, and neither ${DEFAULT_BASES.join(' nor ')} exists. Fetch the default branch, or pass --base <ref>.`
+        );
+    }
+    const resolvedBase = verifyRef(git, baseRef);
     if (resolvedBase.error !== undefined) return failed(resolvedBase.error);
     const resolvedHead = verifyRef(git, head);
     if (resolvedHead.error !== undefined) return failed(resolvedHead.error);
     const merged = git(['merge-base', resolvedBase.sha, resolvedHead.sha]);
     if (merged.error !== undefined || merged.output.trim() === '') {
-        return failed(`No merge base between ${base} and ${head}. ${SHALLOW_REMEDY}`);
+        return failed(`No merge base between ${baseRef} and ${head}. ${SHALLOW_REMEDY}`);
     }
     const mergeBase = merged.output.trim();
 

@@ -490,21 +490,41 @@ describe('checkHolds: the shape of the holds file', () => {
         assert.match(check({ holds: [hold({ held: '>=5 <4' })] }).join('\n'), /admits no version/);
     });
 
-    it('requires evidence to be a URL or an existing file:line', () => {
+    it('requires evidence to be a URL or the path of an existing file', () => {
         assert.match(
             check({ holds: [hold({ evidence: 'see the chat' })] }).join('\n'),
-            /URL or file:line/
+            /URL or the path of a file/
         );
         const missing = check({
-            holds: [hold({ evidence: 'docs/gone.md:12' })],
+            holds: [hold({ evidence: 'docs/gone.md' })],
             fileExists: () => false
         });
         assert.match(missing.join('\n'), /names a file that does not exist/);
         const present = check({
-            holds: [hold({ evidence: 'docs/here.md:12-14' })],
+            holds: [hold({ evidence: 'docs/here.md' })],
             fileExists: (file) => file === 'docs/here.md'
         });
         assert.deepEqual(present, []);
+        assert.deepEqual(check({ holds: [hold({ evidence: 'https://example.test/pull/1' })] }), []);
+    });
+
+    it('refuses evidence that carries a line number, even for a file that exists', () => {
+        for (const evidence of ['docs/here.md:12', 'docs/here.md:12-14', 'docs/here.md:12:5']) {
+            const findings = check({
+                holds: [hold({ evidence })],
+                fileExists: () => true
+            });
+            assert.equal(findings.length, 1, evidence);
+            assert.match(findings[0], /carries a line number/);
+            assert.match(findings[0], /never a line/);
+        }
+    });
+
+    it('reads a URL with digits after a colon as a URL, not as a line number', () => {
+        const findings = check({
+            holds: [hold({ evidence: 'https://example.test:8080/pull/1' })]
+        });
+        assert.deepEqual(findings, []);
     });
 
     it('checks the other entries when one is malformed', () => {
@@ -553,8 +573,8 @@ describe('run and the command line', () => {
         });
     });
 
-    it('exits 0 on a hold that is honoured, resolving a file:line evidence against the root', () => {
-        const holds = JSON.stringify([hold({ evidence: 'package.json:1' })]);
+    it('exits 0 on a hold that is honoured, resolving a path evidence against the root', () => {
+        const holds = JSON.stringify([hold({ evidence: 'package.json' })]);
         withRoot({ holds, dependabot: dependabotWith(IGNORE_VITEST) }, (root) => {
             const result = cli(root);
             assert.equal(result.status, 0, result.stdout);

@@ -107,6 +107,10 @@ The pre-commit hook only proves a `*.test.*` file exists. You judge whether it i
 
 - **Mutation check**: for each test covering this change, would it still pass if the change were
   reverted? Name every test that would. Those are not coverage.
+- **Real mutations on an agent-written pull request**: also apply two real mutations of the fix (drop
+  the new condition, flip a boundary) in a disposable linked worktree, never in the main checkout or a
+  live lane, and run the tests named for the change. A mutation they do not catch means the tests are
+  rejected.
 - Assertions that cannot fail: `toBeTruthy()` on a value the test constructed, `toHaveTextContent('')`
   where `toBeEmptyDOMElement()` was meant, a `waitFor` whose body cannot throw.
 - Fixture duplication: a literal hardcoded in a test where `src/test/handlers.ts` or

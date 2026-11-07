@@ -350,6 +350,78 @@ describe('the command line against a real repository', () => {
             expect(cli(root).code).toBe(0);
         });
 
+        // `git add -N` lists the path in the index but stages no content, so a commit leaves the file out.
+        it('refuses a staged source whose sibling is only an intent-to-add entry', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/a.ts');
+            write(root, 'src/lib/a.test.ts');
+            git(root, ['add', 'src/lib/a.ts']);
+            git(root, ['add', '-N', 'src/lib/a.test.ts']);
+
+            const result = cli(root);
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toContain('src/lib/a.ts');
+        });
+
+        it('accepts a sibling that was intent-to-add and then staged for real', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/a.ts');
+            write(root, 'src/lib/a.test.ts');
+            git(root, ['add', 'src/lib/a.ts']);
+            git(root, ['add', '-N', 'src/lib/a.test.ts']);
+            git(root, ['add', 'src/lib/a.test.ts']);
+
+            expect(cli(root).code).toBe(0);
+        });
+
+        // HEAD holds the sibling and `ls-files` still lists it, but the index deletes it (`git rm --cached`)
+        // and `git add -N` only re-marks the path: the commit removes the file, so it covers nothing.
+        it('refuses a committed sibling that was removed from the index and re-marked with intent-to-add', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/ok.ts', 'export const ok = 2;\n');
+            git(root, ['add', 'src/lib/ok.ts']);
+            git(root, ['rm', '--quiet', '--cached', 'src/lib/ok.test.ts']);
+            git(root, ['add', '-N', 'src/lib/ok.test.ts']);
+
+            const result = cli(root);
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toContain('src/lib/ok.ts');
+        });
+
+        it('refuses a sibling that is intent-to-add and then deleted from the disk', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/a.ts');
+            write(root, 'src/lib/a.test.ts');
+            git(root, ['add', 'src/lib/a.ts']);
+            git(root, ['add', '-N', 'src/lib/a.test.ts']);
+            rmSync(path.join(root, 'src/lib/a.test.ts'));
+
+            expect(cli(root).code).toBe(1);
+        });
+
+        it('accepts a sibling staged and then deleted from the disk: the commit still carries it', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/a.ts');
+            write(root, 'src/lib/a.test.ts');
+            git(root, ['add', '-A']);
+            rmSync(path.join(root, 'src/lib/a.test.ts'));
+
+            expect(cli(root).code).toBe(0);
+        });
+
+        it('accepts a sibling that arrives as a staged rename of a committed file', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/a.ts');
+            git(root, ['mv', 'src/lib/ok.test.ts', 'src/lib/a.test.ts']);
+            git(root, ['add', 'src/lib/a.ts']);
+
+            // The rename shows as `R`, not `A`, in a plain staged diff: only a listing that turns
+            // rename detection off sees the new path as a staged addition.
+            expect(cli(root).code).toBe(0);
+        });
+
         it('refuses a source whose sibling left the index but stayed on disk', () => {
             const root = makeRepo();
             write(root, 'src/lib/ok.ts', 'export const ok = 1;\n');

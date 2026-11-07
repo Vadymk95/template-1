@@ -10,7 +10,7 @@
  *   swallows (an `eval` probe inside `try/catch`), which no page error or failed request would show.
  *
  * Pure on purpose, like the other `e2e/support` helpers: the matching and formatting are unit-tested
- * in Vitest (`csp-guard.test.ts`), while the fixture that wires them to a page lives in `./test.ts`.
+ * in Vitest (`csp-guard.test.ts`), while the fixture that wires them to the browser context lives in `./test.ts`.
  */
 const CSP_MESSAGE = /content[- ]security[- ]policy/i;
 
@@ -101,7 +101,7 @@ export const formatCspViolation = ({
 };
 
 /**
- * Runs inside every page and frame before any page script (`page.addInitScript`). Must stay
+ * Runs inside every page and frame before any page script (`context.addInitScript`). Must stay
  * self-contained: Playwright serialises the function body, so it cannot close over module scope.
  * The name is passed in for the same reason.
  */

@@ -14,16 +14,20 @@
  *              `.cursor/brain/MAP.md`) must resolve to a file git lists (tracked, or new and not
  *              ignored) or to a folder holding one, so an emptied folder and an ignored file are
  *              gone, here as on a clean checkout; bare file names, routes, package subpaths and
- *              build output are not judged. A path that ends in `:12` or `:12-20` is a finding
- *              too, and so is the name of a file at the root (`name.ext:12`; a host with a port is
- *              no file): cite the symbol, a line moves with every edit
+ *              build output are not judged. A path that ends in `:12`, `:12-20` or `:12:5` is a
+ *              finding too, and so is the name of a file at the root (`name.ext:12`; a host with a
+ *              port is no file): cite the symbol, a line moves with every edit. The docs read are
+ *              the files of DOC_FILES and the .md/.mdc files directly inside each DOC_DIRS folder,
+ *              `docs/` included
  *   scripts    a backticked `npm run x` or `family:name` token whose family is one of package.json's
  *              script families must exist in package.json
  *   sentinels  the tier-law sentinel sentences (gate-tiers.json → docs.sentinels) appear only in
  *              AGENTS.md — a copy elsewhere is a restatement, which is how rules go stale in place
  *   memoryImports  CLAUDE.md and AGENTS.md hold no `@path` that Claude Code would import into every
  *              session (a `~/` path, or one naming an existing file), except `@AGENTS.md` in CLAUDE.md
- *   suites     the browser suite has not outgrown the ceiling in gate-tiers.json, and that
+ *   suites     every suite in gate-tiers.json has a `dir`, a `match` (a valid pattern), a `count`
+ *              (files or tests) and a `max` that is a positive integer, or it is a finding and not
+ *              measured; the browser suite has not outgrown the ceiling, and that
  *              ceiling is not more than twice the measurement; every run prints the measurement
  *              (`suites.e2e: 9 test(s) of 10`), so no suite carries a hand-written `_measured`
  *   tests      no focused test (`.only`, `fit`, `only: true`) lands; a test switched off for good
@@ -113,7 +117,8 @@ export const DOC_DIRS = [
     '.cursor/docs',
     '.cursor/templates',
     '.claude/commands',
-    '.cursor/commands'
+    '.cursor/commands',
+    'docs'
 ];
 export const HISTORY_FILES = ['.cursor/brain/DECISIONS.md'];
 /** Files a platform discovers by name; nothing needs to point at them. */
@@ -180,6 +185,12 @@ export const scriptFamilies = (scripts) =>
     new Set(Object.keys(scripts).map((name) => name.split(':')[0]));
 
 /**
+ * `:12`, `:12-20` or `:12:5` (line and column) closing a path token or the name of a file at the
+ * root: a pointer into a file's lines, which move with every edit.
+ */
+const LINE_POINTER = /:\d+(?:-\d+|:\d+)?$/;
+
+/**
  * Classify one backticked token. A path is judged only when it is anchored in a tracked top-level
  * directory: `src/pages/<Page>/` (placeholder), `/dev/ui` (a route), `msw/node` (a package
  * subpath), `PageName.tsx` (an example) and `dist/x.html` (build output) are all "other".
@@ -187,7 +198,7 @@ export const scriptFamilies = (scripts) =>
 export const classifyToken = (rawToken, { topDirs, families }) => {
     const token = rawToken
         .replace(/[:,.]+$/, '')
-        .replace(/:\d+(?:-\d+)?$/, '')
+        .replace(LINE_POINTER, '')
         .replace(/^\.\//, '');
     const npmRun = token.match(/^npm run ([a-z][a-z0-9:-]*)(\*)?/);
     if (npmRun && npmRun[2]) return { kind: 'family', value: npmRun[1] };
@@ -247,12 +258,6 @@ export const pathExists = (root, value, listed = null) =>
         if (listed === null || listed.has(target)) return existsSync(path.join(root, target));
         return ext === '' && holdsListedFile(root, listed, target);
     });
-
-/**
- * `:12` or `:12-20` closing a path token or the name of a file at the root: a pointer into a file's
- * lines, which move with every edit.
- */
-const LINE_POINTER = /:\d+(?:-\d+)?$/;
 
 /**
  * A file at the repository root, the one place a pointer has no directory (`name.ext:12`), so
@@ -1532,6 +1537,38 @@ const TEST_CALL = /(?<![.\w])(?:test|it)\s*\(/g;
  * becomes checkable: a suite over its ceiling is a finding, and so is a ceiling more than twice the
  * measurement, because a ceiling that far above the number stops flagging anything.
  */
+const SUITE_COUNTS = ['files', 'tests'];
+
+const isNonEmptyString = (value) => typeof value === 'string' && value !== '';
+
+const isValidPattern = (value) => {
+    try {
+        return isNonEmptyString(value) && new RegExp(value) instanceof RegExp;
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * What stops a suite from being measured against its ceiling: a comparison with an absent, NaN or
+ * string `max` is false both ways, so such a suite would pass for ever without a word.
+ */
+const suiteShapeProblems = (suite) => {
+    if (!isRecord(suite) || Array.isArray(suite)) return ['it is not an object'];
+    const problems = [];
+    if (!isNonEmptyString(suite.dir)) problems.push('`dir` must be a non-empty folder path');
+    if (!isValidPattern(suite.match)) problems.push('`match` must be a valid regular expression');
+    if (!SUITE_COUNTS.includes(suite.count)) {
+        problems.push(`\`count\` must be one of ${SUITE_COUNTS.join(', ')}`);
+    }
+    if (!Number.isInteger(suite.max) || suite.max <= 0) {
+        problems.push(
+            `\`max\` must be a positive integer, got ${JSON.stringify(suite.max) ?? 'nothing'}`
+        );
+    }
+    return problems;
+};
+
 const measureSuite = (root, suite) => {
     const dir = path.join(root, suite.dir);
     if (!existsSync(dir)) return null;
@@ -1548,7 +1585,7 @@ const measureSuite = (root, suite) => {
 /** What each suite measures against its ceiling, one line a run (`suites.e2e: 9 test(s) of 10`), so the number is read here and never typed into gate-tiers.json. */
 export const suiteNotes = ({ root, suites }) =>
     Object.entries(suites).flatMap(([label, suite]) => {
-        if (label.startsWith('_')) return [];
+        if (label.startsWith('_') || suiteShapeProblems(suite).length > 0) return [];
         const result = measureSuite(root, suite);
         if (result === null) return [];
         return [
@@ -1560,6 +1597,13 @@ export const checkSuiteBudgets = ({ root, suites }) => {
     const findings = [];
     for (const [label, suite] of Object.entries(suites)) {
         if (label.startsWith('_')) continue;
+        const problems = suiteShapeProblems(suite);
+        if (problems.length > 0) {
+            findings.push(
+                ...problems.map((problem) => `gate-tiers.json § suites.${label}: ${problem}`)
+            );
+            continue;
+        }
         if ('_measured' in suite) {
             findings.push(
                 `gate-tiers.json § suites.${label}._measured: a hand-written measurement goes stale unseen — delete the key; docs:check prints the measurement on every run`

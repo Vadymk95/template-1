@@ -2,9 +2,10 @@
 //
 // Guards two push-cost properties of the Playwright configs: a red run must stop after a capped
 // number of failures instead of running every remaining test into its timeouts (the gate run and
-// CI only — the desk run against the dev server stays uncapped), and the gate config and the dev
-// config must write `.last-run.json` to two different folders, or the second suite in the push
-// chain overwrites the first's last-failed record and `--last-failed` selects the wrong tests.
+// CI only — the desk run against the dev server stays uncapped; the dev config caps on CI), and
+// the gate config and the dev config must write `.last-run.json` to two different folders, or the
+// second suite in the push chain overwrites the first's last-failed record and `--last-failed`
+// selects the wrong tests.
 //
 // It also guards the retry policy: in CI a test that passes only on a retry must still fail the run
 // (`failOnFlakyTests`), or the retries turn a flake into a green run nobody ever sees.
@@ -61,6 +62,21 @@ describe('playwright.config.ts maxFailures', () => {
 
     it('stays uncapped on the desk run against the dev server (neither flag set)', async () => {
         const config = await importGateConfig();
+        expect(config.maxFailures).toBeUndefined();
+    });
+});
+
+// The dev-server suite runs in CI as its own job (`smoke:dev`), so a red run there pays for every failing
+// test's timeout just as the gate run does. The desk run stays uncapped, like the gate config's.
+describe('playwright.dev.config.ts maxFailures', () => {
+    it('caps at 10 when CI is set', async () => {
+        process.env.CI = 'true';
+        const config = await importDevConfig();
+        expect(config.maxFailures).toBe(10);
+    });
+
+    it('stays uncapped on the desk run', async () => {
+        const config = await importDevConfig();
         expect(config.maxFailures).toBeUndefined();
     });
 });

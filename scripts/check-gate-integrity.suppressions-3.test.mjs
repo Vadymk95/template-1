@@ -12,6 +12,7 @@ import {
     BASE_FILES,
     check,
     createChange,
+    git,
     gitEnvironment,
     LAST_SAMPLES,
     output,
@@ -96,6 +97,26 @@ describe('check-gate-integrity', () => {
             assert.match(output(check(createChange(changes))), /8 changes to the gate/);
         });
 
+        it('lists a suppression added in the same commit that renames its file', () => {
+            // With rename detection a renamed file is neither added nor modified for the diff
+            // filter, so its added lines would go unread unless the read turns detection off.
+            const body = Array.from(
+                { length: 12 },
+                (_, index) => `export const v${index} = ${index};`
+            );
+            const files = { ...BASE_FILES, 'src/old-name.ts': `${body.join('\n')}\n` };
+            const repo = createChange(
+                {
+                    'src/old-name.ts': null,
+                    'src/new-name.ts': `${[...body, SUPPRESSION_SAMPLES[3][1]].join('\n')}\n`
+                },
+                files
+            );
+            const verdict = check(repo);
+            assert.equal(verdict.code, 1);
+            assert.match(output(verdict), /suppression\s+src\/new-name\.ts:13 /);
+        });
+
         it('reads a file whose name has a space and a non-ASCII letter', () => {
             const repo = createChange({
                 'src/my file é.ts': `${SUPPRESSION_SAMPLES[3][1]}\n`
@@ -136,11 +157,66 @@ describe('check-gate-integrity', () => {
             assert.equal(run(repo, [`--base=${repo.base}`, '--labels=bug,gate-change']).code, 0);
         });
 
+        describe('without --base', () => {
+            const GATE_CHANGE = { 'scripts/gate-trace.mjs': 'process.exit(0);\n' };
+            const point = (repo, ref, target) =>
+                git(repo.root, 'update-ref', `refs/remotes/${ref}`, target);
+
+            it('takes origin/main when origin/master does not exist', () => {
+                const repo = createChange(GATE_CHANGE);
+                point(repo, 'origin/main', repo.base);
+                const result = run(repo, []);
+                assert.equal(result.code, 1);
+                assert.match(result.stdout, /scripts\/gate-trace\.mjs \(modified\)/);
+                assert.ok(result.stdout.includes(`base ${repo.base.slice(0, 7)}`));
+            });
+
+            it('takes origin/master first when both exist', () => {
+                const repo = createChange(GATE_CHANGE);
+                point(repo, 'origin/master', repo.base);
+                point(repo, 'origin/main', git(repo.root, 'rev-parse', 'HEAD'));
+                const result = run(repo, []);
+                assert.equal(result.code, 1);
+                assert.match(result.stdout, /scripts\/gate-trace\.mjs \(modified\)/);
+            });
+
+            it('fails closed, naming both refs and the flag, when neither exists', () => {
+                const repo = createChange(GATE_CHANGE);
+                const result = run(repo, []);
+                assert.equal(result.code, 2);
+                assert.match(result.stderr, /origin\/master/);
+                assert.match(result.stderr, /origin\/main/);
+                assert.match(result.stderr, /--base <ref>/);
+                assert.equal(result.stdout, '');
+            });
+
+            it('uses an explicit --base as given, whatever the default refs hold', () => {
+                const repo = createChange(GATE_CHANGE);
+                point(repo, 'origin/master', git(repo.root, 'rev-parse', 'HEAD'));
+                assert.equal(run(repo, []).code, 0);
+                assert.equal(run(repo, ['--base', repo.base]).code, 1);
+                assert.equal(run(repo, [`--base=${repo.base}`]).code, 1);
+            });
+
+            it('does not fall back to a default ref when the explicit one cannot be resolved', () => {
+                const repo = createChange(GATE_CHANGE);
+                point(repo, 'origin/master', repo.base);
+                const result = run(repo, ['--base', 'nope']);
+                assert.equal(result.code, 2);
+                assert.match(result.stderr, /Cannot resolve "nope"/);
+            });
+
+            it('still refuses an empty --base', () => {
+                const repo = createChange(GATE_CHANGE);
+                point(repo, 'origin/master', repo.base);
+                const result = run(repo, ['--base=']);
+                assert.equal(result.code, 2);
+                assert.match(result.stderr, /--base needs a value/);
+            });
+        });
+
         it('exits 2 with the reason on stderr for a bad flag, a bad label list and a bad ref', () => {
             const repo = createChange({ 'src/app.ts': 'x\n' });
-            const noBase = run(repo, []);
-            assert.equal(noBase.code, 2);
-            assert.match(noBase.stderr, /--base <ref> is required/);
             assert.equal(run(repo, ['--base', repo.base, '--wat', '1']).code, 2);
             const badLabels = run(repo, ['--base', repo.base, '--labels', '["gate-change"']);
             assert.equal(badLabels.code, 2);

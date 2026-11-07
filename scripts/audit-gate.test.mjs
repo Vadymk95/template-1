@@ -194,3 +194,150 @@ describe('evaluateAudit', () => {
         expect(result).toMatchObject({ ok: true, unexpected: [] });
     });
 });
+
+describe('a root advisory is judged by its own severity', () => {
+    const OTHER = 'GHSA-test-cccc-dddd';
+
+    // A package npm rates `carrier` severity reached through an advisory of another rating.
+    const carried = (carrierSeverity, rootSeverity, id = ID) =>
+        audit({
+            carrier: { severity: carrierSeverity, via: [advisory(id, rootSeverity)], effects: [] }
+        });
+
+    it('does not block a low advisory reached through a high package', () => {
+        const result = evaluateAudit(carried('high', 'low'), [], NOW);
+
+        expect(result.unexpected).toEqual([]);
+        expect(result.ok).toBe(true);
+    });
+
+    it('does not block a moderate advisory reached through a critical package', () => {
+        expect(evaluateAudit(carried('critical', 'moderate'), [], NOW)).toMatchObject({
+            ok: true,
+            unexpected: []
+        });
+    });
+
+    it('still blocks a critical advisory reached through a low package', () => {
+        const result = evaluateAudit(carried('low', 'critical'), [], NOW);
+
+        expect(result.unexpected).toEqual([
+            expect.objectContaining({ id: ID, severity: 'critical' })
+        ]);
+        expect(result.ok).toBe(false);
+    });
+
+    it('still blocks a high advisory reached through a moderate package', () => {
+        expect(evaluateAudit(carried('moderate', 'high'), [], NOW).unexpected).toEqual([
+            expect.objectContaining({ id: ID, severity: 'high' })
+        ]);
+    });
+
+    it('falls back to the package severity for a via object with no severity', () => {
+        const { severity: _omitted, ...bare } = advisory();
+        const result = evaluateAudit(
+            audit({ carrier: { severity: 'high', via: [bare], effects: [] } }),
+            [],
+            NOW
+        );
+
+        expect(result.unexpected).toEqual([expect.objectContaining({ id: ID, severity: 'high' })]);
+    });
+
+    it('falls back to the package severity for an empty severity string', () => {
+        const result = evaluateAudit(
+            audit({
+                carrier: { severity: 'high', via: [{ ...advisory(), severity: '' }], effects: [] }
+            }),
+            [],
+            NOW
+        );
+
+        expect(result.unexpected).toEqual([expect.objectContaining({ id: ID })]);
+    });
+
+    it('keeps the root severity through a chain of derived packages', () => {
+        const result = evaluateAudit(
+            audit({
+                root: { severity: 'low', via: [advisory(ID, 'low')], effects: ['wrapper'] },
+                wrapper: { severity: 'high', via: ['root'], effects: [] }
+            }),
+            [],
+            NOW
+        );
+
+        expect(result.unexpected).toEqual([]);
+        expect(result.ok).toBe(true);
+    });
+
+    it('counts one advisory reached through two packages once', () => {
+        const result = evaluateAudit(
+            audit({
+                first: { severity: 'high', via: [advisory()], effects: [] },
+                second: { severity: 'high', via: [advisory()], effects: [] }
+            }),
+            [],
+            NOW
+        );
+
+        expect(result.unexpected).toHaveLength(1);
+    });
+
+    it('lists one advisory reached with two ratings under the higher one', () => {
+        const result = evaluateAudit(
+            audit({
+                first: { severity: 'high', via: [advisory(ID, 'low')], effects: [] },
+                second: { severity: 'high', via: [advisory(ID, 'high')], effects: [] }
+            }),
+            [],
+            NOW
+        );
+
+        expect(result.unexpected).toEqual([expect.objectContaining({ id: ID, severity: 'high' })]);
+    });
+
+    it('judges two advisories behind one package separately', () => {
+        const result = evaluateAudit(
+            audit({
+                carrier: {
+                    severity: 'high',
+                    via: [advisory(ID, 'low'), advisory(OTHER, 'high')],
+                    effects: []
+                }
+            }),
+            [],
+            NOW
+        );
+
+        expect(result.unexpected).toEqual([expect.objectContaining({ id: OTHER })]);
+    });
+
+    it('keeps the npm:<package> fallback for a high package with no advisory url', () => {
+        const result = evaluateAudit(
+            audit({ orphan: { severity: 'high', via: [{ name: 'x' }], effects: [] } }),
+            [],
+            NOW
+        );
+
+        expect(result.unexpected).toEqual([expect.objectContaining({ id: 'npm:orphan' })]);
+    });
+
+    it('does not call an allowance stale while its low advisory is still reported', () => {
+        const result = evaluateAudit(carried('high', 'low'), [allowance()], NOW);
+
+        expect(result.stale).toEqual([]);
+        expect(result.allowlisted).toEqual([expect.objectContaining({ id: ID })]);
+        expect(result.ok).toBe(true);
+    });
+
+    it('keeps an allowance past its date red even when its advisory no longer blocks', () => {
+        const result = evaluateAudit(
+            carried('high', 'low'),
+            [allowance({ expires: '2026-01-14' })],
+            NOW
+        );
+
+        expect(result.expired).toEqual([expect.objectContaining({ id: ID })]);
+        expect(result.ok).toBe(false);
+    });
+});

@@ -14,7 +14,8 @@
  *                                       upper bound (a hold with no ceiling holds nothing)
  *     "reason": "...",                  why, in one or two sentences
  *     "lift": "...",                    the event that lifts it (an upstream release, a peer range)
- *     "evidence": "<url or file:line>", the PR / issue / measurement; a file:line must exist
+ *     "evidence": "<url or path>",      the PR / issue / measurement; a path must exist, and never
+ *                                       carries a line number (a line moves with every edit)
  *     "reviewBy": "2026-11-02" }        OPTIONAL, ISO date, only for a hold that protects security;
  *                                       the check is red ON that date (the date is the first red
  *                                       day, UTC; the day before is green). One date per item, in
@@ -362,7 +363,10 @@ const isIsoDate = (value) => {
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 };
 
-const FILE_LINE = /^([^\s:]+):\d+(?:-\d+)?$/;
+// A path with a line number (`file:12`, `file:12-14`, `file:12:5`): refused, the repo names a symbol or
+// a path, never a line.
+const FILE_LINE = /^[^\s:]+:\d+(?:-\d+|:\d+)?$/;
+const FILE_PATH = /^[^\s:]+$/;
 
 /** Shape of one entry. Returns the entry's parsed `held` intervals, or null when it is unusable. */
 const validateEntry = ({ entry, index, seen, fileExists, findings }) => {
@@ -395,10 +399,11 @@ const validateEntry = ({ entry, index, seen, fileExists, findings }) => {
     if (/^https?:\/\/\S+$/.test(evidence)) {
         // a URL: nothing to verify offline
     } else if (FILE_LINE.test(evidence)) {
-        if (!fileExists(FILE_LINE.exec(evidence)[1]))
-            fail(`evidence "${evidence}" names a file that does not exist`);
+        fail(`evidence "${evidence}" carries a line number; name the path, never a line`);
+    } else if (FILE_PATH.test(evidence)) {
+        if (!fileExists(evidence)) fail(`evidence "${evidence}" names a file that does not exist`);
     } else {
-        fail(`evidence "${evidence}" must be a URL or file:line`);
+        fail(`evidence "${evidence}" must be a URL or the path of a file`);
     }
     let held = null;
     try {
