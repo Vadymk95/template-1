@@ -174,17 +174,26 @@ jobs:
             - name: Install dependencies
               run: npm ci --ignore-scripts
 
+            - name: Read runner distro
+              id: distro
+              run: |
+                  . /etc/os-release
+                  echo "id=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
+
             - name: Cache Playwright browsers
               uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: ~/.cache/ms-playwright
-                  key: playwright-xbrowser-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+                  key: playwright-xbrowser-${{ runner.os }}-${{ steps.distro.outputs.id }}-${{ hashFiles('package-lock.json') }}
 
             # The cache above holds browser BINARIES, not the OS libraries they link against — and
             # `ensure-playwright.mjs` skips `--with-deps` precisely when the cache hits, so a warm cache
             # produced a WebKit that could not launch at all:
             # `libevent-2.1.so.7: cannot open shared object file`. Chromium's deps ship with the runner
             # image; WebKit's do not. This step is idempotent and cheap on a warm image.
+            # The key carries the Ubuntu release because the browser binaries are built per release:
+            # a cache saved on one release cannot launch on the next, and `ubuntu-latest` moves
+            # between releases without a change to the lockfile.
             - name: Install browser system dependencies
               run: npx --no-install playwright install-deps
 
