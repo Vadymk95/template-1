@@ -194,8 +194,14 @@ jobs:
             # The key carries the Ubuntu release because the browser binaries are built per release:
             # a cache saved on one release cannot launch on the next, and `ubuntu-latest` moves
             # between releases without a change to the lockfile.
+            # A normal install takes about a minute, and a stalled apt would otherwise hold the job until its timeout.
             - name: Install browser system dependencies
-              run: npx --no-install playwright install-deps
+              run: |
+                  for try in 1 2 3; do
+                      timeout --kill-after=15s 180s npx --no-install playwright install-deps && exit 0
+                      echo "playwright install-deps: try ${try} of 3 failed" >&2
+                  done
+                  exit 1
 
             - name: Ensure Playwright browsers (chromium, firefox, webkit)
               run: node scripts/ensure-playwright.mjs
