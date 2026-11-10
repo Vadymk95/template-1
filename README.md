@@ -294,7 +294,9 @@ cannot go out with no gate and no output.
 **`ci.yml`** — on pull requests and pushes to `master` (Node 24.x, `npm ci --ignore-scripts`): a single
 `npm run verify:ci` step, plus the Playwright browser cache and artifact uploads, plus the `dev-smoke` job
 (content-variance fixture on a dev server) and the `cross-browser` job (Firefox + WebKit on the geometry
-specs). One `verify:ci` step on purpose — see the gate rule above.
+specs). The `cross-browser` job runs in the official Playwright image, its tag read from the lock file by the
+`playwright-image` job (`.cursor/brain/DECISIONS.md` has the why). One `verify:ci` step on purpose — see the gate
+rule above.
 
 **`security.yml`** — on push, PR and a weekly cron: gitleaks over the full history, CodeQL
 `security-extended`, and zizmor over the workflow files themselves (unpinned actions, a checkout that leaves

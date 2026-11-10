@@ -144,14 +144,54 @@ jobs:
                   path: playwright-report/
                   retention-days: 7
 
+    # The tag of the Playwright image the `cross-browser` job runs in: the @playwright/test version the
+    # lock file pins, read here so there is one source. A Dependabot or npm update of @playwright/test
+    # then moves the image with it; Dependabot does not bump a tag written inside a workflow file.
+    # Checks out the lock file only: the job installs nothing and needs no other file.
+    playwright-image:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        outputs:
+            version: ${{ steps.read.outputs.version }}
+
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+                  sparse-checkout: package-lock.json
+                  sparse-checkout-cone-mode: false
+
+            - name: Read the locked @playwright/test version
+              id: read
+              run: |
+                  version="$(jq -r '.packages["node_modules/@playwright/test"].version' package-lock.json)"
+                  [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "package-lock.json has no plain @playwright/test version: ${version}" >&2; exit 1; }
+                  echo "version=${version}" >> "$GITHUB_OUTPUT"
+
     # Firefox and WebKit, on the geometry specs only. They are not in `verify` because three engines on
     # every spec triples the local e2e wall-clock, and a webkit font-metric difference in an unrelated
     # spec would then fail a push for a reason that has nothing to do with the change. Scoped by
     # `testMatch` in `e2e/support/cross-browser.ts`; a typo there collects ZERO tests and reports
     # success, which is why the step below asserts a test actually ran.
+    #
+    # Runs in the official Playwright image: it ships the three browsers and the system libraries they
+    # link against, so the job installs nothing from apt. Installing them on the runner stalled often
+    # enough to turn the required check red or slow (measured: DECISIONS.md, "Cross-browser runs in the
+    # Playwright image"). `-resolute` is Ubuntu 26.04, the release `ubuntu-latest` had when the job
+    # moved, so the per-release Firefox and WebKit builds and the font packages stay the same.
+    # `--user 1001` is the runner's uid and Playwright's documented setting for this image, so checkout
+    # and setup-node write the workspace as they did before. Node still comes from setup-node: the
+    # image's own Node is not the one the repo pins.
+    # `!cancelled()`: a job skipped because a job it needs failed reports success, and this is a
+    # required check. Running it instead, an empty version fails the container setup, red.
     cross-browser:
+        needs: playwright-image
+        if: ${{ !cancelled() }}
         runs-on: ubuntu-latest
-        timeout-minutes: 20
+        timeout-minutes: 10
+        container:
+            image: mcr.microsoft.com/playwright:v${{ needs.playwright-image.outputs.version }}-resolute
+            options: --user 1001
         env:
             HUSKY: '0'
             CROSS_BROWSER: '1'
@@ -174,39 +214,8 @@ jobs:
             - name: Install dependencies
               run: npm ci --ignore-scripts
 
-            - name: Read runner distro
-              id: distro
-              run: |
-                  . /etc/os-release
-                  echo "id=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
-
-            - name: Cache Playwright browsers
-              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-              with:
-                  path: ~/.cache/ms-playwright
-                  key: playwright-xbrowser-${{ runner.os }}-${{ steps.distro.outputs.id }}-${{ hashFiles('package-lock.json') }}
-
-            # The cache above holds browser BINARIES, not the OS libraries they link against — and
-            # `ensure-playwright.mjs` skips `--with-deps` precisely when the cache hits, so a warm cache
-            # produced a WebKit that could not launch at all:
-            # `libevent-2.1.so.7: cannot open shared object file`. Chromium's deps ship with the runner
-            # image; WebKit's do not. This step is idempotent and cheap on a warm image.
-            # The key carries the Ubuntu release because the browser binaries are built per release:
-            # a cache saved on one release cannot launch on the next, and `ubuntu-latest` moves
-            # between releases without a change to the lockfile.
-            # A normal install takes about a minute, and a stalled apt would otherwise hold the job until its timeout.
-            # apt-get runs as root under sudo, out of reach of the timeout's signal, so a failed try kills what is left
-            # of apt-get and dpkg and repairs dpkg; otherwise the next try only finds the dpkg lock still held.
-            - name: Install browser system dependencies
-              run: |
-                  for try in 1 2 3; do
-                      timeout --kill-after=15s 180s npx --no-install playwright install-deps && exit 0
-                      echo "playwright install-deps: try ${try} of 3 failed" >&2
-                      sudo pkill -KILL -x 'apt-get|dpkg' || true
-                      sudo dpkg --configure -a || true
-                  done
-                  exit 1
-
+            # The image already holds this version's builds. This step only proves it: a missing build
+            # (an image older than the lock file) fails here, naming the build, instead of in a spec.
             - name: Ensure Playwright browsers (chromium, firefox, webkit)
               run: node scripts/ensure-playwright.mjs
 
