@@ -8,6 +8,7 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 
 | Entry                                                              | Date    | Status         |
 | ------------------------------------------------------------------ | ------- | -------------- |
+| Stryker runs the suite in the `forks` pool, as `vitest run` does   | 2026-11 | in force       |
 | Cross-browser runs in the Playwright image                         | 2026-11 | in force       |
 | A browser subscription started in an effect is released            | 2026-11 | in force       |
 | Gate checks refuse a value they cannot judge                       | 2026-11 | in force       |
@@ -57,6 +58,27 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 | Component pattern: arrow function plus `FunctionComponent`         | 2026-04 | in force       |
 | Build stack: Tailwind v4, Vite 8 with Rolldown, `plugin-react` v6  | 2026-03 | in force       |
 | No FSD; Zustand for client state, TanStack Query for server state  | 2026-03 | in force       |
+
+## [2026-11] Stryker runs the suite in the `forks` pool, as `vitest run` does
+
+**Status:** in force. **Evidence:** `scripts/mutation-scope.test.mjs`, `stryker.config.json`.
+
+**Context:** no failure here; this is parity. Stryker's vitest runner defaults to the `threads` pool, a worker thread
+per test file; `vitest run` defaults to `forks`, a process per file, and `vitest.config.ts` names no pool. An import
+that cannot load in a second worker thread therefore passes the gate and fails the weekly job. template-next-seo went
+red that way on 2026-11-09: a native addon, loaded through `next-intl/plugin`, loaded in the first worker thread and
+failed in the next with "Module did not self-register", before Stryker mutated anything. Stryker 10.0.0 hid such a
+failure (a test file that fails to load counted as no tests); 10.1.x, which runs here, reports it. This repo imports no
+native addon today, so it is green; the same default would turn it red the day one arrives.
+
+**Decision:** `stryker.config.json` sets `vitest.pool` to `forks` (an option new in 10.1.0), so both runners load a
+file's imports the same way. `scripts/mutation-scope.test.mjs` fails when the pool Stryker names differs from the one
+`vitest.config.ts` names (the vitest default, `forks`, when it names none).
+
+**Consequences:** a failed Stryker run leaves `.stryker-tmp`, a full copy of the repository. In template-next-seo
+`vitest run` collected that copy because its `include` is a wildcard; here every `include` pattern starts at the repo
+root, and probe files under a stale sandbox were not collected, so no `exclude` was added. A second case in the same
+test file fails when an `include` pattern starts with `**`, the form that would reach the copy.
 
 ## [2026-11] Cross-browser runs in the Playwright image
 

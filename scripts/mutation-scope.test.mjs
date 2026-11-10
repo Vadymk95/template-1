@@ -72,6 +72,48 @@ describe('mutation scope mirrors coverage excludes', () => {
     });
 });
 
+// The suite is one thing under two runners. `vitest run` uses the `forks` pool (a process per test file);
+// Stryker's vitest runner defaults to `threads` (a worker thread per test file). An import that cannot
+// load in a second worker thread, a native addon for one, then passes the gate and fails the weekly job
+// (template-next-seo went red on 2026-11-09 that way). Nothing here imports one today; naming the pool
+// keeps both runners on one execution model, so the day one arrives the gate fails first. The vitest
+// default is `forks` (https://vitest.dev/config/pool).
+describe('mutation runs the suite in the pool `vitest run` uses', () => {
+    const STRYKER_DEFAULT_POOL = 'threads';
+    const VITEST_DEFAULT_POOL = 'forks';
+
+    const strykerPool = strykerConfig.vitest?.pool ?? STRYKER_DEFAULT_POOL;
+    const vitestPool = vitestConfig.test?.pool ?? VITEST_DEFAULT_POOL;
+
+    it('names the same pool as vitest.config.ts, or the vitest default when that names none', () => {
+        expect(
+            strykerPool,
+            `stryker \`vitest.pool\` is "${strykerPool}" but \`vitest run\` uses "${vitestPool}" - set "vitest": { "pool": "${vitestPool}" } in stryker.config.json`
+        ).toBe(vitestPool);
+    });
+});
+
+// A Stryker run that fails (a red dry run, a crash) leaves its sandbox behind: a full second copy of the
+// repository. It stays out of the suite only because every `include` pattern starts at the repo root; a
+// pattern that starts with `**` would reach into the copy and run its tests (template-next-seo's include
+// is such a wildcard, and `vitest run` collected the copy there until its `exclude` named the directory).
+describe('vitest leaves the Stryker sandbox out of the suite', () => {
+    const include = vitestConfig.test?.include ?? [];
+
+    it('reads the include list, fail-closed', () => {
+        expect(include.length, 'no `test.include` found in vitest.config.ts').toBeGreaterThan(0);
+    });
+
+    it('starts every include pattern at the repo root', () => {
+        const reaching = include.filter((pattern) => pattern.startsWith('**'));
+
+        expect(
+            reaching,
+            `vitest \`test.include\` patterns [${reaching.join(', ')}] reach into the Stryker sandbox a failed run leaves behind - anchor them at the repo root, or add the sandbox directory to \`test.exclude\``
+        ).toEqual([]);
+    });
+});
+
 describe('productionScope', () => {
     it('keeps src-scoped production files and directories, negated or not', () => {
         expect(productionScope('src/main.tsx')).toBe('src/main.tsx');
