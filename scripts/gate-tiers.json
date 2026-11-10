@@ -117,8 +117,12 @@
                 "reason": "the cross-browser lane, deliberately CI-only per AGENTS.md § the gate"
             },
             {
+                "run": "PR_LABELS=\"$(gh api \"repos/$REPOSITORY/pulls/$PR_NUMBER\" --jq '[.labels[].name]')\"",
+                "reason": "reads the pull request's current labels from the API for the next line; the labels exist only on the pull request, so no local chain can read them"
+            },
+            {
                 "run": "node scripts/check-gate-integrity.mjs --base \"$BASE_SHA\" --head \"$HEAD_SHA\" --labels \"$PR_LABELS\"",
-                "reason": "lists a change to the gate or an added suppression on a pull request until a reviewer labels it; the labels exist only on the pull request event, so no local chain can judge them"
+                "reason": "lists a change to the gate or an added suppression on a pull request until a reviewer labels it; the labels exist only on the pull request, so no local chain can judge them"
             }
         ],
         "rulesetContextAllowlist": []

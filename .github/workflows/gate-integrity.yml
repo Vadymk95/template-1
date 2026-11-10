@@ -5,9 +5,13 @@ name: Gate integrity
 # This job lists such a change and fails until a reviewer who has read the list adds the label gate-change.
 # CI runs the pull request's own code, so the check cannot make a weakening impossible: the boundary is this
 # required status check plus a human read of the listed paths (a team fork also puts CODEOWNERS on them, see
-# the README section on what a fork does not inherit). The labels reach the script through env from the
-# event payload and are never interpolated into the command line. A re-run of an old run reuses the labels
-# that run started with: after adding or removing the label, let the labeled event run the job.
+# the README section on what a fork does not inherit). The job reads the pull request's labels from the API
+# when it runs, not from the event payload, and they reach the script through env, never interpolated into
+# the command line. A re-run therefore sees the labels as they are now. The payload would not do: a pull
+# request opened with the label fires two events in the same second, both carry the labels as they were
+# when the event fired, and a run that was cancelled in favour of its twin is the one GitHub can count for
+# the merge. Reading the live labels makes every run give the same verdict, and the runs queue instead of
+# cancelling each other.
 
 on:
     pull_request:
@@ -15,10 +19,11 @@ on:
 
 permissions:
     contents: read
+    pull-requests: read
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-    cancel-in-progress: true
+    cancel-in-progress: false
 
 jobs:
     gate-integrity:
@@ -34,8 +39,12 @@ jobs:
             - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
               with:
                   node-version-file: .nvmrc
-            - run: node scripts/check-gate-integrity.mjs --base "$BASE_SHA" --head "$HEAD_SHA" --labels "$PR_LABELS"
+            - run: |
+                  PR_LABELS="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" --jq '[.labels[].name]')"
+                  node scripts/check-gate-integrity.mjs --base "$BASE_SHA" --head "$HEAD_SHA" --labels "$PR_LABELS"
               env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPOSITORY: ${{ github.repository }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
                   BASE_SHA: ${{ github.event.pull_request.base.sha }}
                   HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-                  PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
