@@ -219,6 +219,9 @@ jobs:
             - name: Ensure Playwright browsers (chromium, firefox, webkit)
               run: node scripts/ensure-playwright.mjs
 
+            - name: Font probe (trial)
+              run: node .github/trial/font-probe.cjs
+
             - name: Build for the production geometry spec
               run: npm run build
 
@@ -238,5 +241,91 @@ jobs:
               if: failure()
               with:
                   name: playwright-report-cross-browser
+                  path: playwright-report/
+                  retention-days: 7
+
+    cross-browser-runner:
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        env:
+            HUSKY: '0'
+            CROSS_BROWSER: '1'
+            PLAYWRIGHT_BROWSERS: 'chromium,firefox,webkit'
+
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+
+            - name: Use Node.js 24.x
+              uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              with:
+                  node-version: 24.x
+                  cache: 'npm'
+
+            - name: Upgrade npm to ^11.14 (cross-platform optional binaries fix)
+              run: npm install -g npm@^11.14.0
+
+            - name: Install dependencies
+              run: npm ci --ignore-scripts
+
+            - name: Read runner distro
+              id: distro
+              run: |
+                  . /etc/os-release
+                  echo "id=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-xbrowser-${{ runner.os }}-${{ steps.distro.outputs.id }}-${{ hashFiles('package-lock.json') }}
+
+            # The cache above holds browser BINARIES, not the OS libraries they link against — and
+            # `ensure-playwright.mjs` skips `--with-deps` precisely when the cache hits, so a warm cache
+            # produced a WebKit that could not launch at all:
+            # `libevent-2.1.so.7: cannot open shared object file`. Chromium's deps ship with the runner
+            # image; WebKit's do not. This step is idempotent and cheap on a warm image.
+            # The key carries the Ubuntu release because the browser binaries are built per release:
+            # a cache saved on one release cannot launch on the next, and `ubuntu-latest` moves
+            # between releases without a change to the lockfile.
+            # A normal install takes about a minute, and a stalled apt would otherwise hold the job until its timeout.
+            # apt-get runs as root under sudo, out of reach of the timeout's signal, so a failed try kills what is left
+            # of apt-get and dpkg and repairs dpkg; otherwise the next try only finds the dpkg lock still held.
+            - name: Install browser system dependencies
+              run: |
+                  for try in 1 2 3; do
+                      timeout --kill-after=15s 180s npx --no-install playwright install-deps && exit 0
+                      echo "playwright install-deps: try ${try} of 3 failed" >&2
+                      sudo pkill -KILL -x 'apt-get|dpkg' || true
+                      sudo dpkg --configure -a || true
+                  done
+                  exit 1
+
+            - name: Ensure Playwright browsers (chromium, firefox, webkit)
+              run: node scripts/ensure-playwright.mjs
+
+            - name: Font probe (trial)
+              run: node .github/trial/font-probe.cjs
+
+            - name: Build for the production geometry spec
+              run: npm run build
+
+            # `--list` first, so a `testMatch` that selects nothing fails HERE with a readable message
+            # instead of passing silently as an empty run.
+            - name: Assert every engine has tests to run
+              run: node scripts/check-cross-browser-selection.mjs
+
+            - name: Layout geometry on every engine (production routes)
+              run: npm run test:e2e:prod
+
+            - name: Content stress on every engine (dev server)
+              run: npm run smoke:dev
+
+            - name: Upload Playwright report on failure
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              if: failure()
+              with:
+                  name: playwright-report-cross-browser-runner
                   path: playwright-report/
                   retention-days: 7
