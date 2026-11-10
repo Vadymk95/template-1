@@ -6,13 +6,16 @@
 // config: the cache really does key on `settings` (the first block, against ESLint itself) and the real
 // config really carries the fingerprint for the files the rules cover (the second block).
 // `css-fingerprint.test.mjs` covers the hash. The last block: both linters leave `.cursor/` alone, so
-// an agent's scratch script there cannot red the iterate chain.
-import { spawnSync } from 'node:child_process';
+// an agent's scratch script there cannot red the iterate chain. One more block, at the end: the commit
+// hook formats every file the push gate checks for format (the `lint-staged` globs in `package.json`).
+import { execFileSync, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { ESLint } from 'eslint';
+import { getFileInfo } from 'prettier';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { cssFingerprint } from './css-fingerprint.mjs';
@@ -146,5 +149,61 @@ describe('the agent scratch folder `.cursor/`', { timeout: 60_000 }, () => {
 
         expect(await eslint.isPathIgnored('scripts/probe.mjs'), 'outside .cursor/').toBe(false);
         expect(await eslint.isPathIgnored('.cursor/probe.mjs')).toBe(true);
+    });
+});
+
+describe('the lint-staged globs', { timeout: 60_000 }, () => {
+    // Git location variables a hook chain exports make a child git answer for another repository.
+    const GIT_LOCATION_VARIABLES = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_INDEX_FILE'];
+    const gitEnvironment = Object.fromEntries(
+        Object.entries(process.env).filter(([key]) => !GIT_LOCATION_VARIABLES.includes(key))
+    );
+
+    // lint-staged matches a staged path with picomatch and these exact options
+    // (node_modules/lint-staged/lib/matchFiles.js, `picomatch(pattern, {...})`, lines 10-17): dot files
+    // match, and a pattern without a slash is matched against the base name in every directory
+    // (`matchBase`). picomatch is lint-staged's own dependency and lint-staged does not export its
+    // matcher, so it is loaded from where lint-staged resolves it.
+    const picomatch = createRequire(import.meta.resolve('lint-staged'))('picomatch');
+    const matchesGlob = (pattern, file) =>
+        picomatch(pattern, {
+            cwd: process.cwd(),
+            dot: true,
+            matchBase: !pattern.includes('/'),
+            posixSlashes: true,
+            strictBrackets: true
+        })(file);
+
+    it('cover every tracked file the format check reads, so a commit formats what the push checks', async () => {
+        const patterns = Object.keys(
+            JSON.parse(readFileSync('package.json', 'utf8'))['lint-staged']
+        );
+        const tracked = execFileSync('git', ['ls-files', '-z'], {
+            cwd: process.cwd(),
+            env: gitEnvironment,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+            maxBuffer: 64 * 1024 * 1024
+        })
+            .split('\0')
+            .filter(Boolean);
+
+        // `prettier --check .` skips what `.gitignore` and `.prettierignore` list and any file it
+        // cannot infer a parser for; `getFileInfo` answers both the way the command does.
+        const checked = [];
+        for (const file of tracked) {
+            const info = await getFileInfo(file, {
+                ignorePath: ['.gitignore', '.prettierignore'],
+                resolveConfig: false
+            });
+            if (!info.ignored && info.inferredParser) checked.push(file);
+        }
+        expect(checked.length).toBeGreaterThan(0);
+
+        const unmatched = checked.filter(
+            (file) => !patterns.some((pattern) => matchesGlob(pattern, file))
+        );
+
+        expect(unmatched).toEqual([]);
     });
 });
