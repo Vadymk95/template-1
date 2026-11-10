@@ -225,6 +225,9 @@ jobs:
             - name: Build for the production geometry spec
               run: npm run build
 
+            - name: App font probe (trial)
+              run: node .github/trial/app-font-probe.cjs
+
             # `--list` first, so a `testMatch` that selects nothing fails HERE with a readable message
             # instead of passing silently as an empty run.
             - name: Assert every engine has tests to run
@@ -310,6 +313,9 @@ jobs:
 
             - name: Build for the production geometry spec
               run: npm run build
+
+            - name: App font probe (trial)
+              run: node .github/trial/app-font-probe.cjs
 
             # `--list` first, so a `testMatch` that selects nothing fails HERE with a readable message
             # instead of passing silently as an empty run.

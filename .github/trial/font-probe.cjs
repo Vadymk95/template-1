@@ -6,9 +6,9 @@ const { readFileSync } = require('node:fs');
 
 const STACKS = {
     page: 'Inter, ui-sans-serif, system-ui, sans-serif',
-    dejavu: '"DejaVu Sans"',
-    liberation: '"Liberation Sans"',
-    wqy: '"WenQuanYi Zen Hei"',
+    dejavu: "'DejaVu Sans'",
+    liberation: "'Liberation Sans'",
+    wqy: "'WenQuanYi Zen Hei'",
     freesans: 'FreeSans'
 };
 const TEXT = 'The quick brown fox jumps over the lazy dog 0123456789';

@@ -147,6 +147,10 @@
                 "run": "node .github/trial/font-probe.cjs",
                 "reason": "trial only, removed before merge"
             },
+            {
+                "run": "node .github/trial/app-font-probe.cjs",
+                "reason": "trial only, removed before merge"
+            },
             { "run": "npm run verify:ci", "reason": "the gate itself" },
             {
                 "run": "npm run smoke:dev",
