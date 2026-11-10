@@ -8,6 +8,7 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 
 | Entry                                                              | Date    | Status         |
 | ------------------------------------------------------------------ | ------- | -------------- |
+| Cross-browser runs in the Playwright image                         | 2026-11 | in force       |
 | A browser subscription started in an effect is released            | 2026-11 | in force       |
 | Gate checks refuse a value they cannot judge                       | 2026-11 | in force       |
 | The probe stops its server, and the group a killed probe left      | 2026-10 | in force       |
@@ -56,6 +57,34 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 | Component pattern: arrow function plus `FunctionComponent`         | 2026-04 | in force       |
 | Build stack: Tailwind v4, Vite 8 with Rolldown, `plugin-react` v6  | 2026-03 | in force       |
 | No FSD; Zustand for client state, TanStack Query for server state  | 2026-03 | in force       |
+
+## [2026-11] Cross-browser runs in the Playwright image
+
+**Status:** in force. **Evidence:** `.github/workflows/ci.yml`, `scripts/ci-cross-browser-image.test.mjs`.
+
+**Context:** `playwright install-deps` on the runner's apt stalled: 12 of 152 steps took over 150 s or went red, on 3
+of 13 days from 2026-10-16 to 2026-11-10. A loop of three tries could not outlast a slow mirror, and one master run
+went red after 9 minutes.
+
+**Decision:** the `cross-browser` job runs in `mcr.microsoft.com/playwright:v<version>-resolute`, which ships the
+browsers and the libraries they link against, so the job installs nothing from apt. The `playwright-image` job reads
+`<version>` from `package-lock.json`.
+
+**Consequences:**
+
+- One source for the version: the npm update that moves `@playwright/test` moves the image. Dependabot does not bump a
+  tag inside a workflow file, so a literal tag would lag every update.
+- `cross-browser` needs `playwright-image` and runs on `if: ${{ !cancelled() }}`. A job skipped because a job it needs
+  failed reports success, and `cross-browser` is a required check; run instead, an empty version fails container setup.
+- `-resolute` is Ubuntu 26.04, the release of `ubuntu-latest` when the job moved, so the per-release Firefox and WebKit
+  builds and the font packages stayed the same. `--user 1001` is the runner's uid, Playwright's documented setting.
+- Node still comes from setup-node (24.x); the image's own Node is not relied on.
+- A version with no published image fails at container setup, red, naming the tag.
+- The app bundles Inter at build time and `vite-plugin-webfont-dl` (`vite.config.ts`) serves it on the dev server too,
+  so Latin text renders in Inter on every engine wherever the job runs. Only glyphs Inter lacks, and text drawn before
+  Inter loads, use the machine's fallback font: in the image that is WenQuanYi Zen Hei for `sans-serif`.
+
+Trial numbers: to be added from the pull request's measurement.
 
 ## [2026-11] A browser subscription started in an effect is released
 
