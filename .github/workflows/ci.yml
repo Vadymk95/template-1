@@ -195,11 +195,15 @@ jobs:
             # a cache saved on one release cannot launch on the next, and `ubuntu-latest` moves
             # between releases without a change to the lockfile.
             # A normal install takes about a minute, and a stalled apt would otherwise hold the job until its timeout.
+            # apt-get runs as root under sudo, out of reach of the timeout's signal, so a failed try kills what is left
+            # of apt-get and dpkg and repairs dpkg; otherwise the next try only finds the dpkg lock still held.
             - name: Install browser system dependencies
               run: |
                   for try in 1 2 3; do
                       timeout --kill-after=15s 180s npx --no-install playwright install-deps && exit 0
                       echo "playwright install-deps: try ${try} of 3 failed" >&2
+                      sudo pkill -KILL -x 'apt-get|dpkg' || true
+                      sudo dpkg --configure -a || true
                   done
                   exit 1
 

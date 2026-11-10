@@ -100,6 +100,14 @@
                 "reason": "names the failed try on stderr; not a check"
             },
             {
+                "run": "sudo pkill -KILL -x 'apt-get|dpkg' || true",
+                "reason": "after a failed try, kills the apt-get or dpkg left running as root, which the timeout cannot signal, so the next try is not refused by the dpkg lock; not a check"
+            },
+            {
+                "run": "sudo dpkg --configure -a || true",
+                "reason": "after a failed try, finishes any package configuration the killed try interrupted; not a check"
+            },
+            {
                 "run": "done",
                 "reason": "ends the retry loop around the browser dependency install; not a check"
             },
