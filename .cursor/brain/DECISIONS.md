@@ -84,7 +84,11 @@ browsers and the libraries they link against, so the job installs nothing from a
   so Latin text renders in Inter on every engine wherever the job runs. Only glyphs Inter lacks, and text drawn before
   Inter loads, use the machine's fallback font: in the image that is WenQuanYi Zen Hei for `sans-serif`.
 
-Trial numbers: to be added from the pull request's measurement.
+Measured on pull request #133: twelve attempts on 2026-11-10, each paired with the old job. The image job took a median
+101 s (86 to 146 s), 20 to 32 s of it container setup, and never stalled or was red; the old job 208 s (145 to 648 s),
+`install-deps` 29 to 540 s, over 150 s in 4 of 12 attempts, one red after 626 s (all three apt tries failed). Apt lines:
+0 against 188. Both passed 25 and 3 tests. At 390 and 1440 the built app has the same boxes, size and Chromium font
+(Inter) in both on all three engines; only the fallback font differs: DejaVu Sans (runner), WenQuanYi Zen Hei (image).
 
 ## [2026-11] A browser subscription started in an effect is released
 
