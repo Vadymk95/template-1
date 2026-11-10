@@ -8,6 +8,9 @@ name: Mutation
 # `thresholds.break` in stryker.config.json is a floor-of-record from the measured
 # baseline (44.5% on 2026-08-09) — the job fails only when test strength REGRESSES
 # below it. Raise the floor after a good run; never lower it to go green.
+# `stryker.config.json` runs the suite in the `forks` pool, the pool `vitest run` uses; Stryker's own
+# default, `threads`, loads a native addon in a second worker thread and fails on Linux. A dry run is
+# the quick check: `npx stryker run --dryRunOnly --concurrency 4`.
 
 on:
     schedule:
