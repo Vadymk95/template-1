@@ -107,50 +107,6 @@
                 "run": "node scripts/check-cross-browser-selection.mjs",
                 "reason": "fails loud on a testMatch that silently selects zero tests; not a lint/type/unit check"
             },
-            {
-                "run": ". /etc/os-release",
-                "reason": "trial only, removed before merge"
-            },
-            {
-                "run": "echo \"id=${ID}-${VERSION_ID}\" >> \"$GITHUB_OUTPUT\"",
-                "reason": "trial only, removed before merge"
-            },
-            {
-                "run": "for try in 1 2 3; do",
-                "reason": "trial only, removed before merge"
-            },
-            {
-                "run": "timeout --kill-after=15s 180s npx --no-install playwright install-deps && exit 0",
-                "reason": "trial only, removed before merge"
-            },
-            {
-                "run": "echo \"playwright install-deps: try ${try} of 3 failed\" >&2",
-                "reason": "trial only, removed before merge"
-            },
-            {
-                "run": "sudo pkill -KILL -x 'apt-get|dpkg' || true",
-                "reason": "trial only, removed before merge"
-            },
-            {
-                "run": "sudo dpkg --configure -a || true",
-                "reason": "trial only, removed before merge"
-            },
-            {
-                "run": "done",
-                "reason": "trial only, removed before merge"
-            },
-            {
-                "run": "exit 1",
-                "reason": "trial only, removed before merge"
-            },
-            {
-                "run": "node .github/trial/font-probe.cjs",
-                "reason": "trial only, removed before merge"
-            },
-            {
-                "run": "node .github/trial/app-font-probe.cjs",
-                "reason": "trial only, removed before merge"
-            },
             { "run": "npm run verify:ci", "reason": "the gate itself" },
             {
                 "run": "npm run smoke:dev",
