@@ -88,8 +88,24 @@
                 "reason": "installs the Playwright browsers the gate needs; not a check"
             },
             {
-                "run": "npx --no-install playwright install-deps",
-                "reason": "installs OS-level browser dependencies; not a check"
+                "run": "for try in 1 2 3; do",
+                "reason": "starts the retry loop around the OS-level browser dependency install (up to three tries); not a check"
+            },
+            {
+                "run": "timeout --kill-after=15s 180s npx --no-install playwright install-deps && exit 0",
+                "reason": "installs OS-level browser dependencies, each try capped at 180 s so a stalled apt cannot hold the job; not a check"
+            },
+            {
+                "run": "echo \"playwright install-deps: try ${try} of 3 failed\" >&2",
+                "reason": "names the failed try on stderr; not a check"
+            },
+            {
+                "run": "done",
+                "reason": "ends the retry loop around the browser dependency install; not a check"
+            },
+            {
+                "run": "exit 1",
+                "reason": "fails the step after the third failed try of the browser dependency install; not a check"
             },
             {
                 "run": ". /etc/os-release",
