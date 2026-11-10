@@ -158,7 +158,7 @@ jobs:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   persist-credentials: false
-                  sparse-checkout: package-lock.json
+                  sparse-checkout: package-lock.missing
                   sparse-checkout-cone-mode: false
 
             - name: Read the locked @playwright/test version
