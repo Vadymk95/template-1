@@ -642,4 +642,162 @@ describe('the command line against a real repository', () => {
             expect(result.stderr).toMatch(/no-such-ref is not a commit/);
         });
     });
+
+    // The iterate chain runs this mode: it judges the working tree against HEAD, so a missing test is
+    // found before `git add`, not at the commit hook. A sibling counts when it is on disk, because at
+    // this moment nothing is staged yet; the commit hook still wants it in the index.
+    describe('changed mode', () => {
+        /** A repo whose HEAD also holds `src/lib/legacy.ts`, a logic file with no test. */
+        const makeRepoWithLegacy = () => {
+            const root = initRepo('test-siblings-changed-');
+            write(root, 'src/lib/ok.ts');
+            write(root, 'src/lib/ok.test.ts');
+            write(root, 'src/lib/legacy.ts');
+            commit(root, 'base');
+            git(root, ['update-ref', 'refs/remotes/origin/master', 'HEAD']);
+            return root;
+        };
+
+        it('passes on a clean tree, even when HEAD holds a file with no test', () => {
+            expect(cli(makeRepoWithLegacy(), ['--changed']).code).toBe(0);
+        });
+
+        it('refuses an untracked logic file with no test and names the file and the remedy', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/fresh.ts');
+
+            const result = cli(root, ['--changed']);
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toContain('src/lib/fresh.ts');
+            expect(result.stderr).toContain('add src/lib/fresh.test.ts');
+        });
+
+        it('accepts an untracked logic file with an untracked test beside it', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/fresh.ts');
+            write(root, 'src/lib/fresh.test.ts');
+
+            expect(cli(root, ['--changed']).code).toBe(0);
+        });
+
+        it('refuses a staged-only logic file with no test', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/fresh.ts');
+            git(root, ['add', 'src/lib/fresh.ts']);
+
+            const result = cli(root, ['--changed']);
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toContain('src/lib/fresh.ts');
+        });
+
+        it('accepts a staged logic file whose test is staged too', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/fresh.ts');
+            write(root, 'src/lib/fresh.test.ts');
+            git(root, ['add', '-A']);
+
+            expect(cli(root, ['--changed']).code).toBe(0);
+        });
+
+        it('refuses an unstaged edit of a tracked logic file that has no test', () => {
+            const root = makeRepoWithLegacy();
+            write(root, 'src/lib/legacy.ts', 'export const changed = 1;\n');
+
+            const result = cli(root, ['--changed']);
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toContain('src/lib/legacy.ts');
+        });
+
+        it('accepts an unstaged edit of a tracked logic file whose test is committed', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/ok.ts', 'export const changed = 1;\n');
+
+            expect(cli(root, ['--changed']).code).toBe(0);
+        });
+
+        it('applies the exempt list of the commit hook', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/constants.ts');
+            write(root, 'src/pages/Login/index.ts');
+            write(root, 'src/components/ui/button.tsx');
+            write(root, 'src/types/global.d.ts');
+            write(root, 'src/lib/api/_exampleQuery.ts');
+
+            expect(cli(root, ['--changed']).code).toBe(0);
+        });
+
+        it('ignores a changed file outside src', () => {
+            const root = makeRepo();
+            write(root, 'scripts/tool.mjs');
+            write(root, 'e2e/home.spec.ts');
+
+            expect(cli(root, ['--changed']).code).toBe(0);
+        });
+
+        it('does not judge a deleted logic file', () => {
+            const root = makeRepoWithLegacy();
+            rmSync(path.join(root, 'src/lib/legacy.ts'));
+
+            expect(cli(root, ['--changed']).code).toBe(0);
+        });
+
+        it('judges a renamed logic file at its new path', () => {
+            const root = makeRepo();
+            git(root, ['mv', 'src/lib/ok.ts', 'src/lib/renamed.ts']);
+
+            const result = cli(root, ['--changed']);
+
+            // `ok.test.ts` stayed behind: the old name had a test, the new one has none.
+            expect(result.code).toBe(1);
+            expect(result.stderr).toContain('src/lib/renamed.ts');
+            expect(result.stderr).not.toContain('src/lib/ok.ts');
+        });
+
+        it('accepts a renamed logic file that moved with its test', () => {
+            const root = makeRepo();
+            git(root, ['mv', 'src/lib/ok.ts', 'src/lib/renamed.ts']);
+            git(root, ['mv', 'src/lib/ok.test.ts', 'src/lib/renamed.test.ts']);
+
+            expect(cli(root, ['--changed']).code).toBe(0);
+        });
+
+        it('reports every offender, not only the first', () => {
+            const root = makeRepo();
+            write(root, 'src/lib/a.ts');
+            write(root, 'src/lib/b.tsx');
+
+            const result = cli(root, ['--changed']);
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toContain('src/lib/a.ts');
+            expect(result.stderr).toContain('src/lib/b.tsx');
+        });
+
+        it('fails in a repository with no commit, rather than judging nothing', () => {
+            const root = initRepo('test-siblings-changed-empty-');
+            write(root, 'src/lib/fresh.ts');
+
+            const result = cli(root, ['--changed']);
+
+            expect(result.code).toBe(1);
+            expect(result.stderr).toMatch(/no commit/);
+        });
+
+        it('refuses to combine with --range or with named files', () => {
+            const root = makeRepo();
+
+            for (const args of [
+                ['--changed', '--range'],
+                ['--changed', 'src/lib/ok.ts']
+            ]) {
+                const result = cli(root, args);
+
+                expect(result.code).toBe(1);
+                expect(result.stderr).toMatch(/cannot be combined/);
+            }
+        });
+    });
 });

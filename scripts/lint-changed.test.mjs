@@ -156,6 +156,14 @@ describe('against a real git repository', { timeout: 30_000 }, () => {
             expect(changedFiles({ cwd: root })).toEqual(['renamed.mjs']);
         });
 
+        it('lists a deleted file only when asked, for the checks that must see a removal', () => {
+            const root = makeRepo();
+            unlinkSync(path.join(root, 'kept.mjs'));
+
+            expect(changedFiles({ cwd: root })).toEqual([]);
+            expect(changedFiles({ cwd: root, deleted: true })).toEqual(['kept.mjs']);
+        });
+
         it('leaves out an untracked file the repository ignores', () => {
             const root = makeRepo();
             write(root, 'generated/out.mjs');

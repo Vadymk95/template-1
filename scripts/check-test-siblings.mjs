@@ -5,13 +5,16 @@
 // missing sibling so a model that skips tests cannot land untested logic.
 //
 // "Exists" means TRACKED, never "is on disk": a sibling the author wrote but did not
-// `git add` (or commit) satisfies nobody who later checks out the change. An intent-to-add entry
+// `git add` (or commit) satisfies nobody who later checks out the change. The one exception is
+// `--changed`, the iterate chain's mode: nothing is staged yet while the author works, so a test on
+// disk counts there, and the commit hook then asks for it in the index. An intent-to-add entry
 // (`git add -N`) is listed by git but carries no content, so it does not count either. Staged mode
 // reads the git index; range mode reads the tree of the head commit.
 //
 // Usage:
 //   node scripts/check-test-siblings.mjs                 # staged files vs the index (pre-commit)
 //   node scripts/check-test-siblings.mjs --range         # base...HEAD vs HEAD's tree (CI, push gate)
+//   node scripts/check-test-siblings.mjs --changed       # working tree vs HEAD, tests on disk (iterate chain)
 //   node scripts/check-test-siblings.mjs --range <base>[...<head>]
 //   node scripts/check-test-siblings.mjs <file> [file…]  # checks given files against the disk (for tests)
 //
@@ -24,6 +27,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 import { isEntryPoint } from './is-entry-point.mjs';
+import { changedFiles } from './lint-changed.mjs';
 
 // Exempt: tests themselves, type decls, barrels, declaration-only registries
 // (constants / store keys / route paths), app shell, generated UI, MSW mocks,
@@ -225,6 +229,19 @@ const readRange = ({ git, env, baseRef, head }) => {
     };
 };
 
+/** What the working tree changed against HEAD, and the test files that are on disk beside it. */
+const readChanged = (top) => {
+    try {
+        return {
+            files: changedFiles({ cwd: top }),
+            subject: 'changed source files (working tree against HEAD)',
+            remedy: 'the commit hook also wants the test `git add`ed'
+        };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+};
+
 /* ------------------------------------------------------------------------ run */
 
 const fail = (message) => {
@@ -234,8 +251,16 @@ const fail = (message) => {
 
 /** `--range` alone, or `--range <base>`, or `--range <base>...<head>`; anything else is a file. */
 const parseArguments = (argv) => {
-    const unknown = argv.find((argument) => argument.startsWith('--') && argument !== '--range');
+    const unknown = argv.find(
+        (argument) => argument.startsWith('--') && !['--range', '--changed'].includes(argument)
+    );
     if (unknown) return { error: `unknown option ${unknown}` };
+
+    if (argv.includes('--changed')) {
+        return argv.length === 1
+            ? { changed: true }
+            : { error: '--changed cannot be combined with --range or with file names' };
+    }
 
     const at = argv.indexOf('--range');
     if (at === -1) return { files: argv };
@@ -259,11 +284,16 @@ const main = () => {
         if (!top) fail('not inside a git repository, so there is no index or history to read');
         const git = makeGit(top);
 
-        change = parsed.range
-            ? readRange({ git, env: process.env, ...parsed.range })
-            : readStaged(git);
+        if (parsed.changed) {
+            change = readChanged(top);
+            exists = (file) => existsSync(`${top}/${file}`);
+        } else {
+            change = parsed.range
+                ? readRange({ git, env: process.env, ...parsed.range })
+                : readStaged(git);
+            exists = (file) => change.tracked?.has(file) ?? false;
+        }
         if (change.error) fail(change.error);
-        exists = (file) => change.tracked.has(file);
     }
 
     const missing = findMissingSiblings(change.files, exists);

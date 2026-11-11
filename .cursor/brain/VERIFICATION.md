@@ -67,7 +67,11 @@ lets the next run stop it, but only when the recorded start time and command pro
   the push tiers run it forced),
   then ESLint, type-aware, on the files the
   working tree changed (tracked changes against HEAD and untracked files, deleted ones left out;
-  `scripts/lint-changed.mjs`), then only the tests reachable from the uncommitted diff, then the mutation-scope test by
+  `scripts/lint-changed.mjs`), then what the commit hook would refuse, on those same changed files: a `src` logic file
+  with no test beside it (`scripts/check-test-siblings.mjs --changed`; a test on disk counts here, the hook wants it
+  staged), a file that is not formatted (`scripts/format-changed.mjs`) and the docs drift when a docs-class file
+  changed (`scripts/docs-trigger.mjs`, the one place that condition lives; the hook runs it with `--staged`), then only
+  the tests reachable from the uncommitted diff, then the mutation-scope test by
   name (stages: `scripts/gate-tiers.json`). Seconds; run it after every change. Deliberate properties:
     - while `package.json` or a vite/vitest config is dirty, `--changed` runs the FULL suite. The force-rerun triggers
       are literal paths anchored at the repository root (`forceRerunTriggersFor` in `vitest.config.ts`): the runner's
