@@ -37,8 +37,12 @@ const git = (cwd, args) =>
 
 const nulSeparated = (output) => output.split('\0').filter((name) => name !== '');
 
-/** The files that differ from HEAD (staged or not, deleted ones left out) and the untracked ones, sorted, relative to `cwd`. */
-export const changedFiles = ({ cwd }) => {
+/**
+ * The files that differ from HEAD (staged or not) and the untracked ones, sorted, relative to `cwd`.
+ * Deleted files are left out unless `deleted` is set: a check that reads file contents cannot open
+ * them, while one that reacts to a removal (the docs drift check) must see them.
+ */
+export const changedFiles = ({ cwd, deleted = false }) => {
     try {
         git(cwd, ['rev-parse', '--verify', '--quiet', 'HEAD']);
     } catch (error) {
@@ -50,7 +54,15 @@ export const changedFiles = ({ cwd }) => {
         );
     }
     const tracked = nulSeparated(
-        git(cwd, ['diff', '--name-only', '--diff-filter=d', '--relative', '-z', 'HEAD', '--'])
+        git(cwd, [
+            'diff',
+            '--name-only',
+            ...(deleted ? [] : ['--diff-filter=d']),
+            '--relative',
+            '-z',
+            'HEAD',
+            '--'
+        ])
     );
     const untracked = nulSeparated(git(cwd, ['ls-files', '--others', '--exclude-standard', '-z']));
 

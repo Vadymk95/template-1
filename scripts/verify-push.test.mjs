@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readConfiguredPhase, resolvePushPlan } from './verify-push.mjs';
+import { readConfiguredPhase, resolvePushPlan, skippedStages } from './verify-push.mjs';
 
 const SCRIPT = resolve(process.cwd(), 'scripts/verify-push.mjs');
 
@@ -17,7 +17,15 @@ const CAPTURE = ['ignore', 'pipe', 'pipe'];
 /* CLI cases run in a throwaway package, never against this repo's own gate: the dispatcher
    spawns whatever `verify:scaffold:push` / `verify:ci` say, and the fixture package defines
    them as one-line exits so the passthrough is provable in seconds. */
-const makeFixturePackage = ({ phase, scaffoldExit = 0, ciExit = 0 }) => {
+const FIXTURE_CHECKS = {
+    'verify:ci': { chain: 'audit:gate -> verify' },
+    verify: { chain: 'lint -> test -> build -> e2e' },
+    build: { chain: 'tsc -b -> vite build' },
+    'verify:scaffold:push': { chain: 'audit:gate -> verify:scaffold' },
+    'verify:scaffold': { chain: 'lint -> test' }
+};
+
+const makeFixturePackage = ({ phase, scaffoldExit = 0, ciExit = 0, checks = FIXTURE_CHECKS }) => {
     const dir = mkdtempSync(join(tmpdir(), 'verify-push-'));
     writeFileSync(
         join(dir, 'package.json'),
@@ -32,7 +40,7 @@ const makeFixturePackage = ({ phase, scaffoldExit = 0, ciExit = 0 }) => {
     );
     mkdirSync(join(dir, 'scripts'));
     if (phase !== undefined) {
-        writeFileSync(join(dir, 'scripts/gate-tiers.json'), JSON.stringify({ phase }));
+        writeFileSync(join(dir, 'scripts/gate-tiers.json'), JSON.stringify({ phase, checks }));
     }
     return dir;
 };
@@ -66,15 +74,14 @@ afterEach(() => {
 });
 
 describe('resolvePushPlan (pure)', () => {
-    it('phase 0 routes to the scaffold chain and names every skipped stage', () => {
-        const plan = resolvePushPlan({ phase: 0, override: undefined });
+    it('phase 0 routes to the scaffold chain and names every stage it drops', () => {
+        const plan = resolvePushPlan({
+            phase: 0,
+            override: undefined,
+            checks: FIXTURE_CHECKS
+        });
         expect(plan.target).toBe('verify:scaffold:push');
-        expect(plan.skipped).toEqual([
-            'build',
-            'verify:web-vitals-chunks',
-            'size:check',
-            'test:e2e:prod'
-        ]);
+        expect(plan.skipped).toEqual(['build', 'e2e']);
     });
 
     it('phase 1 routes to the full verify:ci chain with nothing skipped', () => {
@@ -128,10 +135,39 @@ describe('verify-push CLI (fixture package)', { timeout: 20_000 }, () => {
         const verdict = runDispatcher(dir);
         expect(verdict.code).toBe(0);
         expect(verdict.output).toContain('PHASE 0');
-        expect(verdict.output).toContain(
-            'build, verify:web-vitals-chunks, size:check, test:e2e:prod'
-        );
         expect(verdict.output).toContain('"phase": 1');
+        const lines = verdict.output
+            .split('\n')
+            .filter((line) => line.includes('skipped at phase 0'));
+        expect(lines).toHaveLength(2);
+        expect(lines[0]).toContain('build');
+        expect(lines[1]).toContain('e2e');
+    });
+
+    it('phase 0: a stage added to the full chain later is printed without editing any list', () => {
+        const checks = {
+            ...FIXTURE_CHECKS,
+            verify: { chain: 'lint -> test -> build -> e2e -> brand-new-check' }
+        };
+        const dir = makeFixturePackage({ phase: 0, checks });
+        cleanupDirs.push(dir);
+
+        const verdict = runDispatcher(dir);
+
+        expect(verdict.code).toBe(0);
+        expect(verdict.output).toMatch(
+            /brand-new-check.*skipped at phase 0|skipped at phase 0.*brand-new-check/
+        );
+    });
+
+    it('phase 0: says so, loudly, when the stage list cannot be derived', () => {
+        const dir = makeFixturePackage({ phase: 0, checks: {} });
+        cleanupDirs.push(dir);
+
+        const verdict = runDispatcher(dir);
+
+        expect(verdict.code).toBe(0);
+        expect(verdict.output).toContain('could not be derived');
     });
 
     it('phase 0: the scaffold chain’s own failure passes through as the push’s failure', () => {
@@ -158,5 +194,63 @@ describe('verify-push CLI (fixture package)', { timeout: 20_000 }, () => {
         const dir = makeFixturePackage({ phase: 0, ciExit: 5 });
         cleanupDirs.push(dir);
         expect(runDispatcher(dir, { GATE_PHASE: 'full' }).code).toBe(5);
+    });
+});
+
+describe('skippedStages (derived from the two chains)', () => {
+    const skipped = (checks) =>
+        skippedStages({ checks, full: 'verify:ci', scaffold: 'verify:scaffold:push' });
+
+    it('lists the stages of the full chain that the scaffold chain lacks, in the full chain’s order', () => {
+        expect(skipped(FIXTURE_CHECKS)).toEqual(['build', 'e2e']);
+    });
+
+    it('lists a stage of a nested chain by its own name when the scaffold lacks all of it', () => {
+        // `build` is a chain itself (tsc -b -> vite build): one line for it, not one per step.
+        expect(skipped(FIXTURE_CHECKS)).not.toContain('tsc -b');
+    });
+
+    it('descends into a nested chain the scaffold runs only in part', () => {
+        const checks = {
+            ...FIXTURE_CHECKS,
+            test: { chain: 'unit -> slow' },
+            verify: { chain: 'lint -> test -> build -> e2e' },
+            'verify:scaffold': { chain: 'lint -> unit' }
+        };
+
+        expect(skipped(checks)).toEqual(['slow', 'build', 'e2e']);
+    });
+
+    it('lists nothing when both chains run the same stages', () => {
+        const checks = {
+            ...FIXTURE_CHECKS,
+            verify: { chain: 'lint -> test' }
+        };
+
+        expect(skipped(checks)).toEqual([]);
+    });
+
+    it('returns null when a chain is not defined, so the caller can say so', () => {
+        expect(skipped({})).toBeNull();
+    });
+
+    it('does not loop on a chain that contains itself', () => {
+        const checks = { ...FIXTURE_CHECKS, verify: { chain: 'lint -> verify' } };
+
+        expect(() => skipped(checks)).not.toThrow();
+    });
+
+    it('in this repository, names every stage verify has and verify:scaffold lacks', () => {
+        const { checks } = JSON.parse(readFileSync('scripts/gate-tiers.json', 'utf8'));
+        const stages = (name) => checks[name].chain.split(' -> ');
+        const expected = stages('verify').filter(
+            (stage) => !stages('verify:scaffold').includes(stage)
+        );
+
+        expect(expected.length).toBeGreaterThan(0);
+        expect(skipped(checks)).toEqual(expected);
+        expect(resolvePushPlan({ phase: 0, override: undefined, checks }).skipped).toEqual(
+            expected
+        );
     });
 });

@@ -6,7 +6,7 @@
         "verify:iter": {
             "class": "code",
             "description": "iterate: the seconds-long check run per change",
-            "chain": "check-hooks -> lint:oxlint -> typecheck -> lint-changed -> vitest run --changed --passWithNoTests -> vitest run scripts/mutation-scope.test.mjs"
+            "chain": "check-hooks -> lint:oxlint -> typecheck -> lint-changed -> check-test-siblings --changed -> format-changed -> docs-trigger -> vitest run --changed --passWithNoTests -> vitest run scripts/mutation-scope.test.mjs"
         },
         "verify": {
             "class": "code",

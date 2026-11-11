@@ -619,8 +619,9 @@ the holes that reproduced and sit on a path a fork or a real incident would hit.
   `App` error boundary in `src/App.test.tsx`; the `safeFetch` contract in
   `src/lib/api/safeFetch.test.ts`.
 - **`no-empty`** is an ESLint error with `allowEmptyCatch: false`, so a `catch {}` fails lint.
-- **Pre-commit `docs:check` trigger.** The `grep -qE` in `.husky/pre-commit` also matches
-  `scripts/docs-check.*` and `package.json`, so a broken checker or a renamed npm script cannot
+- **Pre-commit `docs:check` trigger.** The condition (`DOCS_TRIGGER` in `scripts/docs-trigger.mjs`, which the
+  commit hook and the iterate chain both run; an inline `grep -qE` in `.husky/pre-commit` before that) also
+  matches `scripts/docs-check.*` and `package.json`, so a broken checker or a renamed npm script cannot
   commit clean.
 
 **Evidence:** https://github.com/Vadymk95/template-1/commit/cb92490 and
