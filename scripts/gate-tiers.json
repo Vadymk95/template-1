@@ -107,6 +107,14 @@
                 "run": "node scripts/check-cross-browser-selection.mjs",
                 "reason": "fails loud on a testMatch that silently selects zero tests; not a lint/type/unit check"
             },
+            {
+                "run": "node scripts/mutation-changed.mjs --pick",
+                "reason": "lists the changed lines in the mutation scope and tells the later steps whether to run; informational, not a check"
+            },
+            {
+                "run": "npm run test:mutation:changed",
+                "reason": "mutation testing on the lines the pull request changed; informational by decision (DECISIONS.md), too slow for the gate"
+            },
             { "run": "npm run verify:ci", "reason": "the gate itself" },
             {
                 "run": "npm run smoke:dev",

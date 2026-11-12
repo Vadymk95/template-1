@@ -258,6 +258,7 @@ VITE_ENABLE_MSW=false
 | `npm run gate:integrity`           | Lists gate files and suppressions this branch changes vs the default branch (CI: PR base)  |
 | `npm run bench:verify`             | The gate step by step with timings                                                         |
 | `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job                                   |
+| `npm run test:mutation:changed`    | Surviving mutants on the lines this change touched (informational; `-- --pick` lists them) |
 | `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                                           |
 | `npm run verify:web-vitals-chunks` | Post-build `dist` checks: the standard web-vitals chunk split and the Latin font preload   |
 | `npm run build:analyze`            | Bundle visualizer (`ANALYZE=true`)                                                         |
@@ -318,6 +319,11 @@ with `uvx zizmor@1.30.1 .github/workflows`: the version is the one the job pins 
 `.github/zizmor.yml`, so it reproduces the gate online or offline. zizmor audits only this repository's
 workflow files; its online audits also ask the GitHub API about the actions those files reference, with the
 job's read-only token.
+
+**`mutation-changed.yml`** — on pull requests, informational and not a required check: lists the mutants of the lines
+the pull request changed that no test catches, in the job summary. It ends after one cheap step when the change touches
+nothing in the Stryker scope, and skips a change above 20 files or 800 lines (the weekly `mutation.yml` covers those).
+The same list locally: `npm run test:mutation:changed`.
 
 **`gate-integrity.yml`** — on pull requests (also when a label is added or removed; the job reads the pull request's labels from the API when it runs, so a re-run sees the current labels, and twin runs queue instead of cancelling each other): lists every changed gate
 file (the globs in `scripts/gate-files.json`: the check scripts and their tests, hooks, workflows, lint, type, test

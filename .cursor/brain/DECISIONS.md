@@ -8,6 +8,7 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 
 | Entry                                                              | Date    | Status         |
 | ------------------------------------------------------------------ | ------- | -------------- |
+| Mutation on the lines a pull request changed is informational      | 2026-11 | in force       |
 | Stryker runs the suite in the `forks` pool, as `vitest run` does   | 2026-11 | in force       |
 | Cross-browser runs in the Playwright image                         | 2026-11 | in force       |
 | A browser subscription started in an effect is released            | 2026-11 | in force       |
@@ -58,6 +59,30 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 | Component pattern: arrow function plus `FunctionComponent`         | 2026-04 | in force       |
 | Build stack: Tailwind v4, Vite 8 with Rolldown, `plugin-react` v6  | 2026-03 | in force       |
 | No FSD; Zustand for client state, TanStack Query for server state  | 2026-03 | in force       |
+
+## [2026-11] Mutation on the lines a pull request changed is informational
+
+**Status:** in force. **Evidence:** `scripts/mutation-changed.mjs`, `scripts/mutation-changed.test.mjs`, `.github/workflows/mutation-changed.yml`.
+
+**Context:** test strength was measured once a week over the whole scope (about 12 minutes, 720 mutants) and by the
+mutations a reviewer makes by hand. Coverage says a line runs under a test; nothing per pull request said a test would
+catch a wrong line. A later round wants to ask for a test file only where a script finds logic, which is safe only when
+weak tests are visible per change.
+
+**Decision:** `mutation-changed.yml` runs Stryker on the lines the pull request changed and lists every surviving or
+uncovered mutant in the job summary. It never fails on the score and is not a required check. The same script runs
+locally as `npm run test:mutation:changed`. The weekly `mutation.yml` and `stryker.config.json` stay as they are.
+
+**Consequences:**
+
+- Stryker gets only the changed lines, in the scope of `stryker.config.json` (a `--mutate` on its command line would
+  replace that list, so the script applies it), with no incremental file and no break threshold. A mutant counts only
+  when it lies entirely inside a changed range, so a block-removal mutant larger than the edit is not tried.
+- Above 20 files or 800 changed lines, or past 25 minutes, the check prints a notice and exits 0: the weekly run covers it.
+- It could gate later, as a separate decision, when over 10 pull requests that mutate something the median run is at
+  most 10 minutes and at most half of the survivors are equivalent (no test would catch them).
+- It is deleted, with no replacement, when the median run is above 15 minutes or more than 70% of the survivors are
+  equivalent.
 
 ## [2026-11] Stryker runs the suite in the `forks` pool, as `vitest run` does
 
