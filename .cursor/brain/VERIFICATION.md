@@ -10,6 +10,12 @@ everything else points. This file holds the mechanics, the phase table, and the 
 on every phase-0 push. `GATE_PHASE=full` overrides per run (how gate machinery itself is pushed). CI
 always runs the full chain — the phase gates only the LOCAL hook.
 
+A push that changes no harness file (no path of `scripts/gate-files.json`, none under `scripts/`, no `package.json`, no lockfile, between
+the merge base with `origin/master` or `origin/main` and HEAD) also leaves out the harness tests listed under
+`selfTests` in `gate-tiers.json`, in either phase: `scripts/verify-push.mjs` decides and prints which way it went
+on every push, `scripts/check-coverage.mjs` applies it. A push whose change cannot be told (a package below the repository root too), CI, `npm test`,
+`npm run verify` and `GATE_SELF_TESTS=all git push` run them all.
+
 | Check | Runs at phase 0 (scaffold) | Added when (the trigger) |
 | --- | --- | --- |
 | the phase-0 push gate (`verify:scaffold:push`) | yes — every push, seconds | day one |

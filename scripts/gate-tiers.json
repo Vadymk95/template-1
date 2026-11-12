@@ -75,6 +75,22 @@
             "description": "mechanical doc drift: paths, scripts, sentinels, versions, command table, dead docs, agent-memory imports, the chain view against package.json, hand-written retellings and compositions of it; the push budget vs traced pushes of the same phase (report only)"
         }
     },
+    "selfTests": {
+        "_description": "The harness tests a push that changes no harness file leaves out (scripts/verify-push.mjs decides, scripts/check-coverage.mjs applies it; CI, npm test and verify always run them). A file belongs here only if it costs seconds and reads no repository file outside scripts/: temp folders do not count, nor do the tools it loads from node_modules (package.json and the lockfile pin them, and a change of either runs everything), nor a look at the machine such as whether a system tool exists. The harness tests that read the real repository (app files, configs, package.json) are guards over it, so they are never listed. Adding a file is a gate change.",
+        "files": [
+            "scripts/check-gate-integrity.suppressions-1.test.mjs",
+            "scripts/check-gate-integrity.suppressions-2.test.mjs",
+            "scripts/check-gate-integrity.suppressions-3.test.mjs",
+            "scripts/check-gate-integrity.gate-files.test.mjs",
+            "scripts/check-test-siblings.test.mjs",
+            "scripts/gate-trace.test.mjs",
+            "scripts/lint-changed.test.mjs",
+            "scripts/check-lock-age.test.mjs",
+            "scripts/check-gate-env.test.mjs",
+            "scripts/format-changed.test.mjs",
+            "scripts/verify-push.self-tests.test.mjs"
+        ]
+    },
     "ci": {
         "_description": "Data for scripts/docs-check.mjs § ciSteps/rulesetContexts. allowedRunSteps lists every `run:` step in a PR-triggered workflow that legitimately runs outside `verify` (install/tooling steps, and the cross-browser/dev-smoke lanes AGENTS.md § the gate documents as CI-only), each with the reason it is not a check that belongs in the gate. rulesetContextAllowlist is for a required status check produced by something other than this repo's own workflows (a third-party GitHub App) — empty today.",
         "allowedRunSteps": [
@@ -235,7 +251,7 @@
             "requiresMainCheckout": false
         },
         "push": {
-            "description": "Husky pre-push -> verify:push (phase-aware). Runs unconditionally, never shortened by what the diff touched.",
+            "description": "Husky pre-push -> verify:push (phase-aware). Runs at every push, never shortened by what the diff touched, with one named exception: the harness tests listed in selfTests are left out of a push that changes no harness file; the push prints that it left them out, and CI always runs them.",
             "expected": ["verify:push"],
             "forbidden": [],
             "runsRegardlessOfDiff": true,

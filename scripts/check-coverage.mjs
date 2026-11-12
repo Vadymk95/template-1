@@ -14,10 +14,50 @@
  *
  * Usage:
  *   node scripts/check-coverage.mjs            # runs `vitest run --coverage` and guards its output
+ *
+ * A push that changes no harness file leaves out the harness tests listed in gate-tiers.json
+ * (`selfTests`): scripts/verify-push.mjs decides and tells this step through SELF_TESTS_FLAG in the
+ * environment of the chain it starts. The flag only switches the list on; the files always come from
+ * the list. Without the flag, or under CI, every test runs. Coverage does not count `scripts/**`,
+ * so no number moves.
  */
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
+import { isCi } from './check-test-siblings.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
+
+export const SELF_TESTS_FLAG = 'GATE_LEAVE_OUT_SELF_TESTS';
+
+/** The harness tests a push may leave out; empty when the list is missing or malformed. */
+export const readSelfTests = (cwd) => {
+    try {
+        const files = JSON.parse(readFileSync(`${cwd}/scripts/gate-tiers.json`, 'utf8')).selfTests
+            ?.files;
+        return Array.isArray(files) && files.every((file) => typeof file === 'string') ? files : [];
+    } catch {
+        return [];
+    }
+};
+
+/** The arguments of the vitest run (after `npx`), with the listed tests excluded only when told to. */
+export const coverageArguments = ({ env, cwd }) => {
+    // `--no-install` so a missing or incomplete `node_modules` cannot make npx fetch a different
+    // vitest from the network and gate on a tool this repo does not pin.
+    const args = ['--no-install', 'vitest', 'run', '--coverage'];
+    if (env[SELF_TESTS_FLAG] === '1' && !isCi(env)) {
+        for (const file of readSelfTests(cwd)) args.push('--exclude', file);
+    }
+    return args;
+};
+
+/** The one line that says the run leaves harness tests out; undefined when it leaves none out. */
+export const leftOutNotice = (args) => {
+    const count = args.filter((arg) => arg === '--exclude').length;
+    return count === 0
+        ? undefined
+        : `check-coverage: ${String(count)} listed harness tests left out (${SELF_TESTS_FLAG}=1; CI runs them)`;
+};
 
 /**
  * Vitest's own wording, copied from a measured run rather than guessed. Both halves must be present:
@@ -35,12 +75,10 @@ export const findCoverageDropouts = (output) =>
         .filter((line) => DROPOUT_MARKERS.every((marker) => line.includes(marker)));
 
 const main = () => {
-    // `--no-install` so a missing or incomplete `node_modules` cannot make npx fetch a different
-    // vitest from the network and gate on a tool this repo does not pin.
-    const result = spawnSync('npx', ['--no-install', 'vitest', 'run', '--coverage'], {
-        encoding: 'utf8',
-        shell: false
-    });
+    const args = coverageArguments({ env: process.env, cwd: process.cwd() });
+    const notice = leftOutNotice(args);
+    if (notice !== undefined) console.log(notice);
+    const result = spawnSync('npx', args, { encoding: 'utf8', shell: false });
 
     // Captured rather than inherited, because the guard has to READ the output. Echo it back first so
     // the run looks the same as before.

@@ -25,7 +25,13 @@ const FIXTURE_CHECKS = {
     'verify:scaffold': { chain: 'lint -> test' }
 };
 
-const makeFixturePackage = ({ phase, scaffoldExit = 0, ciExit = 0, checks = FIXTURE_CHECKS }) => {
+const makeFixturePackage = ({
+    phase,
+    scaffoldExit = 0,
+    ciExit = 0,
+    checks = FIXTURE_CHECKS,
+    extraScripts = {}
+}) => {
     const dir = mkdtempSync(join(tmpdir(), 'verify-push-'));
     writeFileSync(
         join(dir, 'package.json'),
@@ -34,7 +40,8 @@ const makeFixturePackage = ({ phase, scaffoldExit = 0, ciExit = 0, checks = FIXT
             version: '0.0.0',
             scripts: {
                 'verify:scaffold:push': `node -e "process.exit(${String(scaffoldExit)})"`,
-                'verify:ci': `node -e "process.exit(${String(ciExit)})"`
+                'verify:ci': `node -e "process.exit(${String(ciExit)})"`,
+                ...extraScripts
             }
         })
     );
@@ -160,6 +167,27 @@ describe('verify-push CLI (fixture package)', { timeout: 20_000 }, () => {
         );
     });
 
+    it('phase 0: names the stages of a full chain that is a script alias, read from package.json', () => {
+        const checks = {
+            ...FIXTURE_CHECKS,
+            verify: undefined,
+            'verify:enterprise': { chain: 'lint -> test -> build -> e2e' }
+        };
+        const dir = makeFixturePackage({
+            phase: 0,
+            checks,
+            extraScripts: { verify: 'npm run verify:enterprise' }
+        });
+        cleanupDirs.push(dir);
+
+        const verdict = runDispatcher(dir);
+
+        expect(verdict.code).toBe(0);
+        expect(verdict.output).toMatch(/- build: skipped at phase 0/);
+        expect(verdict.output).toMatch(/- e2e: skipped at phase 0/);
+        expect(verdict.output).not.toMatch(/- verify: skipped at phase 0/);
+    });
+
     it('phase 0: says so, loudly, when the stage list cannot be derived', () => {
         const dir = makeFixturePackage({ phase: 0, checks: {} });
         cleanupDirs.push(dir);
@@ -198,8 +226,8 @@ describe('verify-push CLI (fixture package)', { timeout: 20_000 }, () => {
 });
 
 describe('skippedStages (derived from the two chains)', () => {
-    const skipped = (checks) =>
-        skippedStages({ checks, full: 'verify:ci', scaffold: 'verify:scaffold:push' });
+    const skipped = (checks, scripts) =>
+        skippedStages({ checks, scripts, full: 'verify:ci', scaffold: 'verify:scaffold:push' });
 
     it('lists the stages of the full chain that the scaffold chain lacks, in the full chain’s order', () => {
         expect(skipped(FIXTURE_CHECKS)).toEqual(['build', 'e2e']);
@@ -240,16 +268,35 @@ describe('skippedStages (derived from the two chains)', () => {
         expect(() => skipped(checks)).not.toThrow();
     });
 
+    it('follows a stage that is only a script alias to the chain of its target', () => {
+        const checks = {
+            ...FIXTURE_CHECKS,
+            verify: undefined,
+            'verify:enterprise': { chain: 'lint -> test -> build -> e2e' }
+        };
+
+        expect(skipped(checks, { verify: 'npm run verify:enterprise' })).toEqual(['build', 'e2e']);
+        // Without the alias the stage is one opaque name: the list cannot see inside it.
+        expect(skipped(checks, {})).toEqual(['verify']);
+    });
+
+    it('does not loop on an alias that points at itself', () => {
+        const checks = { ...FIXTURE_CHECKS, verify: undefined };
+
+        expect(() => skipped(checks, { verify: 'npm run verify' })).not.toThrow();
+    });
+
     it('in this repository, names every stage verify has and verify:scaffold lacks', () => {
         const { checks } = JSON.parse(readFileSync('scripts/gate-tiers.json', 'utf8'));
+        const { scripts } = JSON.parse(readFileSync('package.json', 'utf8'));
         const stages = (name) => checks[name].chain.split(' -> ');
         const expected = stages('verify').filter(
             (stage) => !stages('verify:scaffold').includes(stage)
         );
 
         expect(expected.length).toBeGreaterThan(0);
-        expect(skipped(checks)).toEqual(expected);
-        expect(resolvePushPlan({ phase: 0, override: undefined, checks }).skipped).toEqual(
+        expect(skipped(checks, scripts)).toEqual(expected);
+        expect(resolvePushPlan({ phase: 0, override: undefined, checks, scripts }).skipped).toEqual(
             expected
         );
     });
