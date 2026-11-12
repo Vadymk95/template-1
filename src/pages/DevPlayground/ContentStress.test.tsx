@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
+import i18n from '@/lib/i18n';
+import { DEFAULT_LANGUAGE } from '@/lib/i18n/constants';
 import { renderWithProviders } from '@/test/test-utils';
 
 import { ContentStress } from './ContentStress';
-import { CONTENT_STRESS_CASES, CONTENT_STRESS_TOTAL, STRESS_STATE } from './stressMatrix';
+import {
+    AUTHORED_COPY,
+    CONTENT_STRESS_CASES,
+    CONTENT_STRESS_TOTAL,
+    STRESS_STATE
+} from './stressMatrix';
 
 /**
  * jsdom cannot measure a rendered box, so this proves the CONTRACT the browser spec depends on:
@@ -87,5 +94,25 @@ describe('ContentStress fixture', () => {
         expect(itemCount(STRESS_STATE.ONE)).toBe(1);
         expect(itemCount(STRESS_STATE.MANY)).toBeGreaterThan(itemCount(STRESS_STATE.TYPICAL));
         expect(itemCount(STRESS_STATE.TYPICAL)).toBeGreaterThan(itemCount(STRESS_STATE.ONE));
+    });
+
+    it('renders its own authored copy when the start page namespace is gone', () => {
+        // While `home` exists a call site still on a `home:` key renders the same words, so the
+        // bundle goes for the case: the fixture must not depend on the namespace a fork removes.
+        const home = i18n.getResourceBundle(DEFAULT_LANGUAGE, 'home') as object | undefined;
+        i18n.removeResourceBundle(DEFAULT_LANGUAGE, 'home');
+        try {
+            renderWithProviders(<ContentStress />);
+
+            const textOf = (selector: string): string | null | undefined =>
+                document.querySelector(selector)?.textContent;
+            const prose = '[data-stress-component="Prose"][data-stress-state="typical"]';
+            expect(textOf('[data-stress-root] h1')).toBe(AUTHORED_COPY.heading);
+            expect(textOf('[data-stress-root] h1 + p')).toBe(AUTHORED_COPY.intro);
+            expect(textOf(`${prose} h3`)).toBe(AUTHORED_COPY.heading);
+            expect(textOf(`${prose} [data-stress-target] p`)).toBe(AUTHORED_COPY.text);
+        } finally {
+            if (home) i18n.addResourceBundle(DEFAULT_LANGUAGE, 'home', home);
+        }
     });
 });

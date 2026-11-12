@@ -36,7 +36,7 @@ npx storybook@latest init
 **Already in the template:** `@playwright/test` is installed, `playwright.config.ts` sits at the root, specs live in `e2e/`, and the prod-mode suite runs inside `npm run verify` (see `AGENTS.md` § the gate). Nothing to install.
 
 **Critical flows to test first:**
-1. Auth flow (login → redirect → logout) — shell already exists in `src/pages/LoginPage/`
+1. Auth flow (login → redirect → logout) — what ships and the recipe: `.cursor/brain/EXTENSIONS.md` § "Phase 2 — authentication"
 2. Core user journey (whatever the product does)
 3. Error states (network failure, 404)
 
@@ -84,7 +84,7 @@ VITE_SENTRY_DSN: z.url().optional()
 
 ## 4. Authentication
 
-**The template already ships:** `ProtectedRoute` HOC, `LoginPage`, `DashboardPage`, and a `userStore` with `isLoggedIn` + `token`. The auth shell is wired — you only need to plug in a real provider.
+**Start from:** `.cursor/brain/EXTENSIONS.md` § "Phase 2 — authentication": what ships for auth and how to replace it.
 
 **Options ranked for 2025–2026:**
 
@@ -285,7 +285,7 @@ These are fully implemented — no action needed:
 | **MSW** | `src/test/handlers.ts` + `src/test/server.ts` | Network-level mocking for unit tests. `@testing-library/user-event` also installed. |
 | **Web Vitals** | `src/lib/vitals.ts` | LCP, CLS, INP, FCP, TTFB. Lazy-loaded. Wire `reportToAnalytics` to your analytics provider. |
 | **Type-aware ESLint** | `eslint.config.js` | `strictTypeChecked` + `parserOptions.projectService`. Catches `no-floating-promises`, `no-misused-promises`, `prefer-nullish-coalescing`, etc. |
-| **Auth shell** | `src/hocs/ProtectedRoute.tsx`, `src/pages/LoginPage/`, `src/pages/DashboardPage/`, `src/store/user/userStore.ts` | Route protection and auth state wired. Replace mock logic in `src/lib/api/auth.ts` with real provider. |
+| **Auth state** | `src/store/user/userStore.ts`, `src/lib/api/auth.ts` | Demo auth state and its transport, answered by the MSW handlers in development; real provider: `.cursor/brain/EXTENSIONS.md` § "Phase 2 — authentication". |
 
 ---
 

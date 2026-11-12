@@ -13,8 +13,8 @@ style — style is ESLint's and Prettier's job, not a review finding.
   reads or writes credentials directly.
 - No secrets, keys or endpoints in committed files. `.env.example` carries placeholders; real values
   live in the host's environment. This holds for values that look harmless.
-- Template seeds listed in `.cursor/brain/TEMPLATE_SEEDS.md` (`_example*`, `DevPlayground`, MSW
-  handlers) are reference material. Removing them as "dead code" is a finding.
+- Template seeds listed in `.cursor/brain/TEMPLATE_SEEDS.md`, and the MSW handlers, are reference
+  material. Removing them as "dead code" is a finding.
 
 ## Conventions the linter enforces — flag attempts to work around them
 
