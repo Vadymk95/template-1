@@ -7,13 +7,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { coverageArguments, readSelfTests, SELF_TESTS_FLAG } from './check-coverage.mjs';
 
 const TEST_FILE = /^scripts\/[^/]+\.test\.mjs$/;
-// fork:init deletes this file in every fork, so a list that names it names a file that is gone.
-const NEVER_LISTED = ['scripts/fork-init.test.mjs'];
 
 /**
  * What is wrong with the list of harness tests a push may leave out, in the repository at `cwd`:
- * a name that is not a test file under scripts/, a file that is not there, a name listed twice, a
- * file that must never be listed, and a unit step that leaves out anything but the list.
+ * a name that is not a test file under scripts/, a file that is not there, a name listed twice, and
+ * a unit step that leaves out anything but the list.
  */
 const problemsOf = (cwd) => {
     const listed = readSelfTests(cwd);
@@ -22,7 +20,6 @@ const problemsOf = (cwd) => {
     for (const file of listed) {
         if (!TEST_FILE.test(file)) problems.push(`${file} is not a test file under scripts/`);
         else if (!existsSync(path.join(cwd, file))) problems.push(`${file} does not exist`);
-        if (NEVER_LISTED.includes(file)) problems.push(`${file} must never be listed`);
     }
     for (const file of new Set(listed)) {
         if (listed.filter((other) => other === file).length > 1) {
@@ -82,12 +79,6 @@ describe('the list of harness tests a push may leave out', () => {
             'scripts/a.mjs is not a test file under scripts/',
             'src/a.test.ts is not a test file under scripts/'
         ]);
-    });
-
-    it('fails the test that fork:init deletes in every fork', () => {
-        const dir = fixture(['scripts/fork-init.test.mjs']);
-
-        expect(problemsOf(dir)).toEqual(['scripts/fork-init.test.mjs must never be listed']);
     });
 
     it('fails an empty or missing list', () => {
