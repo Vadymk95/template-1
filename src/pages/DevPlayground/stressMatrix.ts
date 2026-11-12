@@ -58,6 +58,17 @@ export const UNBROKEN_TOKEN = 'Xx'.repeat(UNBROKEN_TOKEN_PAIRS);
 /** One character, not the empty string: a label nothing can read is a content bug, not a layout one. */
 export const MINIMAL_TEXT = 'x';
 
+/**
+ * Real authored copy, never lorem-ipsum: the template's start-page copy, word for word, so TYPICAL is a
+ * real sentence and LONG that sentence tripled. Held here, not read from a namespace: a fork replaces
+ * the start page and its copy, and the measurement must not go with them.
+ */
+export const AUTHORED_COPY = {
+    heading: "What's inside",
+    intro: 'This page is the template seed: replace it with the first real screen and keep the sections you still need.',
+    text: 'React, Vite on Rolldown, TypeScript strict, Tailwind v4, Vitest and Playwright — plus the hooks, CI and agent flow that keep a fork honest from the first commit.'
+} as const;
+
 const TYPICAL_ITEM_COUNT = 3;
 const MANY_ITEM_COUNT = 7;
 

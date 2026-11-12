@@ -203,7 +203,7 @@ Files:
 
 ```
 src/lib/api/auth.queries.ts   (new)  authKeys + meOptions()
-src/hocs/ProtectedRoute.tsx   (edit) read the /me query instead of the store flag
+src/hocs/ProtectedRoute.tsx   (edit, or new) the route guard reads the /me query instead of the store flag
 src/store/user/userStore.ts   (edit) drop the token; see 2.2
 src/lib/api/client.ts         (edit) drop the bearer injection; add the CSRF header (2.4)
 src/lib/queryClient.ts        (edit) 401 handling inside the funnel from 1.3
@@ -250,7 +250,7 @@ A cookie session makes state-changing requests forgeable cross-site. `SameSite` 
 
 ### 2.5 Guards for Phase 2
 
-- Extend `src/hocs/ProtectedRoute.test.tsx`, regression-first: pending renders no redirect; user A to user B swaps the rendered identity; a 401 from `/me` redirects; an authenticated user sees the outlet.
+- Test the route guard, regression-first: pending renders no redirect; user A to user B swaps the rendered identity; a 401 from `/me` redirects; an authenticated user sees the outlet.
 - A test that after login nothing token-like is in `localStorage` or `sessionStorage`. The Pre-Deployment Checklist in `SECURITY_REQUIREMENTS.md` also asks for a grep of the production bundle for both.
 - An e2e spec that stubs `/me` with `page.route` for the anonymous and the signed-in case, service workers blocked by default (1.5) [pw-mock].
 
