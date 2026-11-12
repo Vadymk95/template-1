@@ -55,7 +55,8 @@
         "trace:report": "node scripts/trace-report.mjs",
         "probe": "node scripts/gate-trace.mjs verify:measure -- node scripts/probe.mjs",
         "test:one": "node scripts/gate-trace.mjs test:one -- npx --no-install vitest run",
-        "docs:check": "node scripts/gate-trace.mjs docs:check -- node scripts/docs-check.mjs"
+        "docs:check": "node scripts/gate-trace.mjs docs:check -- node scripts/docs-check.mjs",
+        "fork:init": "node scripts/fork-init.mjs"
     },
     "dependencies": {
         "@hookform/resolvers": "^5.4.0",
