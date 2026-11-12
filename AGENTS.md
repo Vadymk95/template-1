@@ -73,13 +73,16 @@ list of the stages each gate script runs (`checks.<name>.chain`, checked against
 - **Commit** - the pre-commit hook owns it: staged autofix, the TDD sibling gate, then the repo-wide cheap
   checks. Nothing to run by hand; on refusal the hook prints the remedy. The commit-msg hook (commitlint)
   also rejects any body or footer line over 100 characters (the header cap is 96): wrap the body.
-- **Push** - the pre-push hook runs the gate ONCE, never shortened by what the diff touched. Where the
-  repo has heavy stages (the ones that need a build), the push script is phase-aware: phase 0 (scaffold,
-  before the first deploy) runs the offline checks and loudly SKIPS the heavy stages; phase 1 (from the
-  first deploy) runs the full `verify:ci`. A skipped stage is printed, never silent; flip the phase in one
-  commit at the first deploy. A repo whose gate has no heavy stage runs the full `verify:ci` at push and
-  records in `gate-tiers.json` that a phase switch would gate nothing. With no remote there is no push
-  moment: the lead hand-runs the push chain once per slice on the main checkout; an implementer never does.
+- **Push** - the pre-push hook runs the gate ONCE, never shortened by what the diff touched, with one
+  named exception: the harness's own tests that read nothing outside the harness (the list in
+  `gate-tiers.json`) are left out of a push that changes no harness file. The push prints that it left
+  them out, and CI always runs them. Where the repo has heavy stages (the ones that need a build), the
+  push script is phase-aware: phase 0 (scaffold, before the first deploy) runs the offline checks and
+  loudly SKIPS the heavy stages; phase 1 (from the first deploy) runs the full `verify:ci`. A skipped
+  stage is printed, never silent; flip the phase in one commit at the first deploy. A repo whose gate has
+  no heavy stage runs the full `verify:ci` at push and records in `gate-tiers.json` that a phase switch
+  would gate nothing. With no remote there is no push moment: the lead hand-runs the push chain once per
+  slice on the main checkout; an implementer never does.
 - **CI** - phase-blind: always the full `verify:ci`, plus what only CI can do (the security workflow, the
   scheduled mutation job, a mandatory dev-smoke job where the repo has one).
 

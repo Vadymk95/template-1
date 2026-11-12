@@ -85,6 +85,8 @@ export const findMissingSiblings = (files, exists) =>
 /* ------------------------------------------------------------------------ git */
 
 const BASE_CANDIDATES = ['origin/master', 'origin/main'];
+/** The base when no remote branch gives a merge base: a caller that needs the remote's can tell it by this. */
+export const FALLBACK_BASE = 'HEAD~1';
 
 // A hook chain can export these, and a child git that inherits them answers for the repository
 // they name instead of the one at `cwd`. GIT_INDEX_FILE stays: it is not a location, and a partial
@@ -113,7 +115,7 @@ export const makeGit = (cwd) => (args) => {
 
 const splitNul = (text) => text.split('\0').filter(Boolean);
 
-const isCi = (env) => env.CI === 'true' || env.GITHUB_ACTIONS === 'true';
+export const isCi = (env) => env.CI === 'true' || env.GITHUB_ACTIONS === 'true';
 
 /**
  * The commit a range starts from. `git(args)` returns stdout or null when the command fails.
@@ -139,7 +141,7 @@ export const resolveBase = ({ git, env, baseRef }) => {
                 break;
             }
         }
-        if (!ref && isCommit('HEAD~1')) ref = 'HEAD~1';
+        if (!ref && isCommit(FALLBACK_BASE)) ref = FALLBACK_BASE;
     }
 
     if (ref) return { ref };

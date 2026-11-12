@@ -8,6 +8,7 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 
 | Entry                                                              | Date    | Status         |
 | ------------------------------------------------------------------ | ------- | -------------- |
+| A push leaves out the harness tests that read only the harness     | 2026-11 | in force       |
 | Mutation on the lines a pull request changed is informational      | 2026-11 | in force       |
 | Stryker runs the suite in the `forks` pool, as `vitest run` does   | 2026-11 | in force       |
 | Cross-browser runs in the Playwright image                         | 2026-11 | in force       |
@@ -59,6 +60,32 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 | Component pattern: arrow function plus `FunctionComponent`         | 2026-04 | in force       |
 | Build stack: Tailwind v4, Vite 8 with Rolldown, `plugin-react` v6  | 2026-03 | in force       |
 | No FSD; Zustand for client state, TanStack Query for server state  | 2026-03 | in force       |
+
+## [2026-11] A push leaves out the harness tests that read only the harness
+
+**Status:** in force. **Evidence:** `scripts/verify-push.self-tests.test.mjs`, `scripts/gate-tiers.self-tests.test.mjs`.
+
+**Context:** the harness's own tests were about 35 s of a 41 s unit run, and a fork that only writes app code paid
+for them at every push. Five test files that build real git repositories in temp folders were 106.7 s of 125.2 s of
+summed test time. Only a change to the harness can change their result. The rule has to be narrow: of the harness
+test files, 21 of 47 (measured 2026-11-11) read the real repository (app files, configs, `package.json`) and are
+guards over the project.
+
+**Decision:** `selfTests.files` in `scripts/gate-tiers.json` names the test files that read nothing but `scripts/`
+and temp folders (its own test, `verify-push.self-tests.test.mjs`, qualified by measurement: 10 s, no other read). A
+push whose commits change no path of `scripts/gate-files.json`, none under `scripts/`, no `package.json` and no
+lockfile leaves exactly those out of the `test:coverage` stage, in either phase, and prints how many and why.
+Anything unknown runs them: no remote branch, no merge base, a git failure, a package below the repository root, an
+unreadable manifest, `CI`, or `GATE_SELF_TESTS=all git push`. Any other non-empty value of `GATE_SELF_TESTS` stops
+the push with a message, so a mistyped override never leaves the tests out in silence. Coverage counts `src/**`
+only, so no number moves.
+
+**How a file gets on the list:** a pull request that adds it. The list is a gate file (`scripts/**`), so the
+`gate-change` label applies, and `scripts/gate-tiers.self-tests.test.mjs` fails a name that is missing, duplicated or
+not a test file under `scripts/`. A test that reads any app file, config or `package.json` is never listed.
+
+**What CI guarantees:** `CI`, `npm test` and `npm run verify` leave nothing out, so every listed test runs on every
+pull request; a push can only be earlier than CI, never different from it.
 
 ## [2026-11] Mutation on the lines a pull request changed is informational
 
