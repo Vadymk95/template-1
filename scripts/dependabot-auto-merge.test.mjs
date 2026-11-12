@@ -182,6 +182,11 @@ const NO_REQUEST = JSON.stringify({ auto_merge: null });
 const requestBy = (login) =>
     JSON.stringify({ auto_merge: { enabled_by: { login }, merge_method: 'squash' } });
 
+// Each case of a group that calls `runScript` starts the shell script, which starts further
+// processes (the fake `gh` and what it calls), so vitest's 5-second default measures the machine's
+// load, not the script. vitest gives this budget to each case of a group.
+const SCRIPT_BUDGET = { timeout: 30_000 };
+
 /** Runs the script file against the fake `gh`; returns the exit code, the output and the gh calls. */
 const runScript = ({
     updateType = '',
@@ -234,87 +239,105 @@ const runScript = ({
     };
 };
 
-describe('a patch or a minor asks GitHub to enable auto-merge, with the squash method', () => {
-    it.each([
-        ['patch', PATCH],
-        ['minor', MINOR]
-    ])('a %s update sends exactly one enable request and switches nothing off', (_name, type) => {
-        const run = runScript({ updateType: type });
-        expect(run.status, run.output).toBe(0);
-        expect(run.enables, `gh calls: ${run.calls.join(' | ')}`).toHaveLength(1);
-        expect(run.enables[0]).toContain('mergeMethod: SQUASH');
-        expect(run.enables[0]).toContain(PR_NODE_ID);
-        expect(run.disables).toEqual([]);
-    });
-
-    it('a request already pending on a patch is left alone', () => {
-        const run = runScript({ updateType: PATCH, pull: requestBy(WORKFLOW_BOT) });
-        expect(run.status, run.output).toBe(0);
-        expect(run.disables).toEqual([]);
-    });
-});
-
-describe('the base branch needs a required status check before anything is requested', () => {
-    it.each([
-        ['a ruleset', { rules: RULES_REQUIRED, branch: BRANCH_NO_CHECKS }],
-        ['classic protection (contexts)', { rules: RULES_NONE, branch: BRANCH_CLASSIC_CONTEXTS }],
-        ['classic protection (checks)', { rules: RULES_NONE, branch: BRANCH_CLASSIC_CHECKS }],
-        ['both', { rules: RULES_REQUIRED, branch: BRANCH_CLASSIC_CONTEXTS }]
-    ])('with %s the request is sent', (_name, sources) => {
-        const run = runScript({ updateType: MINOR, ...sources });
-        expect(run.status, run.output).toBe(0);
-        expect(run.enables, `gh calls: ${run.calls.join(' | ')}`).toHaveLength(1);
-    });
-
-    it.each([
-        ['rules without a status check and an unprotected branch', RULES_NONE, BRANCH_UNPROTECTED],
-        ['no rules at all and a protection with empty lists', '[]', BRANCH_NO_CHECKS],
-        ['a status-check rule with an empty list', RULES_EMPTY_LIST, BRANCH_NO_CHECKS]
-    ])(
-        'with %s: green, no request, one line that says nothing is required',
-        (_name, rules, branch) => {
-            const run = runScript({ updateType: PATCH, rules, branch });
-            expect(run.status, run.output).toBe(0);
-            expect(run.enables, `gh calls: ${run.calls.join(' | ')}`).toEqual([]);
-            expect(run.output).toMatch(/no required status check/i);
-            expect(run.output).toMatch(/nothing to wait for/i);
-        }
-    );
-
-    it('asks both sources, on the base branch the workflow names', () => {
-        const run = runScript({ updateType: PATCH });
-        expect(
-            run.calls.some((call) =>
-                call.includes(`repos/${REPOSITORY}/rules/branches/${BASE_REF}`)
-            )
-        ).toBe(true);
-        expect(
-            run.calls.some((call) => call.includes(`repos/${REPOSITORY}/branches/${BASE_REF}`))
-        ).toBe(true);
-    });
-
-    it.each([
-        ['the rules read', { rulesError: 'HTTP 500 rules' }, 'HTTP 500 rules'],
-        ['the branch read', { branchError: 'HTTP 500 branch' }, 'HTTP 500 branch'],
-        [
-            'a rules answer of an unexpected shape',
-            { rules: JSON.stringify({ message: 'Not Found' }) },
-            ''
-        ]
-    ])(
-        '%s failing ends red with no request, never as "nothing" or "something" required',
-        (_name, failure, message) => {
-            for (const rules of [RULES_REQUIRED, RULES_NONE]) {
-                const run = runScript({ updateType: PATCH, rules, ...failure });
-                expect(run.status, run.output).not.toBe(0);
-                expect(run.enables, `gh calls: ${run.calls.join(' | ')}`).toEqual([]);
-                if (message) expect(run.output).toContain(message);
+describe(
+    'a patch or a minor asks GitHub to enable auto-merge, with the squash method',
+    SCRIPT_BUDGET,
+    () => {
+        it.each([
+            ['patch', PATCH],
+            ['minor', MINOR]
+        ])(
+            'a %s update sends exactly one enable request and switches nothing off',
+            (_name, type) => {
+                const run = runScript({ updateType: type });
+                expect(run.status, run.output).toBe(0);
+                expect(run.enables, `gh calls: ${run.calls.join(' | ')}`).toHaveLength(1);
+                expect(run.enables[0]).toContain('mergeMethod: SQUASH');
+                expect(run.enables[0]).toContain(PR_NODE_ID);
+                expect(run.disables).toEqual([]);
             }
-        }
-    );
-});
+        );
 
-describe('an answer that is not a count', () => {
+        it('a request already pending on a patch is left alone', () => {
+            const run = runScript({ updateType: PATCH, pull: requestBy(WORKFLOW_BOT) });
+            expect(run.status, run.output).toBe(0);
+            expect(run.disables).toEqual([]);
+        });
+    }
+);
+
+describe(
+    'the base branch needs a required status check before anything is requested',
+    SCRIPT_BUDGET,
+    () => {
+        it.each([
+            ['a ruleset', { rules: RULES_REQUIRED, branch: BRANCH_NO_CHECKS }],
+            [
+                'classic protection (contexts)',
+                { rules: RULES_NONE, branch: BRANCH_CLASSIC_CONTEXTS }
+            ],
+            ['classic protection (checks)', { rules: RULES_NONE, branch: BRANCH_CLASSIC_CHECKS }],
+            ['both', { rules: RULES_REQUIRED, branch: BRANCH_CLASSIC_CONTEXTS }]
+        ])('with %s the request is sent', (_name, sources) => {
+            const run = runScript({ updateType: MINOR, ...sources });
+            expect(run.status, run.output).toBe(0);
+            expect(run.enables, `gh calls: ${run.calls.join(' | ')}`).toHaveLength(1);
+        });
+
+        it.each([
+            [
+                'rules without a status check and an unprotected branch',
+                RULES_NONE,
+                BRANCH_UNPROTECTED
+            ],
+            ['no rules at all and a protection with empty lists', '[]', BRANCH_NO_CHECKS],
+            ['a status-check rule with an empty list', RULES_EMPTY_LIST, BRANCH_NO_CHECKS]
+        ])(
+            'with %s: green, no request, one line that says nothing is required',
+            (_name, rules, branch) => {
+                const run = runScript({ updateType: PATCH, rules, branch });
+                expect(run.status, run.output).toBe(0);
+                expect(run.enables, `gh calls: ${run.calls.join(' | ')}`).toEqual([]);
+                expect(run.output).toMatch(/no required status check/i);
+                expect(run.output).toMatch(/nothing to wait for/i);
+            }
+        );
+
+        it('asks both sources, on the base branch the workflow names', () => {
+            const run = runScript({ updateType: PATCH });
+            expect(
+                run.calls.some((call) =>
+                    call.includes(`repos/${REPOSITORY}/rules/branches/${BASE_REF}`)
+                )
+            ).toBe(true);
+            expect(
+                run.calls.some((call) => call.includes(`repos/${REPOSITORY}/branches/${BASE_REF}`))
+            ).toBe(true);
+        });
+
+        it.each([
+            ['the rules read', { rulesError: 'HTTP 500 rules' }, 'HTTP 500 rules'],
+            ['the branch read', { branchError: 'HTTP 500 branch' }, 'HTTP 500 branch'],
+            [
+                'a rules answer of an unexpected shape',
+                { rules: JSON.stringify({ message: 'Not Found' }) },
+                ''
+            ]
+        ])(
+            '%s failing ends red with no request, never as "nothing" or "something" required',
+            (_name, failure, message) => {
+                for (const rules of [RULES_REQUIRED, RULES_NONE]) {
+                    const run = runScript({ updateType: PATCH, rules, ...failure });
+                    expect(run.status, run.output).not.toBe(0);
+                    expect(run.enables, `gh calls: ${run.calls.join(' | ')}`).toEqual([]);
+                    if (message) expect(run.output).toContain(message);
+                }
+            }
+        );
+    }
+);
+
+describe('an answer that is not a count', SCRIPT_BUDGET, () => {
     it('ends red with the answer shown and no request, and never evaluates it', () => {
         const run = runScript({ updateType: PATCH, rulesRaw: 'a[$(touch /tmp/never)]' });
         expect(run.status, run.output).not.toBe(0);
@@ -323,7 +346,7 @@ describe('an answer that is not a count', () => {
     });
 });
 
-describe('anything else enables nothing', () => {
+describe('anything else enables nothing', SCRIPT_BUDGET, () => {
     it.each([
         ['a major', { updateType: MAJOR }],
         ['an unknown update type', { updateType: 'version-update:semver-unheard-of' }],
@@ -341,7 +364,7 @@ describe('anything else enables nothing', () => {
     );
 });
 
-describe('only a request this workflow made is taken back', () => {
+describe('only a request this workflow made is taken back', SCRIPT_BUDGET, () => {
     const NOT_QUALIFYING = { updateType: MAJOR };
 
     it('a request made by the workflow is switched off, once, and the line says so', () => {
@@ -377,7 +400,7 @@ describe('only a request this workflow made is taken back', () => {
     });
 });
 
-describe('a repository that does not allow auto-merge', () => {
+describe('a repository that does not allow auto-merge', SCRIPT_BUDGET, () => {
     it('ends green with one line that names the setting, and sends no enable request', () => {
         const run = runScript({ updateType: MINOR, allowAutoMerge: false });
         expect(run.status, run.output).toBe(0);
@@ -386,7 +409,7 @@ describe('a repository that does not allow auto-merge', () => {
     });
 });
 
-describe('GitHub refuses the enable request', () => {
+describe('GitHub refuses the enable request', SCRIPT_BUDGET, () => {
     const MESSAGE = 'Pull request is in clean status';
 
     it('ends red, shows GitHub message, and says what to do with a pull request that can merge at once', () => {
@@ -399,7 +422,7 @@ describe('GitHub refuses the enable request', () => {
     });
 });
 
-describe('the job never merges, approves or bypasses', () => {
+describe('the job never merges, approves or bypasses', SCRIPT_BUDGET, () => {
     it('the script calls no merge or review command and passes no admin or bypass flag', () => {
         const code = withoutComments(script);
         expect(code, `${SCRIPT_PATH} is missing or empty`).not.toBe('');
