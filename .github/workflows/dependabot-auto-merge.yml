@@ -1,0 +1,67 @@
+name: Dependabot auto-merge
+
+# For a pull request opened by Dependabot whose highest update is a patch or a minor, this job asks GitHub to
+# enable auto-merge (squash). GitHub then merges the pull request once every required status check is green; the
+# job itself never merges, approves or bypasses anything. A major, an update type it cannot read, or a later
+# push that is not Dependabot's gets no request, and a request this workflow made earlier is switched off (a
+# request a person made is left alone). The decision is scripts/dependabot-auto-merge.sh.
+#
+# The request goes through the GraphQL mutation enablePullRequestAutoMerge, not `gh pr merge --auto`: the CLI
+# merges at once when the pull request is already mergeable, which in a repository without a required status
+# check would merge a dependency update before any check ran. So the script also sends no request when the base
+# branch has no required status check (ruleset or classic protection): it ends green and says so.
+#
+# A fork needs the repository setting "Allow auto-merge" (Settings > General > Pull Requests); without it the job
+# ends green with one line that names the setting. Auto-merge is only as strict as the required checks: README,
+# "What your fork does not inherit".
+#
+# The job has write scopes, so it never checks out or runs the pull request's code. It runs the base branch's
+# copy of one script: the checkout takes the base ref and only that file, and keeps no credentials.
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened]
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+    cancel-in-progress: false
+
+jobs:
+    auto-merge:
+        name: Dependabot auto-merge
+        # The author in the event payload, not github.actor: a push to the branch by someone else must not
+        # change who the pull request belongs to.
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            # contents: write is what the REST read of the repository's allow_auto_merge setting needs;
+            # pull-requests: write is what the enable and disable mutations need.
+            contents: write
+            pull-requests: write
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: ${{ github.event.pull_request.base.ref }}
+                  sparse-checkout: scripts/dependabot-auto-merge.sh
+                  sparse-checkout-cone-mode: false
+                  persist-credentials: false
+            # Its commit verification stays on. A failure (a push that is not Dependabot's, no metadata) must
+            # not fail the job: the script reads the outcome, takes any earlier request of ours back and says why.
+            - id: metadata
+              uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+              continue-on-error: true
+            - id: decide
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPOSITORY: ${{ github.repository }}
+                  BASE_REF: ${{ github.event.pull_request.base.ref }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+                  PR_NODE_ID: ${{ github.event.pull_request.node_id }}
+                  UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+                  METADATA_OUTCOME: ${{ steps.metadata.outcome }}
+              run: bash scripts/dependabot-auto-merge.sh

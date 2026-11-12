@@ -123,6 +123,10 @@
             {
                 "run": "node scripts/check-gate-integrity.mjs --base \"$BASE_SHA\" --head \"$HEAD_SHA\" --labels \"$PR_LABELS\"",
                 "reason": "lists a change to the gate or an added suppression on a pull request until a reviewer labels it; the labels exist only on the pull request, so no local chain can judge them"
+            },
+            {
+                "run": "bash scripts/dependabot-auto-merge.sh",
+                "reason": "runs the base branch's copy of one script that decides whether a Dependabot pull request may auto-merge; it exists only on a Dependabot pull request and checks nothing in the code; scripts/dependabot-auto-merge.test.mjs runs it against a fake gh"
             }
         ],
         "rulesetContextAllowlist": []
