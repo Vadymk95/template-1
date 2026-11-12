@@ -7,7 +7,7 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { inScope, parseDiff, run } from './mutation-changed.mjs';
+import { inScope, killGraceFrom, parseDiff, run } from './mutation-changed.mjs';
 
 const ROOT = process.cwd();
 const LIVE_CONFIG_PATH = path.join(ROOT, 'stryker.config.json');
@@ -489,6 +489,36 @@ describe('the time limit', () => {
     });
 });
 
+describe('the grace before the hard kill', () => {
+    it.each([
+        [undefined, 5000],
+        ['', 5000],
+        ['abc', 5000],
+        ['0', 5000],
+        ['-5', 5000],
+        ['1.5', 5000],
+        ['300', 300]
+    ])('reads %j as %i ms', (value, expected) => {
+        expect(killGraceFrom({ MUTATION_KILL_GRACE_MS: value })).toBe(expected);
+    });
+
+    it('is 5000 ms when the variable is absent from the environment', () => {
+        expect(killGraceFrom({})).toBe(5000);
+    });
+
+    it('reaches the runner as killGraceMs, from the variable or the default', async () => {
+        const { root, base } = changedRepo();
+        const seam = await invoke(root, ['--base', base], {
+            runner: reportRunner(reportOf({})),
+            env: { MUTATION_KILL_GRACE_MS: '300' }
+        });
+        expect(seam.runner.mock.calls[0][0].killGraceMs).toBe(300);
+
+        const plain = await invoke(root, ['--base', base], { runner: reportRunner(reportOf({})) });
+        expect(plain.runner.mock.calls[0][0].killGraceMs).toBe(5000);
+    });
+});
+
 describe('the closing sentence', () => {
     const SURVIVOR_NOTE = /A survivor is a change the tests did not notice/;
     const ALL_CAUGHT = /Every judged mutant on the changed lines was caught/;
@@ -576,7 +606,8 @@ describe('a stop signal sent to the script', () => {
         return condition();
     };
 
-    const exercise = async ({ ignoreTerm = false, signals }) => {
+    // `timing.sinceFirstSignal` is filled with the milliseconds from the first signal to the script's exit.
+    const exercise = async ({ ignoreTerm = false, signals, graceMs, timing = {} }) => {
         const { root } = changedRepo();
         write(root, 'src/lib/b.ts', body(3));
         write(root, 'node_modules/@stryker-mutator/core/bin/stryker.js', standIn(ignoreTerm));
@@ -584,15 +615,30 @@ describe('a stop signal sent to the script', () => {
         const script = spawn(
             process.execPath,
             [path.join(ROOT, 'scripts/mutation-changed.mjs'), '--base', 'HEAD'],
-            { cwd: root, env: { ...cleanEnv(), PID_FILE: pidFile }, stdio: 'ignore' }
+            {
+                cwd: root,
+                env: {
+                    ...cleanEnv(),
+                    PID_FILE: pidFile,
+                    ...(graceMs && { MUTATION_KILL_GRACE_MS: String(graceMs) })
+                },
+                stdio: 'ignore'
+            }
         );
-        const exited = new Promise((resolve) => script.on('close', (code) => resolve(code)));
+        let signalledAt;
+        const exited = new Promise((resolve) =>
+            script.on('close', (code) => {
+                timing.sinceFirstSignal = Date.now() - signalledAt;
+                resolve(code);
+            })
+        );
         let pids = [];
         try {
             expect(await until(() => existsSync(pidFile), 15_000)).toBe(true);
             await until(() => readFileSync(pidFile, 'utf8') !== '', 1000);
             pids = JSON.parse(readFileSync(pidFile, 'utf8'));
             for (const name of signals) {
+                signalledAt ??= Date.now();
                 script.kill(name);
                 await new Promise((resolve) => setTimeout(resolve, 300));
             }
@@ -620,9 +666,18 @@ describe('a stop signal sent to the script', () => {
     );
 
     it('reaches a Stryker that ignores SIGTERM after the grace period, and survives a second signal', async () => {
-        const result = await exercise({ ignoreTerm: true, signals: ['SIGTERM', 'SIGINT'] });
+        const timing = {};
+        const result = await exercise({
+            ignoreTerm: true,
+            signals: ['SIGTERM', 'SIGINT'],
+            // The grace must be clearly longer than the pause between the two signals, or the second can land after the listeners came off.
+            graceMs: 1000,
+            timing
+        });
         expect(result).toEqual({ code: 143, gone: true });
-    }, 25_000);
+        // The default grace is 5000 ms: a runner that ignores the seam exits after it.
+        expect(timing.sinceFirstSignal).toBeLessThan(3500);
+    }, 10_000);
 });
 
 describe('--pick', () => {

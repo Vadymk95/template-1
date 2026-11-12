@@ -25,6 +25,7 @@ const CONFIG_FILE = 'reports/mutation-changed.config.json';
 const STRYKER_BIN = 'node_modules/@stryker-mutator/core/bin/stryker.js';
 // A name Stryker cannot take as a range (the CLI splits on a comma; a glob character makes a range invalid).
 const UNMUTATABLE = /[,*?!+@()[\]{}]/;
+// The wait between SIGTERM and SIGKILL. MUTATION_KILL_GRACE_MS is a seam for the process test only, not an option.
 const KILL_GRACE_MS = 5000;
 const REPLACEMENT_LIMIT = 80;
 const ALL_CAUGHT = 'Every judged mutant on the changed lines was caught.';
@@ -230,8 +231,14 @@ const parseArguments = (argv) => {
     };
 };
 
+/** The grace from the environment: a positive whole number of milliseconds, else the default. */
+export const killGraceFrom = (env) => {
+    const value = Number(env.MUTATION_KILL_GRACE_MS);
+    return Number.isSafeInteger(value) && value > 0 ? value : KILL_GRACE_MS;
+};
+
 /** The real runner: Stryker as a child in its own process group, killed as a group when the signal aborts. */
-export const strykerRunner = ({ config, concurrency, signal, cwd }) =>
+export const strykerRunner = ({ config, concurrency, signal, cwd, killGraceMs = KILL_GRACE_MS }) =>
     new Promise((resolve, reject) => {
         mkdirSync(path.join(cwd, 'reports'), { recursive: true });
         writeFileSync(path.join(cwd, CONFIG_FILE), JSON.stringify(config, null, 4));
@@ -248,7 +255,7 @@ export const strykerRunner = ({ config, concurrency, signal, cwd }) =>
         };
         signal.addEventListener('abort', () => {
             signalGroup('SIGTERM');
-            hardKill = setTimeout(() => signalGroup('SIGKILL'), KILL_GRACE_MS);
+            hardKill = setTimeout(() => signalGroup('SIGKILL'), killGraceMs);
         });
         child.on('error', reject);
         child.on('close', (code) => {
@@ -323,7 +330,8 @@ export const run = async ({
                 config: buildConfig(config, strings),
                 concurrency: options.concurrency,
                 signal: controller.signal,
-                cwd
+                cwd,
+                killGraceMs: killGraceFrom(env)
             })
         );
         finished.catch(() => {});
