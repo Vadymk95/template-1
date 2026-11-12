@@ -40,9 +40,10 @@ discoverable there.
 Wait for approval by risk (the risk list: `.cursor/rules/workflow.mdc` § The Approval Law). Trivial leaf
 edits proceed with a brief note.
 
-**Bigger than a one-sentence diff?** Then the scope lives in `.cursor/<feature-slug>/SPEC.md` and
+**Two or more slices, or a danger zone?** Then the scope lives in `.cursor/<feature-slug>/SPEC.md` and
 `PLAN.md` (templates in `.cursor/templates/`, law in `AGENTS.md` § Before code). Create or update them
-before §3; a plan is approved as a pull-request review, never as a chat reply.
+before §3; a plan is approved as a pull-request review, never as a chat reply. **One slice?** Write its
+acceptance criteria (Given / When / Then) at the top of the pull request description.
 
 ## 3. Build
 

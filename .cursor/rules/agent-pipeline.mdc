@@ -77,7 +77,7 @@ Re-read every changed file: the diff matches the Step 2 plan, nothing is outside
 
 ## Step 5: Brain sync
 
-Before completing, update `.cursor/brain/` where triggered: `MAP.md` (stores, routes, flows, wiring), `DECISIONS.md` (a pattern, deviation or trade-off true today; ≤30 lines, evidence link), `SKELETONS.md` (a risk found or mitigated). Nothing to update → `Brain sync: none needed.` Completing without the declaration is FORBIDDEN.
+Before completing, update `.cursor/brain/` where triggered: `MAP.md` (a change of STRUCTURE: a new layer, entry point, data flow or state boundary; a new page, route or store inside the existing structure changes nothing here, the code is the registry), `DECISIONS.md` (a pattern, deviation or trade-off true today; ≤30 lines, evidence link), `SKELETONS.md` (a risk found or mitigated). Nothing to update → `Brain sync: none needed.` Completing without the declaration is FORBIDDEN.
 
 ## Step 6: Confidence
 

@@ -47,7 +47,7 @@
             "review": "senior review of the diff: leaks, security, bug hunt",
             "docs": "bring the guide and the brain back in line with the code"
         },
-        "spec": "Anything bigger than a one-sentence diff starts with a spec and a plan, copied from the templates folder, reviewed before the first edit."
+        "spec": "Work of two or more slices starts with a spec and a plan, reviewed before the first edit; one slice carries its acceptance criteria in the pull request."
     },
     "reading": {
         "title": "Where to read",
