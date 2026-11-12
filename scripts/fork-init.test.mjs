@@ -15,6 +15,9 @@ import { dirname, join, resolve, sep } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { MANIFEST_PATH, matchesGlob } from './check-gate-integrity.mjs';
+import { checkPathsAndScripts, extractTokens, listDocFiles, listRepoFiles } from './docs-check.mjs';
+
 // Resolved from the repo root, not from `import.meta.url`: vitest serves this module over its own
 // transform URL, so the file-URL form would not locate the script on disk.
 const ROOT = process.cwd();
@@ -528,5 +531,118 @@ describe('fork-init, the script itself', () => {
         for (const command of spawned) {
             expect(['process.execPath', "'git'"]).toContain(command);
         }
+    });
+});
+
+/* The two cases below read the template itself and write nothing. They live here because `fork:init`
+   deletes this file in every fork: a fork carries no standing check for either. */
+describe('the template documents, once the sample pages are removed', () => {
+    // The sample pages and the auth files a fork replaces first (the start, login and dashboard pages,
+    // the route guard, and the two locale files behind them).
+    const SAMPLE_SET = [
+        'public/locales/en/auth.json',
+        'public/locales/en/home.json',
+        'src/hocs/ProtectedRoute.test.tsx',
+        'src/hocs/ProtectedRoute.tsx',
+        'src/pages/DashboardPage/DashboardPage.test.tsx',
+        'src/pages/DashboardPage/DashboardPage.tsx',
+        'src/pages/DashboardPage/index.ts',
+        'src/pages/HomePage/HomePage.test.tsx',
+        'src/pages/HomePage/HomePage.tsx',
+        'src/pages/HomePage/index.ts',
+        'src/pages/HomePage/useHomePage.test.tsx',
+        'src/pages/HomePage/useHomePage.ts',
+        'src/pages/LoginPage/LoginPage.test.tsx',
+        'src/pages/LoginPage/LoginPage.tsx',
+        'src/pages/LoginPage/index.ts',
+        'src/pages/LoginPage/useLoginForm.test.tsx',
+        'src/pages/LoginPage/useLoginForm.ts'
+    ];
+
+    it('leaves docs:check red only on the two lines that name the auth sample on purpose', () => {
+        const docs = listDocFiles(ROOT).map((file) => [
+            file,
+            readFileSync(join(ROOT, file), 'utf8')
+        ]);
+        const scripts = readJson(ROOT, 'package.json').scripts ?? {};
+        const everything = listRepoFiles(ROOT);
+        expect(everything, 'git must list the repository files').not.toBeNull();
+        expect([...everything], 'the sample set is stale').toEqual(
+            expect.arrayContaining(SAMPLE_SET)
+        );
+        const listed = new Set([...everything].filter((file) => !SAMPLE_SET.includes(file)));
+        // As `run` in docs-check.mjs does, but from the reduced list: a folder with no file left is gone.
+        const topDirs = new Set(
+            [...listed].filter((file) => file.includes('/')).map((file) => file.split('/')[0])
+        );
+
+        const findings = checkPathsAndScripts({ docs, root: ROOT, scripts, topDirs, listed });
+
+        expect(findings.map((finding) => finding.split(':')[0]).sort()).toEqual([
+            '.cursor/brain/EXTENSIONS.md',
+            '.cursor/brain/SKELETONS.md'
+        ]);
+    });
+});
+
+describe('the gate documents, which name no template seed', () => {
+    const REGISTRY_PATH = '.cursor/brain/TEMPLATE_SEEDS.md';
+    const GATE_DOC = /\.(?:md|mdc|yml)$/;
+    // Stays named in the gate files on purpose: removing the playground is a labelled change.
+    const PLAYGROUND = 'DevPlayground';
+
+    /** The first backticked token of the first cell of each row of the Registry table. */
+    const registryPaths = () => {
+        const lines = readFileSync(join(ROOT, REGISTRY_PATH), 'utf8').split('\n');
+        const start = lines.findIndex((line) => /^##\s+Registry\s*$/.test(line));
+        expect(start, `${REGISTRY_PATH} needs a "Registry" heading`).toBeGreaterThanOrEqual(0);
+        const rows = [];
+        for (const line of lines.slice(start + 1)) {
+            if (/^#/.test(line)) break;
+            if (!line.startsWith('|')) continue;
+            const cell = line.split('|')[1] ?? '';
+            const token = /`([^`]+)`/.exec(cell);
+            if (token) rows.push(token[1]);
+        }
+        return rows;
+    };
+
+    /** A segment without its glob characters and without anything from the first dot on. */
+    const stemOf = (segment) => segment.replaceAll(/[*?]/g, '').split('.')[0];
+
+    const seedStems = () => {
+        const stems = registryPaths()
+            .filter((path) => !path.includes(PLAYGROUND))
+            .map((path) => {
+                // The last segment that is more than a glob: `Header/*` is the seed `Header`.
+                const named = path.split('/').map(stemOf).filter(Boolean);
+                return named.at(-1);
+            });
+        return new Set(stems);
+    };
+
+    it('lists no seed in a gate document: they point at the registry', () => {
+        const stems = seedStems();
+        for (const stem of ['_example', 'ThemeToggle', 'LanguageSwitcher', 'Header', 'Footer']) {
+            expect([...stems], 'the registry scan found no seed to look for').toContain(stem);
+        }
+        const manifest = readJson(ROOT, MANIFEST_PATH);
+        const gateDocs = [...listRepoFiles(ROOT)]
+            .filter((file) => GATE_DOC.test(file))
+            .filter((file) => manifest.paths.some((glob) => matchesGlob(glob, file)))
+            .filter((file) => existsSync(join(ROOT, file)));
+        expect(gateDocs, 'the gate documents were not found').toContain('AGENTS.md');
+
+        const hits = [];
+        for (const file of gateDocs) {
+            for (const { token, line } of extractTokens(readFileSync(join(ROOT, file), 'utf8'))) {
+                // Whole segments only: `Panel.Header` is not the seed `Header`.
+                if (token.split('/').some((segment) => stems.has(stemOf(segment)))) {
+                    hits.push(`${file}:${line}: \`${token}\``);
+                }
+            }
+        }
+
+        expect(hits).toEqual([]);
     });
 });

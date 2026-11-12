@@ -115,7 +115,7 @@ CI and lint-staged also run **Oxlint** (`.oxlintrc.json`) before ESLint — fast
 
 ## Known deviation: a `<button>` nested inside a `<NavLink>`
 
-- **Where:** `src/components/layout/Header/index.tsx`, the sign-in control.
+- **Where:** `src/components/layout/Header/index.tsx`, the sign-in control: a `<NavLink>` to the sample login page (`src/pages/LoginPage/`), so this entry goes when either goes.
 - **What:** interactive content inside an `<a>` is invalid HTML and gives the control two competing
   activation behaviours. It predates the geometry work and is recorded here rather than fixed, because
   changing it means deciding what the chrome's auth control should be — a design decision for the

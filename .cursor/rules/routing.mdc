@@ -27,7 +27,7 @@ src/router/
 5. Assemble in `src/router/index.tsx` if new module.
 
 ```typescript
-// routes.ts — path constants (actual export: RoutesPath — keys Root, Login, Dashboard, DevPlayground, NotFound)
+// routes.ts — path constants (the keys: RoutesPath in src/router/routes.ts)
 export const RoutesPath = {
     Root: '/',
     Foo: '/foo',

@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DEFAULT_NAMESPACE } from '@/lib/i18n/constants';
 import {
+    AUTHORED_COPY,
     CONTENT_STRESS_CASES,
     CONTENT_STRESS_TOTAL,
     resolveItemCount,
@@ -38,7 +39,6 @@ import {
     type ContentStressComponent
 } from '@/pages/DevPlayground/stressMatrix';
 
-const HOME_NAMESPACE = 'home';
 const ERRORS_NAMESPACE = 'errors';
 
 interface CaseProps {
@@ -141,13 +141,12 @@ const renderCase = ({
 };
 
 export const ContentStress: FunctionComponent = () => {
-    const { t } = useTranslation([DEFAULT_NAMESPACE, HOME_NAMESPACE, ERRORS_NAMESPACE]);
+    const { t } = useTranslation([DEFAULT_NAMESPACE, ERRORS_NAMESPACE]);
 
-    // Real authored copy, never lorem-ipsum: the transform starts from a string the product ships, so
-    // the TYPICAL state is genuinely typical and the LONG state is a real string tripled.
-    const sourceText = t('home:description');
+    // Prose takes AUTHORED_COPY; chrome labels and messages stay in namespaces every fork keeps.
+    const sourceText = AUTHORED_COPY.text;
     const sourceLabel = t('common:button.submit');
-    const sourceHeading = t('home:inside.title');
+    const sourceHeading = AUTHORED_COPY.heading;
     const sourceMessage = t('errors:validation.maxLength');
     const iconLabel = t('common:success');
 
@@ -159,8 +158,8 @@ export const ContentStress: FunctionComponent = () => {
             data-stress-total={CONTENT_STRESS_TOTAL}
         >
             <div className="space-y-2">
-                <h1 className="text-3xl font-bold">{t('home:inside.title')}</h1>
-                <p className="text-muted-foreground">{t('home:seed')}</p>
+                <h1 className="text-3xl font-bold">{AUTHORED_COPY.heading}</h1>
+                <p className="text-muted-foreground">{AUTHORED_COPY.intro}</p>
             </div>
 
             <div className="grid min-w-0 gap-6">

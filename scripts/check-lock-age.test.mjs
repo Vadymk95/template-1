@@ -21,6 +21,12 @@ import { quietPort } from './quiet-ports.mjs';
 
 const { describe, it } = globalThis.describe ? globalThis : await import('node:test');
 
+// Each CLI case starts several node and git processes, and the unreachable-registry case also waits out the
+// script's own pauses between its two retries, so vitest's 5 s default is too tight on a loaded machine.
+// vitest gives this budget to each case of the group; `node:test` would cap the WHOLE group with it and
+// cancel the cases still running, and it sets no limit of its own, so there it gets none.
+const CLI_BUDGET = globalThis.describe ? { timeout: 30_000 } : {};
+
 // Resolved from the repo root, not from `import.meta.url`: vitest serves this module over its own
 // URL scheme, so a URL-relative path cannot work there; `node --test` runs from the root as well.
 const SCRIPT = path.resolve(process.cwd(), 'scripts/check-lock-age.mjs');
@@ -771,7 +777,7 @@ describe('loadBase', () => {
 
 /* ------------------------------------------------------------------------ the CLI, end to end */
 
-describe('the CLI against a real git history and a local registry', () => {
+describe('the CLI against a real git history and a local registry', CLI_BUDGET, () => {
     const git = (cwd, ...args) => {
         const env = { ...process.env };
         for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR']) {

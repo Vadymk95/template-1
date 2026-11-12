@@ -79,7 +79,10 @@ const misplacedHooks = async (code, filePath) => {
 
 const SCHEMA_MODULE = "import { z } from 'zod';\n\nexport const Schema = z.object({});\n";
 
-describe('zod is imported through one module', () => {
+// The cost of the first case of the file that asks ESLint for a config (the cold import of the config and
+// every plugin) falls on this group's first case while the file runs in order; vitest's 5 s default is too
+// tight for that on a loaded machine.
+describe('zod is imported through one module', { timeout: 60_000 }, () => {
     // Zod reads its `jitless` switch when the first object schema is built, and its default probes
     // `new Function`, which the shipped CSP blocks and the browser reports. The switch is set in
     // `src/lib/zod.ts`; a module that imports `zod` itself and builds a schema while it loads brings
