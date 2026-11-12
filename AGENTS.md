@@ -47,6 +47,7 @@ npm run bench:verify       # the gate step by step with timings
 npm run trace:report       # findings from .gate-trace.log
 npm run docs:check         # docs drift (paths against the files git lists, line pointers, scripts, versions, command table, dead docs, the DECISIONS shape, the gate chain view, its strict flags and any retelling or composition of it); inside verify, weekly CI adds --weekly
 npm run test:mutation      # StrykerJS strength gate: weekly mutation.yml, NOT in verify
+npm run test:mutation:changed # survivors on the lines this change touched; informational PR check; `-- --pick` lists them
 ```
 
 <!-- shared-harness:begin -->

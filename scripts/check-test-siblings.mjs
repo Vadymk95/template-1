@@ -97,7 +97,7 @@ const gitEnvironment = (environment) =>
     );
 
 /** Runs git in `cwd`; returns stdout, or null when the command fails. */
-const makeGit = (cwd) => (args) => {
+export const makeGit = (cwd) => (args) => {
     try {
         return execFileSync('git', args, {
             cwd,

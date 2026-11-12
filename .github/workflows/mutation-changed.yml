@@ -1,0 +1,47 @@
+name: Mutation (changed lines)
+
+# Informational: lists the mutants of the lines a pull request changed that no test catches. It never
+# fails on the score and is not a required check. The same list locally: `npm run test:mutation:changed`.
+# A pull request that changes nothing in the mutation scope ends after the pick step.
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
+jobs:
+    mutation-changed:
+        name: Mutation on changed lines
+        runs-on: ubuntu-latest
+        timeout-minutes: 40
+        env:
+            HUSKY: '0'
+
+        steps:
+            # Depth 2: the merge commit's first parent is the base the changed lines are read against.
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  fetch-depth: 2
+                  persist-credentials: false
+
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              with:
+                  node-version-file: .nvmrc
+
+            - name: Pick the changed lines
+              id: pick
+              run: node scripts/mutation-changed.mjs --pick
+
+            - name: Install dependencies
+              if: steps.pick.outputs.count != '0'
+              run: npm ci --ignore-scripts
+
+            - name: Mutate the changed lines
+              if: steps.pick.outputs.count != '0'
+              run: npm run test:mutation:changed
