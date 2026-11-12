@@ -76,7 +76,7 @@
         }
     },
     "selfTests": {
-        "_description": "The harness tests a push that changes no harness file leaves out (scripts/verify-push.mjs decides, scripts/check-coverage.mjs applies it; CI, npm test and verify always run them). A file belongs here only if it reads nothing but scripts/ and temp folders and costs seconds; the harness tests that read the real repository (app files, configs, package.json) are guards over it, so they are never listed. Adding a file is a gate change.",
+        "_description": "The harness tests a push that changes no harness file leaves out (scripts/verify-push.mjs decides, scripts/check-coverage.mjs applies it; CI, npm test and verify always run them). A file belongs here only if it costs seconds and reads no repository file outside scripts/: temp folders do not count, nor do the tools it loads from node_modules (package.json and the lockfile pin them, and a change of either runs everything), nor a look at the machine such as whether a system tool exists. The harness tests that read the real repository (app files, configs, package.json) are guards over it, so they are never listed. scripts/fork-init.test.mjs is never listed: fork:init deletes it in every fork. Adding a file is a gate change.",
         "files": [
             "scripts/check-gate-integrity.suppressions-1.test.mjs",
             "scripts/check-gate-integrity.suppressions-2.test.mjs",

@@ -18,8 +18,8 @@
  * A push that changes no harness file leaves out the harness tests listed in gate-tiers.json
  * (`selfTests`): scripts/verify-push.mjs decides and tells this step through SELF_TESTS_FLAG in the
  * environment of the chain it starts. The flag only switches the list on; the files always come from
- * the list. Without the flag, or under CI, every test runs. Coverage counts `src/**` only, so no
- * number moves.
+ * the list. Without the flag, or under CI, every test runs. Coverage does not count `scripts/**`,
+ * so no number moves.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
