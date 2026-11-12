@@ -53,20 +53,30 @@ npm install && npm run prepare && npm run dev
 
 ## 🧬 Make it yours (fork checklist)
 
-After cloning, these are the exact files / symbols to edit to make the template your own:
+After cloning and `npm run prepare`, run one command from the repository root. It reads and writes files only: no install, no network, no `gh`, and git history is never touched.
 
-- **`package.json`** — the `"name"` field (currently `react-enterprise-foundation`); run `npm install` afterwards so `package-lock.json` records the same name.
-- **`index.html`** — `<title>` (currently `React Enterprise Foundation`) and the commented-out `<meta name="description">` / `<meta name="robots">` tags.
-- **`public/locales/en/common.json`** — `appName` (currently `React Enterprise Foundation`): the brand rendered in the Header and Footer copyright via `t('appName')`. Repeat in every locale file you add.
-- **`e2e/smoke.spec.ts`** — the `toHaveTitle(/React Enterprise Foundation/)` assertion must match the new `<title>`, or the E2E smoke test fails.
-- **`src/lib/i18n/constants.ts`** — `SUPPORTED_LANGUAGES` (add locales beyond `'en'`), `DEFAULT_LANGUAGE`, and the namespace lists `DEFAULT_NAMESPACES` / `LAZY_NAMESPACES` (each must match a folder under `public/locales/{lng}/{ns}.json`).
-- **`app.config.ts`** — `webFontUrls`: the stylesheet URLs of the web fonts the build self-hosts (currently Inter). Put your font's URL in the list, or empty the list to drop the web font, and set the family in `--font-sans` in `src/index.css`. `vite.config.ts` reads this file, but it is not a gate file, so the change needs no `gate-change` label.
-- **`src/index.css`** — brand theme tokens in `:root` and `.dark`: the HSL triples `--primary`, `--primary-hover`, `--secondary`, `--accent`, `--ring`, `--chart-1`…`--chart-5`, plus the `--radius` scale. Currently Google Blue. `--primary-hover` is the default button's hover fill: keep it a step away from `--primary` in the direction that raises the label's contrast; `scripts/button-contrast.test.mjs` fails any button state under 4.5:1.
-- **`LICENSE`** + **`README.md`** — replace the copyright holder (currently `Vadym Kononenko`) and the `# React Enterprise Foundation` heading / intro. MIT suits an open-source fork; for a proprietary app, swap the MIT text for a proprietary or `UNLICENSED` notice.
-- **Template seeds** — when you outgrow the demo modules, follow [`.cursor/brain/TEMPLATE_SEEDS.md`](.cursor/brain/TEMPLATE_SEEDS.md) to graduate or remove them.
-- **Private repository: CodeQL** — `.github/workflows/security.yml` and `.github/ruleset.json`. Code scanning is free on a public repository; a private one needs a GitHub Code Security license (a GitHub Team or GitHub Enterprise plan), and without it the `codeql` job fails with "Code scanning is not enabled for this repository". Get the license, or delete the `codeql` job and its required check in one commit. Sources and the exact check name: [Where the security workflow works](#where-the-security-workflow-works).
+```bash
+npm run fork:init -- --name my-app --title "My App" [--holder "My Company Ltd"] [--private] [--dry-run]
+```
+
+It refuses on a dirty working tree, on an invalid package name, an empty title or an unknown option, and on a second run (it writes `.template-origin.json`, and that file's presence is the refusal). A successful run also removes the command from your fork (the script, its test, the `package.json` entry and this description of it, leaving the list below) so your gate does not carry a test of a one-time tool; `docs:check` judges that final tree, and if it is red the command stays whole. What it does:
+
+- **Identity** — the `package.json` name and both root entries of `package-lock.json`; the `index.html` `<title>`, the `appName` copy in `public/locales/en/common.json`, the `toHaveTitle` expectation in `e2e/smoke.spec.ts` and the heading of this file; the title lines of `AGENTS.md` and `.cursor/brain/PROJECT_CONTEXT.md`; the `LICENSE` copyright holder when `--holder` is given.
+- **Release start** — the version restarts at `0.1.0` in `package.json`, the lock file and `.release-please-manifest.json`; `CHANGELOG.md` restarts empty; `bootstrap-sha` in `release-please-config.json` becomes your repository's current commit, so the first release notes do not replay the template's history.
+- **Origin record** — `.template-origin.json` names the template, its version and its commit.
+- **Decision history** — `.cursor/brain/DECISIONS.md` starts with its header, an empty index and a pointer at the template's version; the `§` pointers into the old entries in other docs become quoted entry names, which `docs:check` does not pin. The script runs `docs:check` at the end and exits 1 if it is red.
+- **`--private`** — for a private repository without a code-scanning licence: the `codeql` job in `.github/workflows/security.yml` and its required check in `.github/ruleset.json` leave together. Sources: [Where the security workflow works](#where-the-security-workflow-works).
+- **What is left** — printed at the end, in order, with the exact `gh` commands: enable Actions, the permission for Actions to open pull requests, the `gate-change` label, one pull request, then the ruleset ([why in this order](#what-your-fork-does-not-inherit)), and the settings that are only switches.
+
+What it does not do, and you decide:
+
+- **Languages** — `src/lib/i18n/constants.ts`: `SUPPORTED_LANGUAGES` (add locales beyond `'en'`), `DEFAULT_LANGUAGE`, and the namespace lists `DEFAULT_NAMESPACES` / `LAZY_NAMESPACES` (each must match a folder under `public/locales/{lng}/{ns}.json`); repeat `appName` in every locale file you add.
+- **Fonts** — `app.config.ts` `webFontUrls`: the stylesheet URLs of the web fonts the build self-hosts (currently Inter). Put your font's URL in the list, or empty the list to drop the web font, and set the family in `--font-sans` in `src/index.css`. `vite.config.ts` reads this file, but it is not a gate file, so the change needs no `gate-change` label.
+- **Brand tokens** — `src/index.css`, in `:root` and `.dark`: the HSL triples `--primary`, `--primary-hover`, `--secondary`, `--accent`, `--ring`, `--chart-1`…`--chart-5`, plus the `--radius` scale. Currently Google Blue. `--primary-hover` is the default button's hover fill: keep it a step away from `--primary` in the direction that raises the label's contrast; `scripts/button-contrast.test.mjs` fails any button state under 4.5:1.
+- **Page meta and licence** — the commented-out `<meta name="description">` / `<meta name="robots">` tags in `index.html`. MIT suits an open-source fork; for a proprietary app, swap the MIT text in `LICENSE` for a proprietary or `UNLICENSED` notice.
+- **Template seeds** — they stay: they are live components and gate fixtures. When you outgrow the demo modules, follow [`.cursor/brain/TEMPLATE_SEEDS.md`](.cursor/brain/TEMPLATE_SEEDS.md) to graduate or remove them.
 - **Repository layout** — keep the app at the git root: `scripts/check-hooks.mjs` refuses to run from a subfolder of the repository, because every gate script reads git paths relative to the repository root.
-- **Decisions and holds** — start your own `.cursor/brain/DECISIONS.md` fresh with a one-line pointer to this template's history (`git log -p -- .cursor/brain/DECISIONS.md` in the template repo). Keep `scripts/version-holds.json`: `verify` fails on a drift, and each hold is re-checked against your own Dependabot PRs, lifted when its condition is met.
+- **Version holds** — keep `scripts/version-holds.json`: `verify` fails on a drift, and each hold is re-checked against your own Dependabot PRs, lifted when its condition is met.
 
 ## 🚀 Tech Stack
 
