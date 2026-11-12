@@ -47,13 +47,7 @@ Local    →  component-only state (useState)
 
 ## Routing
 
-```
-/            → HomePage (index route, not lazy)
-/login       → LoginPage (lazy + WithSuspense)
-/dashboard   → DashboardPage (lazy + WithSuspense; parent layout ProtectedRoute → redirect to /login if unauthenticated)
-/*           → NotFoundPage (lazy + WithSuspense)
-/dev/ui      → DevPlayground (DEV only, lazy + WithSuspense; omitted in production build — template seed)
-```
+Routes are read from `src/router/modules/*.routes.tsx`, their names from `src/router/routes.ts`.
 
 ## i18n Flow
 

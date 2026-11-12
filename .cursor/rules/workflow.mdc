@@ -14,12 +14,13 @@ Gate by **risk, not LOC**.
 | Task Risk | Protocol |
 |---|---|
 | Trivial leaf edit (no danger zone, no contract change) | Proceed with brief notification |
-| Touches a SKELETONS danger zone, Zustand store / TanStack Query contract, API payload contract, router | Present plan → wait for approval → implement |
-| New architecture pattern | Always present plan |
+| One slice that only ADDS (a new page, store, query, route), no danger zone, no existing contract changed | Proceed; the acceptance criteria open the pull request description |
+| Changes an EXISTING contract (a store's shape, a TanStack Query key or payload, an API payload, a route others link to) or touches a SKELETONS danger zone | Present plan → wait for approval → implement |
+| Two or more slices, or a new architecture pattern | `SPEC.md` + `PLAN.md`, approved as a pull-request review |
 
-**FORBIDDEN**: starting implementation of a non-trivial task before approval.
+**FORBIDDEN**: changing an existing contract or entering a danger zone before approval.
 
-For a task bigger than a one-sentence diff the approval is the non-author PR review of `SPEC.md`/`PLAN.md` (`AGENTS.md` › Before code); the table is the chat-level gate below that size. A plan is `.cursor/<feature-slug>/PLAN.md`, copied from `.cursor/templates/PLAN.md`. The steps are in `agent-pipeline.mdc`; Approve sits between Simulate and Execute.
+For work of two or more slices the approval is the non-author PR review of `SPEC.md`/`PLAN.md` (`AGENTS.md` › Before code); the table is the gate below that size. A plan is `.cursor/<feature-slug>/PLAN.md`, copied from `.cursor/templates/PLAN.md`. The steps are in `agent-pipeline.mdc`; Approve sits between Simulate and Execute.
 
 ## Scope Discipline
 

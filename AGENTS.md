@@ -161,14 +161,19 @@ someone else's). Only the push gate clears its own port.
 
 ### Before code - spec and plan
 
-A task bigger than a one-sentence diff gets two tracked files under `.cursor/<feature-slug>/` before the
-first edit: `SPEC.md` (WHAT and WHY: evidence per claim with its source kind, acceptance criteria as
-Given / When / Then, open questions with `blocking` and `evidence tried` - an unknown is parked there,
-never invented) and `PLAN.md` (HOW: changes per file with the code that was read, what is reused,
-sequencing in 2-7 slices each under ~400 changed lines, a test per acceptance criterion, risks, danger
-zones). Copy both from `.cursor/templates/`. Approval is a non-author review of the pull request that
-adds or changes them, never a phrase in a chat recorded by an agent. `/feat` starts from the plan; a plan
-that lives only in a conversation is not a plan.
+Work of **two or more slices**, or work that touches a `SKELETONS.md` danger zone, gets two tracked files
+under `.cursor/<feature-slug>/` before the first edit: `SPEC.md` (WHAT and WHY: evidence per claim with
+its source kind, acceptance criteria as Given / When / Then, open questions with `blocking` and
+`evidence tried` - an unknown is parked there, never invented) and `PLAN.md` (HOW: changes per file with
+the code that was read, what is reused, sequencing in 2-7 slices each under ~400 changed lines, a test per
+acceptance criterion, risks, danger zones). Copy both from `.cursor/templates/`. Approval is a non-author
+review of the pull request that adds or changes them, never a phrase in a chat recorded by an agent.
+`/feat` starts from the plan; a plan that lives only in a conversation is not a plan.
+
+Work that fits **one slice** (under ~400 changed lines, no danger zone) needs no separate files and no
+approval round: its acceptance criteria, as Given / When / Then, open the pull request description, and
+the review of that pull request is the approval. An unknown that blocks it is still asked as one question,
+never invented.
 
 <!-- shared-harness:end -->
 
