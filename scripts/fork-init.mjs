@@ -22,6 +22,11 @@
  *   decisions  `DECISIONS.md` starts over (header, empty index, a pointer at the template's version),
  *              and every `DECISIONS.md` § Heading pointer in the other docs becomes a quoted entry
  *              name plus the origin record, which `docs:check` does not pin to a heading.
+ *   removal    the command leaves the fork it initialised: this script, its test, the `fork:init`
+ *              entry of `package.json` and the README text that documents it (the owner decisions
+ *              stay). The tree is written and removed first and `docs:check` judges that final
+ *              tree; if it is red the command is put back whole, so a red run never leaves half of
+ *              it. The refusal on `.template-origin.json` stays for a script copied back.
  *   --private  the `codeql` job and its required check leave together (a private repository without
  *              a code-scanning licence); every other CodeQL file stays.
  * Then it runs `docs:check` in the fork and prints what is left: the GitHub commands, in order, and
@@ -35,7 +40,7 @@
  *          [--holder "<Copyright holder>"] [--private] [--dry-run]
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -46,6 +51,7 @@ const FIRST_VERSION = '0.1.0';
 const DECISIONS_FILE = '.cursor/brain/DECISIONS.md';
 // History the template owns: other docs may keep their own words about it, these files are reset.
 const HISTORY_FILES = new Set([DECISIONS_FILE, 'CHANGELOG.md']);
+const SELF_FILES = ['scripts/fork-init.mjs', 'scripts/fork-init.test.mjs'];
 const PACKAGE_NAME = /^(?:@[a-z0-9~-][a-z0-9._~-]*\/)?[a-z0-9~-][a-z0-9._~-]*$/;
 const NAME_MAX_LENGTH = 214;
 const CODEQL_JOB = 'codeql';
@@ -298,6 +304,9 @@ const removeCodeqlCheck = (text) => {
     return result;
 };
 
+// The fork keeps the list of what its owner decides and a line on where it came from.
+const FORK_README_INTRO = `This fork started from a template: \`${ORIGIN_FILE}\` names the template, its version and its commit. The one-time edits (name, title, version, release start, decision history) are done, and the command that made them is gone. These are yours to decide:`;
+
 const applyCount = (text, { pattern, count, to, file }) => {
     const found = [...text.matchAll(pattern)].length;
     if (found !== count) {
@@ -355,6 +364,34 @@ export const buildPlan = ({ root, options, old, head }) => {
     }
     return [...contents].map(([file, content]) => ({ file, content, notes: notes.get(file) }));
 };
+
+/** What leaves the two shared files with the command: its manifest entry and the README's account of it. */
+const COMMAND_REMOVALS = {
+    'package.json': {
+        pattern: /,\n {8}"fork:init": "node scripts\/fork-init\.mjs"\n/g,
+        to: '\n',
+        note: 'fork:init entry removed'
+    },
+    'README.md': {
+        pattern: /^After cloning[\s\S]*?^What it does not do, and you decide:$/gm,
+        to: FORK_README_INTRO,
+        note: 'fork checklist rewritten without the command'
+    }
+};
+
+const withoutCommand = (plan) =>
+    plan.map((edit) => {
+        const removal = COMMAND_REMOVALS[edit.file];
+        if (!removal) return edit;
+        const { pattern, to, note } = removal;
+        const content = applyCount(edit.content, {
+            file: edit.file,
+            pattern,
+            count: 1,
+            to: () => to
+        });
+        return { ...edit, content, notes: [...edit.notes, note] };
+    });
 
 const repositoryOf = (root) => {
     try {
@@ -440,21 +477,30 @@ export const forkInit = ({ root, argv }) => {
     }
     const head = git(root, 'rev-parse', 'HEAD').trim();
     const plan = buildPlan({ root, options, old, head });
+    const final = withoutCommand(plan);
+    const removed = SELF_FILES.map((file) => `  ${file}: removed with the command`);
     const lines = [];
 
     if (options.dryRun) {
         lines.push('fork:init dry run: nothing is written. Planned edits:');
-        for (const { file, notes } of plan) lines.push(`  ${file}: ${notes.join('; ')}`);
-        return { ok: true, lines };
+        for (const { file, notes } of final) lines.push(`  ${file}: ${notes.join('; ')}`);
+        return { ok: true, lines: [...lines, ...removed] };
     }
-    for (const { file, content } of plan) writeFileSync(path.join(root, file), content);
-    lines.push(`fork:init wrote ${String(plan.length)} files:`);
-    for (const { file, notes } of plan) lines.push(`  ${file}: ${notes.join('; ')}`);
+    const saved = SELF_FILES.map((file) => [file, readFileSync(path.join(root, file))]);
+    for (const { file, content } of final) writeFileSync(path.join(root, file), content);
+    for (const file of SELF_FILES) rmSync(path.join(root, file));
+    lines.push(`fork:init wrote ${String(final.length)} files:`);
+    for (const { file, notes } of final) lines.push(`  ${file}: ${notes.join('; ')}`);
+    lines.push(...removed);
 
     const check = runDocsCheck(root);
     lines.push('', check.text);
     if (!check.ok) {
-        lines.push('The edits are written; fix the findings above before committing.');
+        for (const { file, content } of plan) writeFileSync(path.join(root, file), content);
+        for (const [file, bytes] of saved) writeFileSync(path.join(root, file), bytes);
+        lines.push(
+            'The edits are written and the command is back whole; fix the findings above before committing.'
+        );
         return { ok: false, lines };
     }
     lines.push(

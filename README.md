@@ -59,7 +59,7 @@ After cloning and `npm run prepare`, run one command from the repository root. I
 npm run fork:init -- --name my-app --title "My App" [--holder "My Company Ltd"] [--private] [--dry-run]
 ```
 
-It refuses on a dirty working tree, on an invalid package name, an empty title or an unknown option, and on a second run (it writes `.template-origin.json`, and that file's presence is the refusal). What it does:
+It refuses on a dirty working tree, on an invalid package name, an empty title or an unknown option, and on a second run (it writes `.template-origin.json`, and that file's presence is the refusal). A successful run also removes the command from your fork (the script, its test, the `package.json` entry and this description of it, leaving the list below) so your gate does not carry a test of a one-time tool; `docs:check` judges that final tree, and if it is red the command stays whole. What it does:
 
 - **Identity** — the `package.json` name and both root entries of `package-lock.json`; the `index.html` `<title>`, the `appName` copy in `public/locales/en/common.json`, the `toHaveTitle` expectation in `e2e/smoke.spec.ts` and the heading of this file; the title lines of `AGENTS.md` and `.cursor/brain/PROJECT_CONTEXT.md`; the `LICENSE` copyright holder when `--holder` is given.
 - **Release start** — the version restarts at `0.1.0` in `package.json`, the lock file and `.release-please-manifest.json`; `CHANGELOG.md` restarts empty; `bootstrap-sha` in `release-please-config.json` becomes your repository's current commit, so the first release notes do not replay the template's history.

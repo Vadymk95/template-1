@@ -1,12 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import {
+    appendFileSync,
     cpSync,
     existsSync,
     mkdirSync,
     mkdtempSync,
     readFileSync,
     realpathSync,
-    rmSync
+    rmSync,
+    writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
@@ -17,6 +19,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // transform URL, so the file-URL form would not locate the script on disk.
 const ROOT = process.cwd();
 const SCRIPT_PATH = 'scripts/fork-init.mjs';
+const TEST_PATH = 'scripts/fork-init.test.mjs';
+const OWNER_DECISIONS = [
+    'Languages',
+    'Fonts',
+    'Brand tokens',
+    'Page meta and licence',
+    'Template seeds',
+    'Repository layout',
+    'Version holds'
+];
 
 /* The script rewrites the repository it runs in, so NO case runs it here: every case works on a
    throwaway copy in the system temp folder, and `run` refuses any other working directory. GIT_* is
@@ -93,6 +105,21 @@ const listFiles = (dir) =>
         .split('\0')
         .filter((file) => file !== '' && existsSync(join(dir, file)));
 
+/** What a fork must hold after a successful run: no part of the command, every owner decision. */
+const expectCommandGone = (dir) => {
+    expect(existsSync(join(dir, SCRIPT_PATH))).toBe(false);
+    expect(existsSync(join(dir, TEST_PATH))).toBe(false);
+    expect(readJson(dir, 'package.json').scripts).not.toHaveProperty('fork:init');
+    const traces = listFiles(dir).filter((file) => {
+        const text = readFileSync(join(dir, file), 'utf8');
+        return text.includes('fork:init') || text.includes('fork-init');
+    });
+    expect(traces).toEqual([]);
+    const readme = read(dir, 'README.md');
+    for (const decision of OWNER_DECISIONS) expect(readme, decision).toContain(`**${decision}**`);
+    expect(readme).toContain('.template-origin.json');
+};
+
 // The history files keep the template's words on purpose, and so does the origin record.
 const HISTORY_FILES = new Set([
     '.cursor/brain/DECISIONS.md',
@@ -154,6 +181,10 @@ describe('fork-init, one full run', () => {
         expect(result.code, result.output).toBe(0);
         const check = docsCheck(dir);
         expect(check.code, check.output).toBe(0);
+    });
+
+    it('removes the command from the fork and keeps the owner decisions in the README', () => {
+        expectCommandGone(dir);
     });
 
     it('leaves the template name, title and holder in no file but the history files', () => {
@@ -265,7 +296,9 @@ describe('fork-init, one full run', () => {
             'package-lock.json',
             'package.json',
             'public/locales/en/common.json',
-            'release-please-config.json'
+            'release-please-config.json',
+            SCRIPT_PATH,
+            TEST_PATH
         ]);
         const rewrittenPointers = ['.cursor/brain/EXTENSIONS.md', '.cursor/brain/VERIFICATION.md'];
         const outside = changed.filter(
@@ -352,9 +385,10 @@ describe('fork-init, refusals', () => {
         }
     }, 30_000);
 
-    it('refuses a second run, before and after the first run is committed', () => {
+    it('refuses a second run with the script copied back, before and after the first is committed', () => {
         const dir = makeCopy();
         expect(run(dir, ['--name', NEW_NAME, '--title', NEW_TITLE]).code).toBe(0);
+        cpSync(join(ROOT, SCRIPT_PATH), join(dir, SCRIPT_PATH));
 
         const dirty = status(dir);
         const again = run(dir, ['--name', 'other-app', '--title', 'Other App']);
@@ -367,6 +401,33 @@ describe('fork-init, refusals', () => {
         expect(committed.code).toBe(1);
         expect(committed.output).toMatch(/already ran/i);
         expect(status(dir)).toBe('');
+    }, 120_000);
+
+    it('refuses a tree that already holds the origin record and changes nothing', () => {
+        const dir = makeCopy();
+        writeFileSync(join(dir, '.template-origin.json'), '{}\n');
+        commitAll(dir, 'chore: an initialised fork');
+        const result = run(dir, ['--name', NEW_NAME, '--title', NEW_TITLE]);
+
+        expect(result.code).toBe(1);
+        expect(result.output).toMatch(/already ran/i);
+        expect(status(dir)).toBe('');
+        expect(readJson(dir, 'package.json').name).toBe(origin.name);
+    }, 30_000);
+
+    it('exits 1 on a red docs:check and leaves the command whole, edits written', () => {
+        const dir = makeCopy();
+        appendFileSync(join(dir, 'README.md'), '\nSee `scripts/no-such-file.mjs`.\n');
+        commitAll(dir, 'chore: seed a finding docs:check reports');
+        const result = run(dir, ['--name', NEW_NAME, '--title', NEW_TITLE]);
+
+        expect(result.code).toBe(1);
+        expect(result.output).toContain('docs:check: RED');
+        expect(result.output).toContain('no-such-file');
+        for (const kept of [SCRIPT_PATH, TEST_PATH]) expect(existsSync(join(dir, kept))).toBe(true);
+        expect(readJson(dir, 'package.json').scripts).toHaveProperty('fork:init');
+        expect(read(dir, 'README.md')).toContain('npm run fork:init');
+        expect(readJson(dir, 'package.json').name).toBe(NEW_NAME);
     }, 120_000);
 
     it('refuses to run outside a git repository', () => {
@@ -406,10 +467,15 @@ describe('fork-init, --dry-run', () => {
             '.template-origin.json',
             '.cursor/brain/DECISIONS.md',
             '.github/workflows/security.yml',
-            '.github/ruleset.json'
+            '.github/ruleset.json',
+            SCRIPT_PATH,
+            TEST_PATH,
+            'fork:init'
         ]) {
             expect(result.output, planned).toContain(planned);
         }
+        for (const kept of [SCRIPT_PATH, TEST_PATH]) expect(existsSync(join(dir, kept))).toBe(true);
+        expect(readJson(dir, 'package.json').scripts).toHaveProperty('fork:init');
     }, 30_000);
 });
 
@@ -439,6 +505,10 @@ describe('fork-init, --private', () => {
 
         const check = docsCheck(dir);
         expect(check.code, check.output).toBe(0);
+    });
+
+    it('removes the command from the fork as well', () => {
+        expectCommandGone(dir);
     });
 
     it('reads the owner and repository from the origin remote for the printed commands', () => {
