@@ -1,5 +1,53 @@
 # Changelog
 
+## [3.4.0](https://github.com/Vadymk95/template-1/compare/v3.3.7...v3.4.0) (2026-11-13)
+
+
+### Features
+
+* **ci:** informational mutation check on the lines a pull request changes ([#137](https://github.com/Vadymk95/template-1/issues/137)) ([e3597cb](https://github.com/Vadymk95/template-1/commit/e3597cbd60dad82748ec0d9be8e2231d233e2c50))
+* **gate:** a push that changes no harness file leaves out the pure harness tests ([#144](https://github.com/Vadymk95/template-1/issues/144)) ([e33c0e8](https://github.com/Vadymk95/template-1/commit/e33c0e84b00320a7a00ce8251c4e2e10ef88af01))
+* **gate:** iterate runs the commit hook's checks; phase 0 names every skipped stage ([#135](https://github.com/Vadymk95/template-1/issues/135)) ([68f17d9](https://github.com/Vadymk95/template-1/commit/68f17d9e8ab67551926c0314443eff695077b094))
+* **lint:** fail on effects that leak listeners, timers, observers and requests ([#128](https://github.com/Vadymk95/template-1/issues/128)) ([8a2c520](https://github.com/Vadymk95/template-1/commit/8a2c520e6ea0da4e544394c87a768fdbf8e7bc80))
+* **scripts:** add fork:init, the local part of fork day in one command ([#136](https://github.com/Vadymk95/template-1/issues/136)) ([5bf353e](https://github.com/Vadymk95/template-1/commit/5bf353eaa3e35acc6f9cd6c2ee89f882d8728216))
+
+
+### Bug fixes
+
+* **fork-day:** removing samples and seeds costs fewer edits; the stress fixture owns its copy ([#143](https://github.com/Vadymk95/template-1/issues/143)) ([121ef8f](https://github.com/Vadymk95/template-1/commit/121ef8f153142d93444d1f5b9108fdba904e7e69))
+* **hooks,ci:** pass commits of linter-ignored files; read gate labels when the job runs ([#131](https://github.com/Vadymk95/template-1/issues/131)) ([977ab78](https://github.com/Vadymk95/template-1/commit/977ab78692ee973ca83b56ec73fd0ce26736dfbd))
+* **hooks:** format .mjs, .cjs, .css and .html files at commit, as the push gate checks them ([#130](https://github.com/Vadymk95/template-1/issues/130)) ([21f0e4a](https://github.com/Vadymk95/template-1/commit/21f0e4aab9f6e53bb49f14805558bab2c0c47e15))
+* **hooks:** the hooks check refuses when a hook file is missing or not executable ([#148](https://github.com/Vadymk95/template-1/issues/148)) ([39d9110](https://github.com/Vadymk95/template-1/commit/39d911002aa350a47a939498566e052df5b22ac5))
+* **mutation:** run Stryker in the forks pool, the pool vitest run uses ([#134](https://github.com/Vadymk95/template-1/issues/134)) ([6c14398](https://github.com/Vadymk95/template-1/commit/6c14398ac2d8a25d0045911a4b6d0555ad5455a4))
+
+
+### Build and dependencies
+
+* **deps:** move oxlint and eslint-plugin-oxlint together to 1.93.0 ([#146](https://github.com/Vadymk95/template-1/issues/146)) ([0e8f5bd](https://github.com/Vadymk95/template-1/commit/0e8f5bd0115de677d5db4e888be9aed7805dbd0b))
+
+
+### Maintenance
+
+* **deps:** bump the minor-and-patch group across 1 directory with 13 updates ([#147](https://github.com/Vadymk95/template-1/issues/147)) ([660dfda](https://github.com/Vadymk95/template-1/commit/660dfdaa31f838174db0ac33318b676d64df8a9e))
+
+
+### Documentation
+
+* **agents:** spec and plan from two slices; one slice carries its criteria in the PR ([#138](https://github.com/Vadymk95/template-1/issues/138)) ([4d4a70c](https://github.com/Vadymk95/template-1/commit/4d4a70c8f433c6fc69da820595991a582b0d1853))
+
+
+### Tests
+
+* **scripts:** give the auto-merge script cases their own time budget ([#145](https://github.com/Vadymk95/template-1/issues/145)) ([a43c42f](https://github.com/Vadymk95/template-1/commit/a43c42ff962ed7151f45b9291d9db772e4a798d7))
+* **scripts:** give the slow self-test groups their own time budget ([#142](https://github.com/Vadymk95/template-1/issues/142)) ([2f375ed](https://github.com/Vadymk95/template-1/commit/2f375edd80bdf16363fb0ed89523a2f4c5147490))
+
+
+### CI
+
+* **cross-browser:** run in the official Playwright image, its tag read from the lock file ([#133](https://github.com/Vadymk95/template-1/issues/133)) ([300261c](https://github.com/Vadymk95/template-1/commit/300261cbe264705d313befddd88fe9c52042b272))
+* **cross-browser:** stop the stalled root apt-get before the next install-deps try ([#132](https://github.com/Vadymk95/template-1/issues/132)) ([ef864b8](https://github.com/Vadymk95/template-1/commit/ef864b878aa5a79e49e9daae34d87e4e36bda6a9))
+* **deps:** auto-merge Dependabot patch and minor updates after the required checks ([#139](https://github.com/Vadymk95/template-1/issues/139)) ([c15b421](https://github.com/Vadymk95/template-1/commit/c15b421a728a46df1e3882b933ab753559fd75cb))
+
 ## [3.3.7](https://github.com/Vadymk95/template-1/compare/v3.3.6...v3.3.7) (2026-11-07)
 
 
