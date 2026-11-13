@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+    chmodSync,
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    rmSync,
+    statSync,
+    writeFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -46,6 +54,37 @@ const run = (cwd, env = {}) => {
     }
 };
 
+const put = (path, text, mode) => {
+    writeFileSync(path, text);
+    chmodSync(path, mode);
+};
+
+const HOOKS = ['pre-commit', 'commit-msg', 'pre-push'];
+
+/* What `npm run prepare` leaves: the hook bodies under .husky/ WITHOUT the exec bit (a shim runs
+   them through sh), one executable shim per hook under .husky/_, and the helper files there. Modes
+   are set with chmod, never left to the umask. `without` leaves shims out, `stripped` takes the
+   exec bit off the named shims, a `hooksPath` of null leaves core.hooksPath unset. */
+const installHooks = (dir, { without = [], stripped = [], hooksPath = '.husky/_' } = {}) => {
+    const shims = join(dir, '.husky/_');
+    mkdirSync(shims, { recursive: true });
+    put(join(shims, 'h'), '# helper\n', 0o644);
+    put(join(shims, 'husky.sh'), '# helper\n', 0o644);
+    for (const name of HOOKS) {
+        put(join(dir, '.husky', name), 'true\n', 0o644);
+        if (!without.includes(name)) {
+            put(join(shims, name), '#!/usr/bin/env sh\n', stripped.includes(name) ? 0o644 : 0o755);
+        }
+    }
+    if (hooksPath !== null) {
+        execFileSync('git', ['config', 'core.hooksPath', hooksPath], {
+            cwd: dir,
+            env: CLEAN_ENV,
+            stdio: CAPTURE
+        });
+    }
+};
+
 let repo = null;
 
 afterEach(() => {
@@ -55,15 +94,12 @@ afterEach(() => {
     }
 });
 
-describe('check-hooks', () => {
+/* Each case starts git and node processes; the full suite runs them next to sixty other files, so
+   the default 5 s limit measures the machine's load, not the script. */
+describe('check-hooks', { timeout: 30_000 }, () => {
     it('passes when core.hooksPath resolves to this repo’s .husky/_', () => {
         repo = makeRepo();
-        mkdirSync(join(repo, '.husky/_'), { recursive: true });
-        execFileSync('git', ['config', 'core.hooksPath', '.husky/_'], {
-            cwd: repo,
-            env: CLEAN_ENV,
-            stdio: CAPTURE
-        });
+        installHooks(repo);
         expect(run(repo).code).toBe(0);
     });
 
@@ -71,12 +107,7 @@ describe('check-hooks', () => {
         /* The measured failure mode: an absolute path left over from a repo move — git skips
            every hook silently while .husky/_ still exists on disk. */
         repo = makeRepo();
-        mkdirSync(join(repo, '.husky/_'), { recursive: true });
-        execFileSync('git', ['config', 'core.hooksPath', '/tmp/nowhere/.husky/_'], {
-            cwd: repo,
-            env: CLEAN_ENV,
-            stdio: CAPTURE
-        });
+        installHooks(repo, { hooksPath: '/tmp/nowhere/.husky/_' });
         const verdict = run(repo);
         expect(verdict.code).toBe(1);
         expect(verdict.output).toContain('git config core.hooksPath .husky/_');
@@ -86,7 +117,7 @@ describe('check-hooks', () => {
         /* Unset means git runs .git/hooks — husky never installed; existence of the
            directory alone proved nothing, which is exactly the fail-open this closes. */
         repo = makeRepo();
-        mkdirSync(join(repo, '.husky/_'), { recursive: true });
+        installHooks(repo, { hooksPath: null });
         const verdict = run(repo);
         expect(verdict.code).toBe(1);
         expect(verdict.output).toContain('git config core.hooksPath .husky/_');
@@ -101,7 +132,103 @@ describe('check-hooks', () => {
 
     it('skips on CI, where hooks are not installed by design', () => {
         repo = makeRepo();
+        installHooks(repo, { without: HOOKS, hooksPath: null });
         expect(run(repo, { CI: 'true' }).code).toBe(0);
+    });
+
+    describe('a hook file git would not run', () => {
+        /* `core.hooksPath` is right in these cases, so the hook file is the only reason to refuse:
+           git runs a hook only from an executable file and skips any other silently. */
+        for (const name of HOOKS) {
+            it(`refuses when the hook file for ${name} is missing, naming only it`, () => {
+                repo = makeRepo();
+                installHooks(repo, { without: [name] });
+                const verdict = run(repo);
+                expect(verdict.code).toBe(1);
+                expect(verdict.output).toContain('Git hooks are not installed');
+                expect(verdict.output).toContain(name);
+                for (const other of HOOKS.filter((candidate) => candidate !== name)) {
+                    expect(verdict.output).not.toContain(other);
+                }
+                expect(verdict.output).toContain('npm run prepare');
+                expect(verdict.output).not.toContain('chmod');
+            });
+        }
+
+        it('refuses a folder holding helper files only, naming every hook', () => {
+            repo = makeRepo();
+            installHooks(repo, { without: HOOKS });
+            const verdict = run(repo);
+            expect(verdict.code).toBe(1);
+            expect(verdict.output).toContain('Git hooks are not installed');
+            for (const name of HOOKS) {
+                expect(verdict.output).toContain(name);
+            }
+            expect(verdict.output).toContain('npm run prepare');
+            expect(verdict.output).not.toContain('chmod');
+        });
+
+        it('refuses a hook file without the exec bit, with chmod and not npm run prepare', () => {
+            repo = makeRepo();
+            installHooks(repo, { stripped: ['commit-msg'] });
+            const verdict = run(repo);
+            expect(verdict.code).toBe(1);
+            expect(verdict.output).toContain('Git hooks are not executable: commit-msg.');
+            expect(verdict.output).not.toContain('pre-commit');
+            expect(verdict.output).not.toContain('pre-push');
+            expect(verdict.output).toContain('Fix: chmod +x .husky/_/*\n');
+            expect(verdict.output).not.toContain('npm run prepare');
+        });
+
+        it('gives both remedies in one run when one hook is missing and another not executable', () => {
+            repo = makeRepo();
+            installHooks(repo, { without: ['pre-push'], stripped: ['commit-msg'] });
+            const verdict = run(repo);
+            expect(verdict.code).toBe(1);
+            expect(verdict.output).toContain('Run once after cloning: npm run prepare');
+            expect(verdict.output).toContain('Fix: chmod +x .husky/_/*\n');
+        });
+
+        it('refuses a body with no hook file for every hook the installed husky wires', () => {
+            /* Pins HUSKY_HOOKS to the real installer: the wired names are the executable files it
+               writes under .husky/_ (its helper files carry no exec bit). HUSKY is emptied because
+               the CI workflows set HUSKY=0, which makes husky skip the install. */
+            repo = makeRepo();
+            execFileSync('node', [resolve(process.cwd(), 'node_modules/husky/bin.js')], {
+                cwd: repo,
+                env: { ...CLEAN_ENV, HUSKY: '' },
+                stdio: CAPTURE
+            });
+            const shims = join(repo, '.husky/_');
+            const wired = readdirSync(shims).filter(
+                (file) => statSync(join(shims, file)).mode & 0o100
+            );
+            expect(wired.length).toBeGreaterThan(0);
+            for (const name of wired) {
+                put(join(repo, '.husky', name), 'true\n', 0o644);
+                rmSync(join(shims, name));
+            }
+            const verdict = run(repo);
+            expect(verdict.code).toBe(1);
+            const line = verdict.output.match(/^Git hooks are not installed: .* for (.+)\.$/m);
+            expect(line?.[1].split(', ').sort()).toEqual([...wired].sort());
+        });
+
+        it('needs no shim for a file under .husky that is not a hook name', () => {
+            repo = makeRepo();
+            installHooks(repo);
+            put(join(repo, '.husky/common.sh'), 'true\n', 0o644);
+            expect(run(repo).code).toBe(0);
+        });
+
+        it('offers one remedy when core.hooksPath is unset and the hook files are missing', () => {
+            repo = makeRepo();
+            installHooks(repo, { without: HOOKS, hooksPath: null });
+            const verdict = run(repo);
+            expect(verdict.code).toBe(1);
+            expect(verdict.output).toContain('npm run prepare');
+            expect(verdict.output).not.toContain('git config core.hooksPath');
+        });
     });
 
     describe('an app that sits in a subfolder of its git repository', () => {
@@ -112,12 +239,7 @@ describe('check-hooks', () => {
         const subfolderApp = () => {
             repo = makeRepo();
             const app = join(repo, 'app');
-            mkdirSync(join(app, '.husky/_'), { recursive: true });
-            execFileSync('git', ['config', 'core.hooksPath', '.husky/_'], {
-                cwd: app,
-                env: CLEAN_ENV,
-                stdio: CAPTURE
-            });
+            installHooks(app);
             return app;
         };
 
@@ -155,12 +277,7 @@ describe('check-hooks', () => {
            repo's config and this check both lies and (in the write direction) mutates the wrong
            repo. The correctly configured cwd repo must pass even with a poisoned environment. */
         repo = makeRepo();
-        mkdirSync(join(repo, '.husky/_'), { recursive: true });
-        execFileSync('git', ['config', 'core.hooksPath', '.husky/_'], {
-            cwd: repo,
-            env: CLEAN_ENV,
-            stdio: CAPTURE
-        });
+        installHooks(repo);
         const otherRepo = makeRepo();
         try {
             const verdict = run(repo, {

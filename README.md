@@ -300,7 +300,8 @@ A push that changes no harness file also leaves out the harness tests listed und
 
 The hooks exist only after `npm run prepare` (lifecycle scripts are disabled via `.npmrc`). `check-hooks` is the first
 step of `verify:iter` and of `verify`: on a clone without hooks they stop with "Git hooks are not installed", so a push
-cannot go out with no gate and no output.
+cannot go out with no gate and no output. The check also reads the hook files: a hook with a body under `.husky/` and
+no executable file where git looks for it is refused by name.
 
 ### CI (GitHub Actions)
 
