@@ -55,7 +55,7 @@ AI-generated UI has recognizable tells. For any UI work reject the framework def
 - **Copy**: realistic strings via `t()` (see i18n above), never lorem-ipsum — placeholder copy hides real wrapping / overflow / length.
 - **Components**: shadcn/ui (new-york) primitives are the source of truth for variants — check `/dev/ui` (DevPlayground seed) for the sanctioned Button / Input states before inventing new ones.
 - **Dark mode**: verify both themes via the `.dark` class — don't tune light only.
-- **Baseline APIs only**: stick to "Widely available" CSS/JS (Container Queries, `:has()`, `<dialog>`, view-transitions, `scroll-snap`). Avoid "Newly available" (e.g. `scheduler.yield()`).
+- **Baseline APIs only**: stick to "Widely available" CSS/JS (Container Queries, `:has()`, `<dialog>`, `scroll-snap`). Avoid "Newly available" (e.g. view transitions, Widely from 2028-04-14) and "Limited availability" (e.g. `scheduler.yield()`: no Safari). A badge moves: check webstatus.dev before relying on one.
 
 ## Accessibility
 
