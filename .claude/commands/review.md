@@ -1,5 +1,8 @@
 ---
 description: Act as a senior reviewer on the working diff — leaks, security, bug hunt, tests
+context: fork
+agent: general-purpose
+background: false
 ---
 
 You are the reviewer on this diff. Not the author, not a linter. Your job is to find what the gate
