@@ -5,7 +5,7 @@
  * The iterate chain used to run oxlint only, which has no type information, so the findings that need
  * it (max-params, explicit-function-return-type, no-unnecessary-condition, dot-notation) surfaced first
  * at the commit hook. This leg lints what differs from HEAD, staged or not, plus untracked files, with
- * the same flags and the same cache as `npm run lint`, so the push finds those files warm. A deleted
+ * the same flags as `npm run lint` and the cache of `npm run fix` (the push lints uncached). A deleted
  * file is dropped (ESLint would fail on a path that is gone), and so is anything ESLint has no config
  * for. Paths ESLint ignores are skipped quietly (`--no-warn-ignored`): the warning it would print
  * otherwise counts under `--max-warnings 0`. With nothing to lint the leg ends before ESLint loads.
@@ -16,6 +16,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
+import { OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
 // The extensions ESLint lints in this repository (the default patterns plus the TypeScript and JSX ones).
@@ -32,6 +33,7 @@ const git = (cwd, args) =>
         cwd,
         env: gitEnv(),
         encoding: 'utf8',
+        maxBuffer: OUTPUT_LIMIT_BYTES,
         stdio: ['ignore', 'pipe', 'pipe']
     });
 

@@ -26,6 +26,8 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { OUTPUT_LIMIT_BYTES } from './child-output.mjs';
+
 /** How long a group gets to leave after SIGTERM before it is killed, and how often it is looked at. */
 export const TERM_GRACE_MS = 3000;
 export const POLL_MS = 100;
@@ -110,7 +112,8 @@ export const readProcess = (pid, run = spawnSync) => {
     const column = (name) => {
         const result = run('ps', ['-ww', '-o', `${name}=`, '-p', String(pid)], {
             encoding: 'utf8',
-            env: { ...process.env, LC_ALL: 'C' }
+            env: { ...process.env, LC_ALL: 'C' },
+            maxBuffer: OUTPUT_LIMIT_BYTES
         });
         return result.status === 0 && typeof result.stdout === 'string' ? result.stdout.trim() : '';
     };

@@ -17,7 +17,10 @@
  * trigger table's first row (see .cursor/brain/VERIFICATION.md).
  *
  * GATE_PHASE=full|0 overrides per run. Template maintainers push gate machinery with
- * GATE_PHASE=full: changes to the gate itself are exactly what the full chain exists to prove.
+ * GATE_PHASE=full: changes to the gate itself are exactly what the full chain exists to prove. It
+ * runs every stage and nothing more: Prettier still reads `.prettiercache`, and the
+ * harness self-tests stay left out when no harness file changed (that is
+ * GATE_SELF_TESTS's decision). `describeOverride` prints that on every full override.
  *
  * A missing or unreadable phase resolves to FULL: the dispatcher fails toward the heavier gate,
  * never toward silence.
@@ -200,6 +203,22 @@ export const describeSelfTests = ({ leaveOut, reason }, count) =>
         ? `── push gate: ${String(count)} harness self-tests left out (this push changes no harness file; CI runs them; ${OVERRIDE_VARIABLE}=all git push runs them here) ──`
         : `── push gate: all harness self-tests run (${reason}) ──`;
 
+/** The two lines phase 0 ends with: the trigger and the one-off run. */
+export const PHASE_0_FOOTER = [
+    '   First deploy = the trigger: set "phase": 1 in scripts/gate-tiers.json',
+    '   (its own commit). One-off run of every stage (the Prettier cache still applies): GATE_PHASE=full git push'
+];
+
+/**
+ * The one line every full GATE_PHASE (`full` or `1`) prints, so the override is not read as a clean
+ * run: every stage runs, the Prettier cache still applies, and the run that skips nothing is named. Undefined
+ * when no full override is set.
+ */
+export const describeOverride = (override) =>
+    override === 'full' || override === '1'
+        ? `── push gate: GATE_PHASE=${override} runs every stage; Prettier still reads .prettiercache; the run that skips nothing: rm -f .prettiercache && GATE_PHASE=full GATE_SELF_TESTS=all git push (CI starts without it) ──`
+        : undefined;
+
 const main = () => {
     const plan = resolvePushPlan({
         phase: readConfiguredPhase(process.cwd()),
@@ -228,9 +247,11 @@ const main = () => {
         for (const stage of plan.skipped ?? []) {
             console.log(`   - ${stage}: skipped at phase 0 (until the first deploy)`);
         }
-        console.log('   First deploy = the trigger: set "phase": 1 in scripts/gate-tiers.json');
-        console.log('   (its own commit). One-off full run: GATE_PHASE=full git push');
+        for (const line of PHASE_0_FOOTER) console.log(line);
     }
+
+    const overrideLine = describeOverride(process.env.GATE_PHASE);
+    if (overrideLine !== undefined) console.log(overrideLine);
 
     console.log(describeSelfTests(decision, listed.length));
     // Only this decision sets the signal: one exported by hand never reaches the unit step.

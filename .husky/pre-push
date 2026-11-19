@@ -17,7 +17,9 @@ fi
 # listed under selfTests in scripts/gate-tiers.json and prints that; CI runs them.
 # Pushing implies network, so the network-bound checks run in both phases.
 # The stages of each chain are listed in scripts/gate-tiers.json (checks.<name>.chain).
-# GATE_PHASE=full forces the full chain for one run; GATE_SELF_TESTS=all runs the listed tests too.
+# GATE_PHASE=full runs every stage for one push; Prettier still reads .prettiercache, and the
+# listed tests stay left out unless GATE_SELF_TESTS=all. The run that skips nothing:
+# rm -f .prettiercache && GATE_PHASE=full GATE_SELF_TESTS=all git push
 echo "→ verify:push (phase-aware gate — see scripts/gate-tiers.json)"
 npm run verify:push || {
     echo "❌ verify:push failed. Fix before push."

@@ -292,11 +292,10 @@ describe('against a real git repository', { timeout: 30_000 }, () => {
             // The copy resolves `eslint` from its own location, so it gets this repository's modules.
             symlinkSync(path.resolve('node_modules'), path.join(folder, 'node_modules'));
             copyFileSync(SCRIPT, path.join(folder, 'lint-changed.mjs'));
-            // ...and imports the entry guard from beside itself.
-            copyFileSync(
-                path.join(path.dirname(SCRIPT), 'is-entry-point.mjs'),
-                path.join(folder, 'is-entry-point.mjs')
-            );
+            // ...and imports the entry guard and the capture limit from beside itself.
+            for (const name of ['is-entry-point.mjs', 'child-output.mjs']) {
+                copyFileSync(path.join(path.dirname(SCRIPT), name), path.join(folder, name));
+            }
 
             const result = runScript(root, path.join(folder, 'lint-changed.mjs'));
 
