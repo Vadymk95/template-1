@@ -256,7 +256,7 @@ VITE_ENABLE_MSW=false
 | `npm run audit:gate`               | Fail-closed dependency audit with a self-expiring allowlist                                |
 | `npm run lock:age`                 | Fails a lockfile version younger than `min-release-age` unless allowed (reason + expiry)   |
 | `npm run gate:integrity`           | Lists gate files and suppressions this branch changes vs the default branch (CI: PR base)  |
-| `npm run bench:verify`             | The gate step by step with timings                                                         |
+| `npm run bench:verify`             | Timings per gate step; `-- --run <script>` runs a script's steps as the push does          |
 | `npm run test:mutation`            | StrykerJS mutation score (test strength) — weekly CI job                                   |
 | `npm run test:mutation:changed`    | Surviving mutants on the lines this change touched (informational; `-- --pick` lists them) |
 | `npm run size:check`               | Per-chunk brotli budgets from `.size-limit.json`                                           |

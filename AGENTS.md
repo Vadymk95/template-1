@@ -43,7 +43,7 @@ npm run verify:ci          # the CI gate; what the push runs from phase 1 (alias
 npm run verify:full        # predicts the whole CI pipeline, the dev-smoke job included; before a PR touching a shared UI primitive, the shell or index.css
 npm run smoke:dev          # the content-stress fixture alone, against `vite dev`
 npm run test:e2e:prod      # Playwright against `vite preview` (same mode as the gate)
-npm run bench:verify       # the gate step by step with timings
+npm run bench:verify       # the gate step by step with timings; `-- --run <script>` runs a script's steps as the push does
 npm run trace:report       # findings from .gate-trace.log
 npm run docs:check         # docs drift (paths against the files git lists, line pointers, scripts, versions, command table, dead docs, the DECISIONS shape, the gate chain view, its strict flags and any retelling or composition of it); inside verify, weekly CI adds --weekly
 npm run test:mutation      # StrykerJS strength gate: weekly mutation.yml, NOT in verify
@@ -91,7 +91,9 @@ variants, a production build or a browser suite by hand: the full chain belongs 
 result an agent cannot act on is not worth its minutes. A review round gets the diff plus `verify:iter`;
 acceptance does not re-run the gate, the push does. Parallel lanes never run heavy stages (one machine,
 shared caches): heavy work serialises at the push. Individual scripts (`typecheck`, `test`, `fix`)
-are drill-downs on a specific failure; none of them is a moment.
+are drill-downs on a specific failure; none of them is a moment. Every test command an agent runs names a worker cap (`--maxWorkers`, `--workers` or
+`--test-concurrency`), and a lane starts nothing heavy while the 1-minute load average is at or above the core
+count (`sysctl -n hw.ncpu` or `nproc`).
 
 **A red push costs one fix, not another round of the whole gate.** Where the repo has a browser suite, it
 stops after a capped number of failures on the gate run and in CI (`maxFailures`) instead of running every
@@ -120,7 +122,7 @@ hand-written second list has already drifted once.
 **Every gate run is traced** to `.gate-trace.log`; `trace:report` turns the log into findings (forbidden
 moments, blown budgets, gate runs from a worktree). After a push, gate output in the terminal is part of
 the contract: **silence is a failure, not a pass** - a push that printed no gate ran no gate, whatever the
-exit code says.
+exit code says. A line that starts with `ACT` asks a person to act; the push prints it on every run until that is done.
 
 **Ports.** A busy port means MOVE, never kill a server you did not start. A script that goes through the
 free-port wrapper takes the next free port; a script that pins its port (a strictPort flag, or a fixed

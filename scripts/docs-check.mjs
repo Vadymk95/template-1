@@ -1731,7 +1731,7 @@ export const budgetReport = ({
         return {
             kind: 'warn',
             baselineMs,
-            message: `budget: "${label}" p90 is ${seconds}s in phase ${phase} over ${scope}, ${(p90 / baselineMs).toFixed(2)}x this machine's ${(baselineMs / 1000).toFixed(1)}s baseline and past the ${String(driftRatio)}x line — find what grew, or delete .gate-budget.json to accept this as the new normal`
+            message: `ACT budget: "${label}" p90 is ${seconds}s in phase ${phase} over ${scope}, ${(p90 / baselineMs).toFixed(2)}x this machine's ${(baselineMs / 1000).toFixed(1)}s baseline and past the ${String(driftRatio)}x line — find what grew, or delete .gate-budget.json to accept this as the new normal`
         };
     }
 
@@ -2593,7 +2593,8 @@ const main = () => {
     const { findings, budget, notes, skipped } = run({ root, today });
 
     console.log(`docs:check${weekly ? ' (weekly)' : ''}`);
-    console.log(`  ${budget.message}`);
+    // A line that asks a person to act starts at the margin, so a scan for `ACT` finds it.
+    console.log(budget.message.startsWith('ACT ') ? budget.message : `  ${budget.message}`);
     for (const note of notes) console.log(`  ${note}`);
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {

@@ -224,6 +224,21 @@ describe('verify-push CLI (fixture package)', { timeout: 20_000 }, () => {
         expect(runDispatcher(dir).code).toBe(4);
     });
 
+    it('phase 1: a red push names the step that failed and how many it did not run', () => {
+        const dir = makeFixturePackage({
+            phase: 1,
+            extraScripts: { 'verify:ci': 'node -p 1 && node missing.mjs && node -p 2' }
+        });
+        cleanupDirs.push(dir);
+        const verdict = runDispatcher(dir);
+
+        expect(verdict.code).toBe(1);
+        expect(verdict.output).toContain('→ step 2/3 verify:ci#2: node missing.mjs');
+        expect(verdict.output).toMatch(
+            /✖ verify:ci: step verify:ci#2 failed \(exit 1\) after \d+\.\d s; 1 later steps not run/
+        );
+    });
+
     it('GATE_PHASE=full on a phase-0 package runs the full chain', () => {
         const dir = makeFixturePackage({ phase: 0, ciExit: 5 });
         cleanupDirs.push(dir);

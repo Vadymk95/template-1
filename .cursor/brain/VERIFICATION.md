@@ -40,6 +40,9 @@ at a load of 3.5 (79 files), 26-34 s through the whole chain at a load of 10 to 
 stays 15 s (`scripts/gate-tiers.json`): a cold first run, a spike or a dirty config can pass it on a loaded machine,
 and `trace:report` lists that as a finding.
 
+The coverage step prints the four totals (the `text-summary` reporter), not a row per file; a missed threshold is still
+named. The per-file table, on demand: `npx --no-install vitest run --coverage --coverage.reporter=text <test file>`.
+
 ## The tracer — how it works (the RULES it enforces are the tier law)
 
 Every `verify*` and `test:e2e` run appends one TSV row to `.gate-trace.log` (gitignored);
@@ -47,6 +50,10 @@ Every `verify*` and `test:e2e` run appends one TSV row to `.gate-trace.log` (git
 moment's budget, a code check against a docs-only change, a push from a linked worktree. Moments,
 budgets and classes are DATA in `scripts/gate-tiers.json`; the analyser names no stage, so the
 discipline changes by editing that JSON.
+
+The push runs its steps through the runner in `scripts/bench-verify.mjs`: wrappers and `npm run` hops are followed, so
+a push writes one row, `verify:push`. It prints one line per step and a verdict naming the step that failed.
+`npm run bench:verify -- --run <script>` runs any script's steps the same way.
 
 ## Ports — the mechanics
 
