@@ -18,13 +18,15 @@
  * Usage: node scripts/gate-trace.mjs <label> -- <command> [args...]
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
 export const LOG_FILE_NAME = '.gate-trace.log';
+export const STEP_FILE_VARIABLE = 'GATE_TRACE_STEP_FILE';
 
 /**
  * When this script runs inside a hook invocation (this repo's own pre-push, or a nested
@@ -136,7 +138,35 @@ export const gatherRunContext = (cwd, exec = gitOutput) => {
     }
 };
 
-export const formatLogLine = ({ timestamp, label, durationMs, exitCode, context }) =>
+/** HEAD when the run starts: the commit a log line is about; empty when git cannot say. */
+export const readHead = (cwd, exec = gitOutput) => {
+    try {
+        return exec(cwd, ['rev-parse', 'HEAD']);
+    } catch {
+        return '';
+    }
+};
+
+/** What a runner wrote to the step file, then the file is gone; empty when it wrote nothing. */
+const takeStepFile = (stepDir) => {
+    try {
+        return readFileSync(path.join(stepDir, 'step'), 'utf8').trim();
+    } catch {
+        return '';
+    } finally {
+        rmSync(stepDir, { recursive: true, force: true });
+    }
+};
+
+export const formatLogLine = ({
+    timestamp,
+    label,
+    durationMs,
+    exitCode,
+    context,
+    head = '',
+    failedStep = ''
+}) =>
     [
         timestamp,
         label,
@@ -146,7 +176,9 @@ export const formatLogLine = ({ timestamp, label, durationMs, exitCode, context 
         context.toplevel,
         context.worktreeKind,
         context.changeClass,
-        context.phase ?? ''
+        context.phase ?? '',
+        head,
+        failedStep
     ].join('\t');
 
 /**
@@ -178,6 +210,7 @@ const main = () => {
     const { label, command, commandArgs } = parsed;
     const cwd = process.cwd();
     const timestamp = new Date().toISOString();
+    const head = readHead(cwd);
     const start = performance.now();
 
     const plan = buildSpawnPlan({
@@ -186,17 +219,33 @@ const main = () => {
         command,
         commandArgs
     });
-    const result = spawnSync(plan.command, plan.args, {
-        stdio: 'inherit',
-        shell: false,
-        env: withoutGitEnv(process.env)
-    });
+    // The traced command may name the step it failed at in this file (scripts/bench-verify.mjs).
+    const env = withoutGitEnv(process.env);
+    delete env[STEP_FILE_VARIABLE];
+    let stepDir;
+    try {
+        stepDir = mkdtempSync(path.join(tmpdir(), 'gate-trace-'));
+        env[STEP_FILE_VARIABLE] = path.join(stepDir, 'step');
+    } catch {
+        stepDir = undefined;
+    }
+    const result = spawnSync(plan.command, plan.args, { stdio: 'inherit', shell: false, env });
     const durationMs = Math.round(performance.now() - start);
     const exitCode = result.status;
 
     try {
+        const stepNamed = stepDir === undefined ? '' : takeStepFile(stepDir);
+        const failedStep = exitCode === 0 ? '' : stepNamed;
         const context = gatherRunContext(cwd);
-        const line = formatLogLine({ timestamp, label, durationMs, exitCode, context });
+        const line = formatLogLine({
+            timestamp,
+            label,
+            durationMs,
+            exitCode,
+            context,
+            head,
+            failedStep
+        });
         appendFileSync(resolveLogPath(cwd), `${line}\n`, 'utf8');
     } catch {
         // Instrumentation must never fail a build: a log line that cannot be written is skipped,

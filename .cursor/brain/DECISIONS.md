@@ -8,6 +8,7 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 
 | Entry                                                              | Date    | Status         |
 | ------------------------------------------------------------------ | ------- | -------------- |
+| A trace row names its commit and the red step | 2026-11 | in force       |
 | The push runs its steps through one runner that names the red one | 2026-11 | in force       |
 | A log keeps four coverage totals and a command's first and last lines | 2026-11 | in force       |
 | A script reads a child's whole output and a full phase says its caches | 2026-11 | in force   |
@@ -63,6 +64,19 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 | Component pattern: arrow function plus `FunctionComponent`         | 2026-04 | in force       |
 | Build stack: Tailwind v4, Vite 8 with Rolldown, `plugin-react` v6  | 2026-03 | in force       |
 | No FSD; Zustand for client state, TanStack Query for server state  | 2026-03 | in force       |
+
+## [2026-11] A trace row names its commit and the red step
+
+**Status:** in force. **Evidence:** `scripts/gate-trace.mjs`, `scripts/trace-report.mjs`, `scripts/docs-check.mjs` and their tests.
+
+**Context:** a red push left a row with an exit code and nothing else: the step that failed and the commit that was
+pushed had to be dug out of the terminal.
+
+**Decision:** a row has two more columns, `head` (the full sha of HEAD when the run started, empty when git cannot
+say) and `failedStep` (the label the runner writes to the file named by `GATE_TRACE_STEP_FILE`). `gate-trace.mjs`
+gives each traced command a fresh temp folder for that file, reads it after the command exits and removes it; the
+column is empty on a pass or when nothing was written, and the exit code is the command's own either way.
+`trace:report` and `docs:check` read 8, 9 and 11 fields, so an old log still parses.
 
 ## [2026-11] The push runs its steps through one runner that names the red one
 

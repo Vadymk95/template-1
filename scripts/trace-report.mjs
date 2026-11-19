@@ -27,27 +27,18 @@ import { resolveLogPath } from './gate-trace.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
 const EXIT_CODE_PATTERN = /^-?\d+$/;
-const LOG_FIELD_NAMES = [
-    'timestamp',
-    'label',
-    'durationMs',
-    'exitCode',
-    'branch',
-    'toplevel',
-    'worktreeKind',
-    'changeClass',
-    'phase'
-];
-const LEGACY_FIELD_COUNT = LOG_FIELD_NAMES.length - 1;
+// Columns: timestamp, label, durationMs, exitCode, branch, toplevel, worktreeKind, changeClass, phase,
+// head, failedStep. A log holds three shapes: 8 fields (before the phase), 9 (before head and failedStep), 11.
+const FIELD_COUNTS = [8, 9, 11];
 
 export const parseLogLine = (line, lineNumber) => {
     const fields = line.split('\t');
-    if (fields.length !== LOG_FIELD_NAMES.length && fields.length !== LEGACY_FIELD_COUNT) {
+    if (!FIELD_COUNTS.includes(fields.length)) {
         return {
             malformed: true,
             lineNumber,
             raw: line,
-            reason: `expected ${LEGACY_FIELD_COUNT} or ${LOG_FIELD_NAMES.length} tab-separated fields, got ${fields.length}`
+            reason: `expected 8, 9 or 11 tab-separated fields, got ${fields.length}`
         };
     }
 
@@ -59,7 +50,10 @@ export const parseLogLine = (line, lineNumber) => {
         branch,
         toplevel,
         worktreeKind,
-        changeClass
+        changeClass,
+        phase = '',
+        head = '',
+        failedStep = ''
     ] = fields;
     const timestampMs = Date.parse(timestamp);
     const durationMs = Number(durationMsRaw);
@@ -80,6 +74,9 @@ export const parseLogLine = (line, lineNumber) => {
         toplevel,
         worktreeKind,
         changeClass,
+        phase,
+        head,
+        failedStep,
         startMs: timestampMs,
         endMs:
             Number.isFinite(timestampMs) && Number.isFinite(durationMs)
