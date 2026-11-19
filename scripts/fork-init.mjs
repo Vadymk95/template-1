@@ -44,6 +44,7 @@ import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'n
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
 export const ORIGIN_FILE = '.template-origin.json';
@@ -72,7 +73,13 @@ const escapeHtml = (text) =>
 const literal = (text) => new RegExp(escapeRegExp(text), 'g');
 
 const git = (root, ...args) =>
-    execFileSync('git', args, { cwd: root, encoding: 'utf8', env: GIT_FREE_ENV, stdio: CAPTURE });
+    execFileSync('git', args, {
+        cwd: root,
+        encoding: 'utf8',
+        env: GIT_FREE_ENV,
+        maxBuffer: OUTPUT_LIMIT_BYTES,
+        stdio: CAPTURE
+    });
 
 export const parseOptions = (argv) => {
     let values;
@@ -460,6 +467,7 @@ const runDocsCheck = (root) => {
             cwd: root,
             encoding: 'utf8',
             env: GIT_FREE_ENV,
+            maxBuffer: OUTPUT_LIMIT_BYTES,
             stdio: CAPTURE
         });
         return { ok: true, text: 'docs:check: green' };

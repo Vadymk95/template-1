@@ -18,6 +18,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
+import { OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
 const INSTALL_LOCATION_PATTERN = /^\s*Install location:\s*(.+?)\s*$/gm;
@@ -82,7 +83,8 @@ const ensure = (browser) => {
             'npx',
             ['--no-install', 'playwright', 'install', browser, '--dry-run'],
             {
-                encoding: 'utf8'
+                encoding: 'utf8',
+                maxBuffer: OUTPUT_LIMIT_BYTES
             }
         );
     } catch {

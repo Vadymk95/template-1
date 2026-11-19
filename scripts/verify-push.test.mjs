@@ -5,7 +5,13 @@ import { join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readConfiguredPhase, resolvePushPlan, skippedStages } from './verify-push.mjs';
+import {
+    describeOverride,
+    PHASE_0_FOOTER,
+    readConfiguredPhase,
+    resolvePushPlan,
+    skippedStages
+} from './verify-push.mjs';
 
 const SCRIPT = resolve(process.cwd(), 'scripts/verify-push.mjs');
 
@@ -223,6 +229,41 @@ describe('verify-push CLI (fixture package)', { timeout: 20_000 }, () => {
         cleanupDirs.push(dir);
         expect(runDispatcher(dir, { GATE_PHASE: 'full' }).code).toBe(5);
     });
+});
+
+describe('what a full GATE_PHASE says it does', () => {
+    const BANNER =
+        '── push gate: GATE_PHASE=full runs every stage; Prettier still reads .prettiercache; the run that skips nothing: rm -f .prettiercache && GATE_PHASE=full GATE_SELF_TESTS=all git push (CI starts without it) ──';
+
+    it('describeOverride gives the exact line for full and for 1, and nothing for anything else', () => {
+        expect(describeOverride('full')).toBe(BANNER);
+        expect(describeOverride('1')).toBe(
+            BANNER.replace('GATE_PHASE=full runs', 'GATE_PHASE=1 runs')
+        );
+        for (const other of [undefined, '', '0', 'scaffold']) {
+            expect(describeOverride(other)).toBeUndefined();
+        }
+    });
+
+    it('the phase-0 footer says every stage runs and the caches still apply', () => {
+        expect(PHASE_0_FOOTER).toEqual([
+            '   First deploy = the trigger: set "phase": 1 in scripts/gate-tiers.json',
+            '   (its own commit). One-off run of every stage (the Prettier cache still applies): GATE_PHASE=full git push'
+        ]);
+    });
+
+    it(
+        'a push prints the line under GATE_PHASE=full and prints none without it',
+        { timeout: 20_000 },
+        () => {
+            const dir = makeFixturePackage({ phase: 0 });
+            cleanupDirs.push(dir);
+
+            expect(runDispatcher(dir, { GATE_PHASE: 'full' }).output).toContain(BANNER);
+            expect(runDispatcher(dir).output).not.toContain('the run that skips nothing');
+            expect(runDispatcher(dir).output).toContain(PHASE_0_FOOTER[1]);
+        }
+    );
 });
 
 describe('skippedStages (derived from the two chains)', () => {

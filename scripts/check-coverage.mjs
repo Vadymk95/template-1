@@ -25,6 +25,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 import { isCi } from './check-test-siblings.mjs';
+import { describeOutputOverflow, OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
 export const SELF_TESTS_FLAG = 'GATE_LEAVE_OUT_SELF_TESTS';
@@ -78,17 +79,32 @@ const main = () => {
     const args = coverageArguments({ env: process.env, cwd: process.cwd() });
     const notice = leftOutNotice(args);
     if (notice !== undefined) console.log(notice);
-    const result = spawnSync('npx', args, { encoding: 'utf8', shell: false });
+    const result = spawnSync('npx', args, {
+        encoding: 'utf8',
+        shell: false,
+        maxBuffer: OUTPUT_LIMIT_BYTES
+    });
 
     // Captured rather than inherited, because the guard has to READ the output. Echo it back first so
     // the run looks the same as before.
     process.stdout.write(result.stdout ?? '');
     process.stderr.write(result.stderr ?? '');
 
+    // Before the status: a run stopped by the capture limit has `status === null` and must not read as
+    // an ordinary failure. `exitCode` and a return, never `process.exit`: that cuts a large write to a
+    // pipe short (65,536 bytes of 1 MiB on macOS).
+    const overflow = describeOutputOverflow('check-coverage', result.error);
+    if (overflow !== undefined) {
+        console.error(overflow);
+        process.exitCode = 1;
+        return;
+    }
+
     // Verdict BEFORE any normalisation: `status === null` means the child died on a signal (an
     // out-of-memory kill on a large suite is the realistic cause), and that must never read as a pass.
     if (result.status !== 0) {
-        process.exit(result.status ?? 1);
+        process.exitCode = result.status ?? 1;
+        return;
     }
 
     const dropouts = findCoverageDropouts(`${result.stdout ?? ''}\n${result.stderr ?? ''}`);
@@ -103,7 +119,7 @@ const main = () => {
         console.error(
             '\nThe percentage above describes a SMALLER set of files than the coverage scope, and vitest exits 0 on its own.\n'
         );
-        process.exit(1);
+        process.exitCode = 1;
     }
 };
 

@@ -26,6 +26,8 @@ import { execFileSync } from 'node:child_process';
 import { accessSync, constants, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { OUTPUT_LIMIT_BYTES } from './child-output.mjs';
+
 // The hook names the installed husky writes a shim for (node_modules/husky/index.js). A husky
 // upgrade means reading that list again.
 const HUSKY_HOOKS = [
@@ -58,6 +60,7 @@ try {
     prefix = execFileSync('git', ['rev-parse', '--show-prefix'], {
         encoding: 'utf8',
         env: gitEnv,
+        maxBuffer: OUTPUT_LIMIT_BYTES,
         stdio: ['ignore', 'pipe', 'pipe']
     }).trim();
 } catch {
@@ -123,7 +126,8 @@ let hooksPath;
 try {
     hooksPath = execFileSync('git', ['config', 'core.hooksPath'], {
         encoding: 'utf8',
-        env: gitEnv
+        env: gitEnv,
+        maxBuffer: OUTPUT_LIMIT_BYTES
     }).trim();
 } catch {
     hooksPath = '';

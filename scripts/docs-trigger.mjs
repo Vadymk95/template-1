@@ -15,6 +15,7 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 
+import { OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 import { changedFiles } from './lint-changed.mjs';
 
@@ -35,6 +36,7 @@ const stagedFiles = (cwd) =>
             Object.entries(process.env).filter(([key]) => !GIT_LOCATION_VARIABLES.includes(key))
         ),
         encoding: 'utf8',
+        maxBuffer: OUTPUT_LIMIT_BYTES,
         stdio: ['ignore', 'pipe', 'pipe']
     })
         .split('\0')

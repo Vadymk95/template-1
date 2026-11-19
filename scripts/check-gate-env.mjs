@@ -17,6 +17,7 @@
 import { spawnSync } from 'node:child_process';
 import { connect, createServer } from 'node:net';
 
+import { OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
 /* The preview port the gate's Playwright run binds (playwright.config.ts). GATE_PREFLIGHT_PORT is a
@@ -44,7 +45,8 @@ const sleep = (ms) =>
  */
 const listeningPids = (port) => {
     const result = spawnSync('lsof', ['-ti', `tcp:${String(port)}`, '-sTCP:LISTEN'], {
-        encoding: 'utf8'
+        encoding: 'utf8',
+        maxBuffer: OUTPUT_LIMIT_BYTES
     });
     if (result.error) {
         return { pids: [], lookupError: result.error };

@@ -16,7 +16,7 @@
         "size:check": "size-limit",
         "typecheck": "tsc -b",
         "typecheck:force": "tsc -b --force",
-        "lint": "eslint . --max-warnings 0 --cache --cache-location .eslintcache",
+        "lint": "eslint . --max-warnings 0",
         "lint:oxlint": "oxlint --config .oxlintrc.json --deny-warnings .",
         "fix": "oxlint --config .oxlintrc.json --fix . && eslint . --fix --cache --cache-location .eslintcache && prettier --write .",
         "format": "prettier --write . --cache --cache-location .prettiercache",

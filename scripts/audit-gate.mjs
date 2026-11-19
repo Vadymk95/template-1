@@ -11,6 +11,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+import { describeOutputOverflow, OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
 const BLOCKING_SEVERITIES = new Set(['high', 'critical']);
@@ -158,8 +159,14 @@ export const evaluateAudit = (audit, allowlist, now) => {
 const loadAudit = () => {
     const result = spawnSync('npm', ['audit', '--json'], {
         encoding: 'utf8',
-        shell: false
+        shell: false,
+        maxBuffer: OUTPUT_LIMIT_BYTES
     });
+    const overflow = describeOutputOverflow('audit-gate', result.error);
+    if (overflow !== undefined) {
+        console.error(overflow);
+        return { audit: null, completed: false };
+    }
 
     try {
         const audit = JSON.parse(result.stdout);

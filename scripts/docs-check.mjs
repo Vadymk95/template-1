@@ -102,6 +102,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
 export const DOC_FILES = [
@@ -2398,6 +2399,7 @@ const trackedFiles = (root) => {
         return execFileSync('git', ['ls-files'], {
             cwd: root,
             encoding: 'utf8',
+            maxBuffer: OUTPUT_LIMIT_BYTES,
             stdio: ['ignore', 'pipe', 'pipe']
         })
             .split('\n')
