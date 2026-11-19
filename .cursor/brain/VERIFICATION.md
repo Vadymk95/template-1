@@ -58,6 +58,9 @@ a push writes one row, `verify:push`. It prints one line per step and a verdict 
 A row holds eleven tab-separated fields: time, label, duration in ms, exit code, branch, toplevel, worktree kind, change
 class, phase, then `head` (the full sha of HEAD when the run started) and `failedStep` (the step the runner named when
 the run went red; empty on a pass).
+`trace:report` ends with the push ledger, the last 20 pushes with time, verdict, failed step, duration and head; a row
+from before a column shows `-` there. Every traced label belongs to a moment in `scripts/gate-tiers.json`: `docs:check`
+fails on one that does not.
 
 ## Ports — the mechanics
 

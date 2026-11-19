@@ -141,6 +141,42 @@ const describeActor = (row) => {
 
 const seconds = (ms) => (ms / 1000).toFixed(1);
 
+const LEDGER_PUSHES = 20;
+
+/**
+ * The last pushes in the log, one line each: when, how it ended, the step that went red, how long,
+ * and the commit. A push is a run under the label the push moment expects; a hand-run of another
+ * gate script is not one. A row from before a column existed shows `-` there. No push, no lines.
+ */
+export const formatPushLedger = (rows, tiers, limit = LEDGER_PUSHES) => {
+    const labels = tiers.moments?.push?.expected ?? [];
+    const pushes = rows.filter((row) => !row.malformed && labels.includes(row.label));
+    if (pushes.length === 0) {
+        return [];
+    }
+    const verdict = ({ exitCodeValid, exitCode }) =>
+        !exitCodeValid ? 'unknown' : exitCode === 0 ? 'pass' : `red (exit ${exitCode})`;
+    const table = [
+        ['time', 'verdict', 'failed step', 'duration', 'head'],
+        ...pushes
+            .slice(-limit)
+            .map((row) => [
+                row.timestamp,
+                verdict(row),
+                row.failedStep || '-',
+                `${seconds(row.durationMs)}s`,
+                row.head.slice(0, 7) || '-'
+            ])
+    ];
+    const widths = table[0].map((_, at) => Math.max(...table.map((cells) => cells[at].length)));
+    return [
+        `Push ledger (${labels.join(', ')}): last ${table.length - 1} of ${pushes.length}`,
+        ...table.map((cells) =>
+            `  ${cells.map((cell, at) => cell.padEnd(widths[at])).join('  ')}`.trimEnd()
+        )
+    ];
+};
+
 export const computeFindings = (rows, tiers) => {
     const findings = [];
 
@@ -246,8 +282,14 @@ const main = () => {
     const rows = parseLog(content);
     const findings = computeFindings(rows, tiers);
 
+    const ledger = formatPushLedger(rows, tiers);
+
     if (findings.length === 0) {
         console.log(`Gate trace: ${rows.length} run(s) recorded, no findings.`);
+        if (ledger.length > 0) {
+            console.log('');
+        }
+        ledger.forEach((line) => console.log(line));
         return;
     }
 
@@ -266,6 +308,7 @@ const main = () => {
         }
         console.log('');
     }
+    ledger.forEach((line) => console.log(line));
 };
 
 if (isEntryPoint(import.meta.url)) {
