@@ -27,6 +27,7 @@ import {
     checkGateChains,
     checkGateFlags,
     checkMemoryImports,
+    checkMomentLabels,
     checkQuarantine,
     checkPathsAndScripts,
     checkPullRequestReadPermission,
@@ -4977,6 +4978,97 @@ describe('run: the gate chain', () => {
             expect(findings).toEqual([
                 'scripts/gate-tiers.json:2: retells the gate chain — point at scripts/gate-tiers.json instead'
             ]);
+        });
+    });
+});
+
+describe('checkMomentLabels', () => {
+    const moments = {
+        iterate: { expected: ['verify:iter'], forbidden: ['verify'] },
+        push: { expected: ['verify:push'], forbidden: [] }
+    };
+    const traced = (label) => `node scripts/gate-trace.mjs ${label} -- npm run ${label}:inner`;
+    const scripts = { 'verify:iter': traced('verify:iter'), verify: traced('verify') };
+    const unlisted = (label, where) =>
+        `scripts/gate-tiers.json: no moment lists "${label}", traced by ${where} — add it to the expected or forbidden list of the moment it belongs to`;
+    const check = (extra = {}, hooks = []) =>
+        checkMomentLabels({ moments, scripts: { ...scripts, ...extra }, hooks });
+
+    it('passes when every traced label is an expected or a forbidden label of a moment', () => {
+        expect(check({ 'verify:push': traced('verify:push'), build: 'vite build' })).toEqual([]);
+    });
+
+    it('names a traced label no moment lists, and the script that traces it', () => {
+        expect(check({ 'verify:push': traced('verify:pushed') })).toEqual([
+            unlisted('verify:pushed', 'package.json § scripts.verify:push')
+        ]);
+        expect(check({ late: `npm run lint && ${traced('verify:late')}` })).toEqual([
+            unlisted('verify:late', 'package.json § scripts.late')
+        ]);
+    });
+
+    it('reads the label a hook traces behind an env prefix, and skips its comments', () => {
+        const hook = [
+            '# GATE_PUSH=1 node scripts/gate-trace.mjs in-a-comment -- npm run x',
+            'if ! GATE_PUSH=1 node scripts/gate-trace.mjs verify:ci -- node scripts/bench-verify.mjs; then'
+        ].join('\n');
+        expect(check({}, [['.husky/pre-push', hook]])).toEqual([
+            unlisted('verify:ci', '.husky/pre-push')
+        ]);
+        expect(check({}, [['.husky/pre-push', hook.replace('verify:ci', 'verify:push')]])).toEqual(
+            []
+        );
+    });
+});
+
+describe('run: the moments map', () => {
+    const tree = (moments, label = 'verify:push') => ({
+        'scripts/gate-tiers.json': JSON.stringify(moments === undefined ? {} : { moments }),
+        'package.json': JSON.stringify({
+            scripts: { 'verify:push': `node scripts/gate-trace.mjs ${label} -- node a.mjs` }
+        }),
+        'package-lock.json': '{"packages":{}}',
+        'AGENTS.md': '`verify:push`\n',
+        'README.md': '# Readme\n'
+    });
+    const moments = { push: { expected: ['verify:push'], forbidden: [] } };
+    const finding = (label) =>
+        `scripts/gate-tiers.json: no moment lists "${label}", traced by package.json § scripts.verify:push — add it to the expected or forbidden list of the moment it belongs to`;
+
+    it('goes red when a traced label is renamed away from the map, green when restored', () => {
+        withGitRepo(tree(moments), (root) => {
+            const manifest = path.join(root, 'package.json');
+            const original = readFileSync(manifest, 'utf8');
+            const findings = () => run({ root, today: '2026-10-09' }).findings;
+
+            expect(findings()).toEqual([]);
+            writeFileSync(manifest, original.replace('trace.mjs verify:push', 'trace.mjs renamed'));
+            expect(findings()).toEqual([finding('renamed')]);
+            writeFileSync(manifest, original);
+            expect(findings()).toEqual([]);
+        });
+    });
+
+    it('judges the label the pre-push hook traces', () => {
+        const hooked = (label) => ({
+            ...tree(moments),
+            '.husky/pre-push': `GATE_PUSH=1 node scripts/gate-trace.mjs ${label} -- node a.mjs\n`
+        });
+        withGitRepo(hooked('verify:push'), (root) => {
+            expect(run({ root, today: '2026-10-09' }).findings).toEqual([]);
+        });
+        withGitRepo(hooked('verify:ci'), (root) => {
+            expect(run({ root, today: '2026-10-09' }).findings).toEqual([
+                'scripts/gate-tiers.json: no moment lists "verify:ci", traced by .husky/pre-push — add it to the expected or forbidden list of the moment it belongs to'
+            ]);
+        });
+    });
+
+    it('is skipped, and not vouched for, when gate-tiers.json has no moments', () => {
+        withGitRepo(tree(undefined, 'renamed'), (root) => {
+            const { findings, skipped } = run({ root, today: '2026-10-09' });
+            expect(findings).toEqual([]);
+            expect(skipped).toEqual(['moment labels']);
         });
     });
 });

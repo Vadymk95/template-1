@@ -64,6 +64,9 @@
  *              `--passWithNoTests` only inside the iterate chain. A command ends at `&&`, `||`,
  *              `;` or a newline, and what a `node scripts/*.mjs` step spawns is not read. The chain
  *              view cannot judge this: it compares package.json with itself
+ *   moments    every label the gate traces (`gate-trace.mjs <label> --` in a package.json script or a
+ *              hook) is an `expected` or a `forbidden` label of a moment in gate-tiers.json; skipped
+ *              when that file has no `moments`
  *   stageWords every key of `docs.stageWords` is a stage of the `verify*` chains
  *   retelling  no line outside that view retells the gate chain. A line does when it names
  *              RETELLING_MIN_STAGES or more distinct stages (the stage names derived from
@@ -1841,6 +1844,37 @@ export const checkGateChains = ({ checks, scripts }) => {
     return findings;
 };
 
+/** `gate-trace.mjs <label> --`: a command the tracer wraps, in a package.json script or a hook. */
+const TRACED_LABEL = /gate-trace\.mjs\s+(\S+)\s+--(?:\s|$)/g;
+
+/**
+ * Every label the gate traces (package.json scripts, hook files) is an `expected` or a `forbidden`
+ * label of some moment in gate-tiers.json: the report judges a run by the moment that names its
+ * label, so a label no moment names is never judged, whatever it costs or when it runs.
+ */
+export const checkMomentLabels = ({ moments, scripts, hooks }) => {
+    const listed = new Set(
+        Object.values(moments).flatMap((moment) =>
+            isRecord(moment) ? [...(moment.expected ?? []), ...(moment.forbidden ?? [])] : []
+        )
+    );
+    const places = [
+        ...Object.entries(scripts).map(([name, command]) => [
+            `package.json § scripts.${name}`,
+            command
+        ]),
+        ...hooks.map(([file, text]) => [file, text.replace(/^\s*#.*$/gm, '')])
+    ];
+    return places.flatMap(([where, text]) =>
+        [...String(text).matchAll(TRACED_LABEL)]
+            .filter(([, label]) => !listed.has(label))
+            .map(
+                ([, label]) =>
+                    `${TIERS_FILE}: no moment lists "${label}", traced by ${where} — add it to the expected or forbidden list of the moment it belongs to`
+            )
+    );
+};
+
 /** The words of a command; a quoted stretch stays inside its word, so `-t "a b"` and `NAME="a b"` are two words. */
 const COMMAND_WORD = /(?:[^\s"']|"(?:[^"\\]|\\.)*"|'[^']*')+/g;
 /** What ends a command inside a script: `&&`, `||`, `;` or a newline, but not the same characters inside quotes. */
@@ -2518,6 +2552,11 @@ export const run = ({ root, today }) => {
         findings.push(...checkSuiteBudgets({ root, suites: tiers.suites }));
         notes.push(...suiteNotes({ root, suites: tiers.suites }));
     }
+    if (isRecord(tiers.moments)) {
+        findings.push(...checkMomentLabels({ moments: tiers.moments, scripts, hooks }));
+    } else {
+        skipped.push('moment labels');
+    }
 
     const pushLabel = tiers.moments?.push?.expected?.[0] ?? 'verify:push';
 
@@ -2583,7 +2622,8 @@ const SUMMARY_CHECKS = [
     'suite ceilings',
     'agent-memory imports',
     'gate chains',
-    'gate flags'
+    'gate flags',
+    'moment labels'
 ];
 
 const main = () => {

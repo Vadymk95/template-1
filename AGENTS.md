@@ -44,7 +44,7 @@ npm run verify:full        # predicts the whole CI pipeline, the dev-smoke job i
 npm run smoke:dev          # the content-stress fixture alone, against `vite dev`
 npm run test:e2e:prod      # Playwright against `vite preview` (same mode as the gate)
 npm run bench:verify       # the gate step by step with timings; `-- --run <script>` runs a script's steps as the push does
-npm run trace:report       # findings from .gate-trace.log
+npm run trace:report       # findings from .gate-trace.log, then the last 20 pushes
 npm run docs:check         # docs drift (paths against the files git lists, line pointers, scripts, versions, command table, dead docs, the DECISIONS shape, the gate chain view, its strict flags and any retelling or composition of it); inside verify, weekly CI adds --weekly
 npm run test:mutation      # StrykerJS strength gate: weekly mutation.yml, NOT in verify
 npm run test:mutation:changed # survivors on the lines this change touched; informational PR check; `-- --pick` lists them
@@ -91,9 +91,9 @@ variants, a production build or a browser suite by hand: the full chain belongs 
 result an agent cannot act on is not worth its minutes. A review round gets the diff plus `verify:iter`;
 acceptance does not re-run the gate, the push does. Parallel lanes never run heavy stages (one machine,
 shared caches): heavy work serialises at the push. Individual scripts (`typecheck`, `test`, `fix`)
-are drill-downs on a specific failure; none of them is a moment. Every test command an agent runs names a worker cap (`--maxWorkers`, `--workers` or
-`--test-concurrency`), and a lane starts nothing heavy while the 1-minute load average is at or above the core
-count (`sysctl -n hw.ncpu` or `nproc`).
+are drill-downs on a specific failure; none of them is a moment. Every test command an agent runs names
+a worker cap (`--maxWorkers`, `--workers` or `--test-concurrency`), and a lane starts nothing heavy while
+the 1-minute load average is at or above the core count (`sysctl -n hw.ncpu` or `nproc`).
 
 **A red push costs one fix, not another round of the whole gate.** Where the repo has a browser suite, it
 stops after a capped number of failures on the gate run and in CI (`maxFailures`) instead of running every
