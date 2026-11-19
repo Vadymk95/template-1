@@ -587,10 +587,10 @@ or stale allowance, and its own inability to complete; lowering `--audit-level` 
 `scripts/audit-gate.test.mjs` covers the fail-closed paths. The Stryker runner's dependency tree is
 inside the gate. Open and below the threshold: two moderate `qs` advisories on the dev-only chain
 `@stryker-mutator/core` 10.0.0 to `typed-rest-client` 2.3.1; they close with a Stryker release that
-moves `typed-rest-client` to 3.1.1 or later. One allowance stands since 2026-11-18, to 2026-12-02:
-`GHSA-fc5q-39xc-vjpf` (picomatch, high). GitHub widened its range to `<= 4.0.7` on 2026-11-17 with no
-patched release (4.0.7 is the newest), and every path to the one copy is dev tooling, so a dated
-reason is the only door; the entry names the re-check.
+moves `typed-rest-client` to 3.1.1 or later. The one allowance, `GHSA-fc5q-39xc-vjpf` (picomatch,
+high, taken 2026-11-18), was removed on 2026-11-19: GitHub withdrew the advisory on 2026-11-18
+(`withdrawn_at` 15:38:56Z), npm stopped reporting it, and the stale check failed every push until the
+entry went.
 
 **Evidence:** https://github.com/Vadymk95/template-1/commit/07e5fff and
 https://github.com/Vadymk95/template-1/commit/8b982b1

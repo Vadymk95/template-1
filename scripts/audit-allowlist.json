@@ -1,8 +1,1 @@
-[
-    {
-        "id": "GHSA-fc5q-39xc-vjpf",
-        "expires": "2026-12-02",
-        "reason": "picomatch ReDoS through single-branch repeated extglobs (GitHub rates it high, CVSS 7.5, vulnerable range <= 4.0.7, no patched version: first_patched_version is null). GitHub widened the range to <= 4.0.7 on 2026-11-17, so the newest release, 4.0.7 (published 2026-08-24), is inside it and every copy is flagged. The trigger is a glob PATTERN with repeated extglobs, compiled by picomatch and matched against a string. The one installed copy is node_modules/picomatch 4.0.7, and every package that requires it is dev tooling (package-lock.json marks the copy dev): lint-staged (^4.0.7), vite (^4.0.7), vitest (^4.0.3), rollup-plugin-visualizer (^4.0.5), tinyglobby (^4.0.4) and fdir (peer ^3 || ^4). Nothing under src/ imports picomatch, so it is not in the browser bundle; vite and vitest run it at dev-server, build and test time to match include, exclude and watch globs that come from this repo's own config files and lint-staged globs, never from a request or from user input. No shipped path matches user input against a pattern or compiles user input as a pattern.",
-        "upstream": "npm's suggested remediation is vitest 3.1.4, a semver-major DOWNGRADE of a held tool, rejected per the capped-floor doctrine. No patched picomatch exists: npm view picomatch dist-tags reads latest 4.0.7 (read 2026-11-18), and a floor or override cannot close an advisory with no patched version. Re-check at expiry: npm view picomatch versions for a release past 4.0.7, and gh api /advisories/GHSA-fc5q-39xc-vjpf for a first_patched_version; if a fix exists, a capped floor or override replaces this entry; if none, re-date with a fresh reading."
-    }
-]
+[]
