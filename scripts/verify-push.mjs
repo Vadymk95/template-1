@@ -31,11 +31,13 @@
  * is made here, once, from the paths between the merge base with the remote branch and HEAD, and passed
  * to the unit step as SELF_TESTS_FLAG. Anything that cannot be told (a package below the repository
  * root too), CI and `GATE_SELF_TESTS=all` run them all.
- * Every push prints which way it went.
+ * Every push prints which way it went. The target's steps run through scripts/bench-verify.mjs
+ * (`runScript`): the same leaf commands `npm run <target>` ran, stopping at the first red with one
+ * verdict line that names the step.
  */
-import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+import { runScript } from './bench-verify.mjs';
 import { MANIFEST_PATH, matchesGlob } from './check-gate-integrity.mjs';
 import { readSelfTests, SELF_TESTS_FLAG } from './check-coverage.mjs';
 import { FALLBACK_BASE, isCi, makeGit, resolveBase } from './check-test-siblings.mjs';
@@ -259,9 +261,8 @@ const main = () => {
     delete env[SELF_TESTS_FLAG];
     if (decision.leaveOut) env[SELF_TESTS_FLAG] = '1';
 
-    const result = spawnSync('npm', ['run', plan.target], { stdio: 'inherit', shell: false, env });
-    // The verdict reads status BEFORE normalisation, so a child killed by a signal cannot pass.
-    process.exit(result.status ?? 1);
+    // The target's steps run through the step runner, one at a time: a red push names the step that failed.
+    process.exitCode = runScript(readScripts(cwd), plan.target, { env });
 };
 
 if (isEntryPoint(import.meta.url)) {

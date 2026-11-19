@@ -55,3 +55,14 @@ describe('vitest.config.ts mockReset', () => {
         expect(config.test.mockReset).toBe(true);
     });
 });
+
+describe('vitest.config.ts coverage reporter', () => {
+    // The `text` reporter prints a row per file into every coverage log and nothing reads it: the check
+    // reads only the dropout lines. The summary prints the four totals, and a missed threshold is still named.
+    it('prints the four totals in the terminal, not a row per file', async () => {
+        const config = await importConfig();
+
+        expect(config.test.coverage.reporter).toContain('text-summary');
+        expect(config.test.coverage.reporter).not.toContain('text');
+    });
+});

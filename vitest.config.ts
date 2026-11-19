@@ -43,8 +43,8 @@ export default mergeConfig(
             forceRerunTriggers: forceRerunTriggersFor(import.meta.dirname),
             coverage: {
                 provider: 'v8',
-                // text: terminal summary, json-summary: CI badge/diff, lcov: Codecov/Coveralls, html: local drill-down
-                reporter: ['text', 'json-summary', 'lcov', 'html'],
+                // text-summary: the four totals in the terminal, json-summary: CI badge/diff, lcov: Codecov/Coveralls, html: local drill-down
+                reporter: ['text-summary', 'json-summary', 'lcov', 'html'],
                 // Explicit include ensures ALL src files appear in the report —
                 // not just those imported by tests. Prevents inflated coverage %.
                 include: ['src/**'],

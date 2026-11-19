@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { parseVerifySteps, resolveScript } from './bench-verify.mjs';
+import { expandSteps, parseVerifySteps, resolveScript } from './bench-verify.mjs';
 
 // `process.cwd()` rather than `import.meta.url`: under Vitest the module URL is not a `file:` URL, so
 // resolving relative to it throws. The script itself runs under plain node and uses the URL form.
@@ -178,5 +180,143 @@ describe('resolveScript', () => {
 
     it('throws when the script does not exist', () => {
         expect(() => resolveScript({}, 'verify')).toThrow(/no `verify` script/);
+    });
+});
+
+describe('parseVerifySteps keeps every argument of a step', () => {
+    it('keeps a node step flags and an npm step extra arguments', () => {
+        const steps = parseVerifySteps('node scripts/a.mjs --kill-port && npm run lint -- --fix');
+
+        expect(steps.map((step) => step.args)).toEqual([
+            ['scripts/a.mjs', '--kill-port'],
+            ['run', 'lint', '--', '--fix']
+        ]);
+    });
+});
+
+describe('expandSteps', () => {
+    const scripts = {
+        top: 'node scripts/gate-trace.mjs top -- npm run top:inner',
+        'top:inner': 'node scripts/a.mjs --range && npm run alias && npm run chain',
+        alias: 'npm run single',
+        single: 'oxlint --deny-warnings .',
+        chain: 'tsc -b && vite build'
+    };
+
+    it('follows the wrapper and aliases and expands a nested chain in run order, flags kept', () => {
+        expect(expandSteps(scripts, 'top')).toEqual([
+            { label: 'top:inner#1', command: 'node', args: ['scripts/a.mjs', '--range'] },
+            { label: 'single', command: 'oxlint', args: ['--deny-warnings', '.'] },
+            { label: 'chain#1', command: 'tsc', args: ['-b'] },
+            { label: 'chain#2', command: 'vite', args: ['build'] }
+        ]);
+    });
+
+    it('throws on a cycle, also through the wrapper, and on a script that does not exist', () => {
+        const loop = { a: 'npm run b', b: 'node scripts/gate-trace.mjs b -- npm run a' };
+
+        expect(() => expandSteps(loop, 'a')).toThrow(/cycle a -> b -> a/);
+        expect(() => expandSteps({ a: 'npm run gone' }, 'a')).toThrow(/no `gone` script/);
+    });
+
+    it('hands a segment npm would give its shell to the shell, whole, never reads it as words', () => {
+        expect(expandSteps({ a: 'node b.mjs && FOO=1 node c.mjs' }, 'a')).toEqual([
+            { label: 'a#1', command: 'node', args: ['b.mjs'] },
+            { label: 'a#2', command: 'sh', args: ['-c', 'FOO=1 node c.mjs'] }
+        ]);
+        // A quote may hold the separator: the script is one shell step, never split inside it.
+        const quoted = 'node -e "a && b" && npm run y';
+        expect(expandSteps({ a: quoted, y: 'x' }, 'a')).toEqual([
+            { label: 'a', command: 'sh', args: ['-c', quoted] }
+        ]);
+    });
+
+    it('throws on a script npm would wrap in a pre or post script, rather than drop that step', () => {
+        expect(() => expandSteps({ a: 'node b.mjs', prea: 'node c.mjs' }, 'a')).toThrow(/prea/);
+        expect(() => expandSteps({ a: 'node b.mjs', posta: 'node c.mjs' }, 'a')).toThrow(/posta/);
+    });
+
+    it('expands the gate scripts of this package with their flags', () => {
+        const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+
+        for (const target of ['verify:ci', 'verify:scaffold:push']) {
+            const lines = expandSteps(manifest.scripts, target).map((step) =>
+                [step.command, ...step.args].join(' ')
+            );
+            expect(lines, target).toContain('node scripts/check-test-siblings.mjs --range');
+            expect(lines.join('\n'), target).not.toContain('npm run');
+        }
+    });
+});
+
+describe('--run: runSteps in a stub package', () => {
+    const dirs = [];
+    afterEach(() => {
+        for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+    });
+
+    // A package whose `gate` script is `gate`; `files` are written beside it. Returns the run of `--run gate`.
+    const runGate = (gate, files, env = {}, target = 'gate') => {
+        const dir = mkdtempSync(join(tmpdir(), 'bench-verify-'));
+        dirs.push(dir);
+        writeFileSync(join(dir, 'package.json'), JSON.stringify({ scripts: { gate } }));
+        for (const [name, text] of Object.entries(files)) {
+            mkdirSync(dirname(join(dir, name)), { recursive: true });
+            writeFileSync(join(dir, name), text, { mode: 0o755 });
+        }
+        const result = spawnSync(
+            process.execPath,
+            [join(process.cwd(), 'scripts/bench-verify.mjs'), '--run', target],
+            {
+                cwd: dir,
+                encoding: 'utf8',
+                stdio: ['ignore', 'pipe', 'pipe'],
+                env: { ...process.env, GATE_TRACE_STEP_FILE: join(dir, 'step'), ...env }
+            }
+        );
+        return { ...result, dir, has: (name) => existsSync(join(dir, name)) };
+    };
+    const THREE = 'node a.mjs && node b.mjs && node c.mjs';
+    const MARK = "require('node:fs').writeFileSync('c-ran', '');";
+
+    it('stops at the first red: the verdict names the step, the status is its own, the label is written', () => {
+        const result = runGate(THREE, { 'a.mjs': '', 'b.mjs': 'process.exit(3);', 'c.mjs': MARK });
+
+        expect(result.status).toBe(3);
+        expect(result.stdout).toContain('→ step 2/3 gate#2: node b.mjs');
+        expect(result.stderr).toMatch(
+            /✖ gate: step gate#2 failed \(exit 3\) after \d+\.\d s; 1 later steps not run/
+        );
+        expect(result.has('c-ran')).toBe(false);
+        expect(readFileSync(join(result.dir, 'step'), 'utf8')).toBe('gate#2');
+    });
+
+    it('answers a script it cannot expand with a verdict line and exit 1', () => {
+        const result = runGate(THREE, {}, {}, 'nope');
+
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain('✖ nope: package.json has no `nope` script to run.');
+    });
+
+    it('reads a step killed by a signal as exit 1', () => {
+        const kill = "process.kill(process.pid, 'SIGKILL');";
+        const result = runGate(THREE, { 'a.mjs': '', 'b.mjs': kill, 'c.mjs': MARK });
+
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain('step gate#2 failed (exit 1)');
+        expect(result.has('c-ran')).toBe(false);
+    });
+
+    it('runs an env prefix and a node_modules/.bin tool the way npm does, the step file variable unseen', () => {
+        const result = runGate('node a.mjs && FOO=1 node b.mjs && stub-tool --flag', {
+            'a.mjs': 'process.exit(process.env.GATE_TRACE_STEP_FILE === undefined ? 0 : 6);',
+            'b.mjs': 'process.exit(process.env.FOO === "1" ? 0 : 5);',
+            'node_modules/.bin/stub-tool': '#!/bin/sh\n[ "$1" = "--flag" ] && : > tool-ran\n'
+        });
+
+        expect(result.status).toBe(0);
+        expect(result.stdout).toMatch(/✓ gate: 3 steps passed in \d+\.\d s/);
+        expect(result.has('tool-ran')).toBe(true);
+        expect(result.has('step')).toBe(false);
     });
 });

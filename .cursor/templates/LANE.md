@@ -13,14 +13,16 @@ tier law stay in `AGENTS.md`. The numbers below were measured in a fork: startin
   a planner file or a gate file goes in the report as exact lines; the lead applies it with the
   operator.
 - Change no package. If one looks necessary, stop that item and report the package and version.
+- Name the worker cap the lane's test commands carry and the load check it runs before anything heavy.
 - An item that tightens a page-level check names who fixes what it turns red.
 
 ## While the lane runs
 
 - Batch independent reads, 3 to 5 per turn. Read no file over 300 lines whole: find the heading or
   the symbol with a search, then read that range.
-- Send command output to a log and print only the exit code and a tail. Give every run its own
-  numbered log, never overwrite the first red log, and quote the first red in the hand-back.
+- Send command output to a log, never pipe a command whose exit code you report, then print the exit
+  code, the log's first line and its last 40 lines, and name the log path in the hand-back. Give every
+  run its own numbered log, never overwrite the first red log, and quote the first red in the hand-back.
 - A lane never waits on a prompt, because nobody answers it: read with Read and Grep, run
   `npm run --prefix <dir>` and `git -C <dir>` instead of `cd`, and use no shell variable and no `;`
   chain.

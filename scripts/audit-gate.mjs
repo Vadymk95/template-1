@@ -198,6 +198,12 @@ const formatExpired = (entries) =>
             `Expired allowlist entry: ${id} expires ${expires}, red from that date on (UTC). ${EXPIRED_REMEDY}`
     );
 
+const formatStale = (entries) =>
+    entries.map(
+        ({ id }) =>
+            `ACT Stale allowlist entry: ${id}: npm audit no longer reports it. If gh api /advisories/${id} shows withdrawn_at, GitHub withdrew it: delete the entry and its DECISIONS line; otherwise read the advisory again and re-date the entry.`
+    );
+
 /** The red lines for an evaluation result; empty when the audit is clean. */
 export const formatFailures = (result) =>
     result.auditFailed
@@ -205,7 +211,7 @@ export const formatFailures = (result) =>
         : [
               ...formatEntries('Unexpected high/critical advisory', result.unexpected),
               ...formatExpired(result.expired),
-              ...formatEntries('Stale allowlist entry', result.stale)
+              ...formatStale(result.stale)
           ];
 
 const main = () => {
