@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readFileSync,
+    realpathSync,
+    rmSync,
+    writeFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -11,7 +19,8 @@ import {
     formatLogLine,
     gatherRunContext,
     isDocsPath,
-    parseStatusPath
+    parseStatusPath,
+    readHead
 } from './gate-trace.mjs';
 
 // Resolved from the repo root, not from `import.meta.url`: vitest serves this module over its own
@@ -142,12 +151,12 @@ describe('gate-trace CLI passthrough (the one thing that must not be got wrong)'
 });
 
 describe('gate-trace log line shape', () => {
-    it('writes exactly 9 tab-separated fields in the documented order', () => {
+    it('writes exactly 11 tab-separated fields in the documented order', () => {
         const repo = makeRepo();
         cleanupDirs.push(repo);
         runWrapper(repo, ['shape-check', '--', 'node', '-e', 'process.exit(0)']);
         const fields = readLogLines(repo)[0]?.split('\t') ?? [];
-        expect(fields).toHaveLength(9);
+        expect(fields).toHaveLength(11);
         const [
             timestamp,
             label,
@@ -156,7 +165,10 @@ describe('gate-trace log line shape', () => {
             branch,
             toplevel,
             worktreeKind,
-            changeClass
+            changeClass,
+            ,
+            head,
+            failedStep
         ] = fields;
         expect(() => new Date(timestamp ?? '').toISOString()).not.toThrow();
         expect(label).toBe('shape-check');
@@ -166,6 +178,82 @@ describe('gate-trace log line shape', () => {
         expect(toplevel).not.toBe('');
         expect(worktreeKind).toBe('main');
         expect(changeClass).toBe('clean');
+        expect(head).toBe(git(['rev-parse', 'HEAD'], repo).trim());
+        expect(failedStep).toBe('');
+    });
+
+    it('leaves the head empty when git cannot name one', () => {
+        const unknown = () => {
+            throw new Error('no commit');
+        };
+        expect(readHead('/nowhere', unknown)).toBe('');
+        expect(readHead('/nowhere', () => 'abc')).toBe('abc');
+    });
+});
+
+describe('gate-trace step file', () => {
+    // The child sees the step file as GATE_TRACE_STEP_FILE and names the step it failed at there.
+    const child = (body, code) => [
+        'node',
+        '-e',
+        `const fs = require('node:fs'); const file = process.env.GATE_TRACE_STEP_FILE; ${body}; process.exit(${code})`
+    ];
+    const failedStepOf = (repo) => readLogLines(repo)[0]?.split('\t')[10];
+
+    it('logs the step a red child names, and still exits with the child’s own code', () => {
+        const repo = makeRepo();
+        cleanupDirs.push(repo);
+        const verdict = runWrapper(repo, [
+            'red',
+            '--',
+            ...child("fs.writeFileSync(file, 'lint')", 3)
+        ]);
+        expect(verdict.code).toBe(3);
+        expect(failedStepOf(repo)).toBe('lint');
+    });
+
+    it('logs no step for a green run or a child that wrote nothing, exit codes untouched', () => {
+        const repo = makeRepo();
+        cleanupDirs.push(repo);
+        expect(
+            runWrapper(repo, ['green', '--', ...child("fs.writeFileSync(file, 'lint')", 0)]).code
+        ).toBe(0);
+        expect(runWrapper(repo, ['silent', '--', ...child('', 3)]).code).toBe(3);
+        expect(readLogLines(repo).map((line) => line.split('\t')[10])).toEqual(['', '']);
+    });
+
+    it('logs the label the step runner prints in its verdict line', () => {
+        const repo = makeRepo();
+        cleanupDirs.push(repo);
+        writeFileSync(
+            join(repo, 'package.json'),
+            JSON.stringify({ scripts: { gate: 'node ok.mjs && node red.mjs && node never.mjs' } })
+        );
+        writeFileSync(join(repo, 'ok.mjs'), '');
+        writeFileSync(join(repo, 'red.mjs'), 'process.exit(3);');
+        writeFileSync(join(repo, 'never.mjs'), '');
+        const runner = resolve(process.cwd(), 'scripts/bench-verify.mjs');
+        const verdict = runWrapper(repo, ['gate', '--', 'node', runner, '--run', 'gate']);
+        const named = /step (.+) failed \(exit 3\)/.exec(verdict.output)?.[1];
+        expect(verdict.code).toBe(3);
+        expect(named).toBeTruthy();
+        expect(failedStepOf(repo)).toBe(named);
+    });
+
+    it('removes the step file after the run, and a child that removes it first changes nothing', () => {
+        const repo = makeRepo();
+        cleanupDirs.push(repo);
+        const seen = join(repo, 'seen');
+        const note = `fs.writeFileSync(file, 'lint'); fs.writeFileSync(${JSON.stringify(seen)}, file)`;
+        runWrapper(repo, ['gone', '--', ...child(note, 3)]);
+        const stepFile = readFileSync(seen, 'utf8');
+        expect(failedStepOf(repo)).toBe('lint');
+        expect(existsSync(stepFile)).toBe(false);
+        expect(existsSync(dirname(stepFile))).toBe(false);
+
+        const removed = "fs.rmSync(require('node:path').dirname(file), { recursive: true })";
+        expect(runWrapper(repo, ['removed', '--', ...child(removed, 3)]).code).toBe(3);
+        expect(readLogLines(repo)[1]?.split('\t')[10]).toBe('');
     });
 });
 
@@ -354,12 +442,14 @@ describe('parseStatusPath / isDocsPath (pure)', () => {
 });
 
 describe('formatLogLine (pure)', () => {
-    it('joins the 9 fields in the documented order, tab-separated', () => {
+    it('joins the 11 fields in the documented order, tab-separated', () => {
         const line = formatLogLine({
             timestamp: '2026-08-30T00:00:00.000Z',
             label: 'verify:iter',
             durationMs: 1234,
             exitCode: 0,
+            head: 'a1b2c3',
+            failedStep: 'lint',
             context: {
                 branch: 'master',
                 toplevel: '/repo',
@@ -377,7 +467,9 @@ describe('formatLogLine (pure)', () => {
             '/repo',
             'main',
             'code',
-            '0'
+            '0',
+            'a1b2c3',
+            'lint'
         ]);
     });
 

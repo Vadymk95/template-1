@@ -1635,19 +1635,21 @@ export const percentile90 = (values) => {
     return sorted[Math.min(sorted.length - 1, Math.ceil(0.9 * sorted.length) - 1)];
 };
 
-/** Rows of the tracer log: 8 legacy fields or 9 with the phase column. */
+/** Rows of the tracer log: 8 legacy fields, 9 with the phase column, or 11 with the head and the failed step too. */
 export const parseTraceRows = (text) =>
     text
         .split('\n')
         .filter((line) => line.length > 0)
         .map((line) => line.split('\t'))
-        .filter((fields) => fields.length === 8 || fields.length === 9)
-        .map(([timestamp, label, durationMs, exitCode, , , , , phase]) => ({
+        .filter((fields) => [8, 9, 11].includes(fields.length))
+        .map(([timestamp, label, durationMs, exitCode, , , , , phase, head, failedStep]) => ({
             timestamp,
             label,
             durationMs: Number(durationMs),
             exitCode,
-            phase: phase ?? ''
+            phase: phase ?? '',
+            head: head ?? '',
+            failedStep: failedStep ?? ''
         }));
 
 /**

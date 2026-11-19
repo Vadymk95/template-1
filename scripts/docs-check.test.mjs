@@ -988,13 +988,14 @@ describe('budget', () => {
         expect(percentile90([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])).toBe(9);
         expect(percentile90([])).toBeNull();
     });
-    it('parses 8- and 9-column rows and ignores malformed ones', () => {
+    it('parses 8-, 9- and 11-column rows and ignores malformed ones', () => {
+        const head = 't\tverify:push\t1000\t0\tmaster\t/r\tmain\tcode';
         const rows = parseTraceRows(
-            't\tverify:push\t1000\t0\tmaster\t/r\tmain\tcode\nt\tverify:push\t2000\t0\tmaster\t/r\tmain\tcode\t0\nbroken\n'
+            `${head}\n${head}\t0\n${head}\t0\tabc123\tlint\n${head}\t0\tabc123\nbroken\n`
         );
-        expect(rows).toHaveLength(2);
-        expect(rows[0].phase).toBe('');
-        expect(rows[1].phase).toBe('0');
+        expect(rows).toHaveLength(3);
+        expect(rows.map((row) => row.phase)).toEqual(['', '0', '0']);
+        expect(rows[2]).toMatchObject({ head: 'abc123', failedStep: 'lint', durationMs: 1000 });
     });
     const row = (durationMs, phase = '0', exitCode = '0') => ({
         label: 'verify:push',

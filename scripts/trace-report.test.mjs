@@ -73,6 +73,28 @@ describe('parseLogLine', () => {
         expect(parsed.exitCode).toBe(0);
     });
 
+    it('reads the 8, 9 and 11 field shapes and refuses any other count', () => {
+        const base = ['2026-08-30T10:00:00.000Z', 'verify:push', '1000', '0', 'master', '/repo'];
+        const fields = [...base, 'main', 'code'];
+        const parse = (...extra) => parseLogLine([...fields, ...extra].join('\t'), 1);
+
+        expect(parse()).toMatchObject({ malformed: false, phase: '', head: '', failedStep: '' });
+        expect(parse('0')).toMatchObject({
+            malformed: false,
+            phase: '0',
+            head: '',
+            failedStep: ''
+        });
+        expect(parse('0', 'abc123', 'lint')).toMatchObject({
+            malformed: false,
+            exitCode: 0,
+            phase: '0',
+            head: 'abc123',
+            failedStep: 'lint'
+        });
+        expect(parse('0', 'abc123').malformed).toBe(true);
+    });
+
     it('flags a missing exit code instead of coercing it to a number', () => {
         const parsed = row({ exitCode: '' });
         expect(parsed.exitCodeValid).toBe(false);

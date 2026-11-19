@@ -55,6 +55,10 @@ The push runs its steps through the runner in `scripts/bench-verify.mjs`: wrappe
 a push writes one row, `verify:push`. It prints one line per step and a verdict naming the step that failed.
 `npm run bench:verify -- --run <script>` runs any script's steps the same way.
 
+A row holds eleven tab-separated fields: time, label, duration in ms, exit code, branch, toplevel, worktree kind, change
+class, phase, then `head` (the full sha of HEAD when the run started) and `failedStep` (the step the runner named when
+the run went red; empty on a pass).
+
 ## Ports — the mechanics
 
 `e2e:one` and `verify:measure` route through `scripts/run-on-free-port.mjs`, which probes up from the
