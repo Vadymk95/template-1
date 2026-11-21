@@ -169,9 +169,15 @@ describe('fork-init, one full run', () => {
     let dir = null;
     let result = null;
     let changed = null;
+    let pointerRules = null;
 
     beforeAll(() => {
         dir = makeCopy();
+        // The rule files that point into the template's decisions before the run: the only rule
+        // files the run may rewrite. Shared rules synced from gatelaw hold no such pointer.
+        pointerRules = git(dir, 'ls-files', '*.mdc')
+            .split('\n')
+            .filter((file) => file !== '' && /DECISIONS\.md`?\s*§/.test(read(dir, file)));
         result = run(dir, ['--name', NEW_NAME, '--title', NEW_TITLE, '--holder', NEW_HOLDER]);
         changed = status(dir)
             .split('\n')
@@ -309,9 +315,9 @@ describe('fork-init, one full run', () => {
                 !allowed.has(file) && !rewrittenPointers.includes(file) && !file.endsWith('.mdc')
         );
         expect(outside).toEqual([]);
-        expect(changed.filter((file) => file.endsWith('.mdc'))).toEqual([
-            '.cursor/rules/agent-pipeline.mdc'
-        ]);
+        expect(changed.filter((file) => file.endsWith('.mdc')).sort()).toEqual(
+            [...pointerRules].sort()
+        );
     });
 
     it('prints what is left: the GitHub commands in order, the human choices and the seeds', () => {
