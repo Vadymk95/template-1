@@ -8,6 +8,7 @@
         ".cursor/rules/**",
         "AGENTS.md",
         "CLAUDE.md",
+        ".gatelaw.json",
         "eslint.config.js",
         ".oxlintrc.json",
         ".prettierrc.json",

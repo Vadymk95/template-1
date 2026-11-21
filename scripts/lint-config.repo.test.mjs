@@ -1,13 +1,13 @@
-// What the lint configuration promises and nothing else checks, against the real linters.
+// What the lint configuration promises and nothing else checks, against the real linters and this
+// repository's own configuration.
 //
 // The Tailwind rules read `src/index.css` on their own, and ESLint's cache never looks at a file a
 // rule opens itself. `eslint.config.js` therefore carries a fingerprint of the stylesheet in `settings`,
-// which ESLint hashes into every cache entry. Two things hold that up and neither is visible in the
-// config: the cache really does key on `settings` (the first block, against ESLint itself) and the real
-// config really carries the fingerprint for the files the rules cover (the second block).
-// `css-fingerprint.test.mjs` covers the hash. The last block: both linters leave `.cursor/` alone, so
-// an agent's scratch script there cannot red the iterate chain. One more block, at the end: the commit
-// hook formats every file the push gate checks for format (the `lint-staged` globs in `package.json`).
+// which ESLint hashes into every cache entry. The first block: the real config really carries the
+// fingerprint for the files the rules cover (the cache half, against ESLint itself, lives in gatelaw,
+// in `lint-config.test.mjs`). The next block: both linters leave `.cursor/` alone, so an agent's
+// scratch script there cannot red the iterate chain. One more block, at the end: the commit hook
+// formats every file the push gate checks for format (the `lint-staged` globs in `package.json`).
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -20,84 +20,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { cssFingerprint } from './css-fingerprint.mjs';
 
-// Loading ESLint and, below, the whole repository config is the cost; the full suite runs these next to
-// sixty other files, so the default 5 s limit measured machine load, not the code (10 s seen once).
-describe('the ESLint cache and a stylesheet a rule reads', { timeout: 60_000 }, () => {
-    const roots = [];
-
-    afterEach(() => {
-        for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
-    });
-
-    // A rule whose verdict depends on a file it opens itself, as the Tailwind rules do.
-    const stylesheetRule = (stylesheet) => ({
-        meta: { name: 'probe', version: '1.0.0' },
-        rules: {
-            'reads-stylesheet': {
-                meta: { schema: [] },
-                create: (context) => ({
-                    Program: (node) => {
-                        const css = readFileSync(stylesheet, 'utf8');
-                        if (css.includes('@utility')) context.report({ node, message: 'utility' });
-                    }
-                })
-            }
-        }
-    });
-
-    const setup = () => {
-        const root = mkdtempSync(path.join(tmpdir(), 'eslint-css-'));
-        roots.push(root);
-        writeFileSync(path.join(root, 'a.js'), 'export const a = 1;\n');
-        const stylesheet = path.join(root, 'globals.css');
-        const lint = async (fingerprint) => {
-            const eslint = new ESLint({
-                cwd: root,
-                cache: true,
-                cacheLocation: path.join(root, '.eslintcache'),
-                overrideConfigFile: true,
-                overrideConfig: [
-                    {
-                        files: ['**/*.js'],
-                        plugins: { probe: stylesheetRule(stylesheet) },
-                        settings: { tailwindCssFingerprint: fingerprint },
-                        rules: { 'probe/reads-stylesheet': 'error' }
-                    }
-                ]
-            });
-            const [result] = await eslint.lintFiles(['a.js']);
-
-            return result.messages.length;
-        };
-        const write = (css) => {
-            writeFileSync(stylesheet, css);
-            return cssFingerprint({ root, entry: 'globals.css' });
-        };
-
-        return { lint, write };
-    };
-
-    it('replays a verdict while the stylesheet changes and nothing in the config does (the gap)', async () => {
-        const { lint, write } = setup();
-        const before = write('a { color: red; }');
-        expect(await lint(before)).toBe(0);
-
-        write('@utility card { padding: 1rem; }');
-
-        // The rule would now report, and the cache still says clean: this is the false green.
-        expect(await lint(before)).toBe(0);
-    });
-
-    it('lints again as soon as the fingerprint in the config follows the stylesheet', async () => {
-        const { lint, write } = setup();
-        expect(await lint(write('a { color: red; }'))).toBe(0);
-
-        expect(await lint(write('@utility card { padding: 1rem; }'))).toBe(1);
-        // And back: the cache entry of the new fingerprint is replaced in turn.
-        expect(await lint(write('a { color: red; }'))).toBe(0);
-    });
-});
-
+// Loading the whole repository config is the cost; the full suite runs these next to sixty other
+// files, so the default 5 s limit measured machine load, not the code (10 s seen once).
 describe('eslint.config.js', { timeout: 60_000 }, () => {
     const eslint = new ESLint({ cwd: process.cwd() });
     const fingerprint = cssFingerprint({ root: process.cwd(), entry: 'src/index.css' });

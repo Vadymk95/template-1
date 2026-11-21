@@ -295,8 +295,11 @@ hook prints the remedy: `npm run fix && git add -u`.
 
 **Pre-push:** `npm run verify:push` — phase-aware (`scripts/gate-tiers.json`): phase 0 runs
 `verify:scaffold:push` and loudly skips the stages that need a build until the first deploy; phase 1 runs the full `verify:ci`.
-A push that changes no harness file also leaves out the harness tests listed under `selfTests` in
-`scripts/gate-tiers.json` and prints that it did; CI always runs them, and `GATE_SELF_TESTS=all git push` runs them here.
+The harness's own tests live in gatelaw and run there; this repository keeps the tests that read it (the files named
+`*.repo.test.mjs` and the guards over its configs) and byte-identical copies of the three that scan every file under
+`scripts/` (`output-limits`, `self-test-capture`, `is-entry-point`), so they still guard what is added here.
+`scripts/gate-tiers.json` therefore lists no harness test to leave out, and every push prints
+`all harness self-tests run (scripts/gate-tiers.json lists no test to leave out)`.
 
 The hooks exist only after `npm run prepare` (lifecycle scripts are disabled via `.npmrc`). `check-hooks` is the first
 step of `verify:iter` and of `verify`: on a clone without hooks they stop with "Git hooks are not installed", so a push
