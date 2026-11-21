@@ -1,23 +1,30 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+// The self-tests start the gate's scripts as child processes and feed them bad setups and bad
+// arguments on purpose, so the scripts print their refusals. `execFileSync` and `execSync` copy the
+// child's stderr onto their own unless `stdio` is given, and `stdio: 'inherit'` passes everything
+// through: a refusal a case expects then lands in every test run and every push log, worded like a
+// real failure ("Git hooks are not installed" in a clone whose hooks are installed).
+// So every child a self-test starts has its output captured, and the case asserts on the text where
+// it matters; nothing it expects reaches the terminal.
+//
+// This file reads the self-tests as syntax trees and names each child process call that does not
+// capture. It does not run the suite a second time: a run inside this one would execute the same
+// files at the same moment as the outer run, and cases that bind a fixed port would meet themselves.
+//
+// Runner-agnostic on purpose: this file is byte-identical in every template, and the templates run their
+// script tests under different runners (vitest with globals, or `node --test`).
+import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
 
-/* The self-tests start the gate's scripts as child processes and feed them bad setups and bad
-   arguments on purpose, so the scripts print their refusals. `execFileSync` and `execSync` copy the
-   child's stderr onto their own unless `stdio` is given, and `stdio: 'inherit'` passes everything
-   through: a refusal a case expects then lands in every `vitest run` and every push log, worded like
-   a real failure ("Git hooks are not installed" in a clone whose hooks are installed). So every
-   child a self-test starts has its output captured, and the case asserts on the text where it
-   matters; nothing it expects reaches the terminal.
-
-   This file reads the self-tests as syntax trees and names each child process call that does not
-   capture. It does not run the suite a second time: a run inside this one would execute the same
-   files at the same moment as the outer run, and cases that bind a fixed port would meet themselves. */
+const { describe, it } = globalThis.describe ? globalThis : await import('node:test');
 
 const ROOT = process.cwd();
-const SCRIPTS = join(ROOT, 'scripts');
+// Where a repository keeps its own code: scripts/ in every one, lib/ and bin/ where it has them (the kit).
+const foldersOf = (root) =>
+    ['scripts', 'lib', 'bin'].filter((folder) => existsSync(join(root, folder)));
 
 // These copy the child's stderr onto the parent's unless `stdio` says otherwise. The other calls
 // buffer the output by default and leak only through an explicit `stdio` that passes it on.
@@ -203,29 +210,32 @@ describe('uncapturedChildren', () => {
             .problems;
 
     it('flags a call that gives no stdio, with or without other options', () => {
-        expect(problemsOf("execFileSync('git', ['status']);")).toHaveLength(1);
-        expect(problemsOf("execFileSync('git', ['status'], { cwd: '/tmp' });")).toHaveLength(1);
-        expect(problemsOf("execFileSync('git', ['status'], options);")).toHaveLength(1);
+        assert.equal(problemsOf("execFileSync('git', ['status']);").length, 1);
+        assert.equal(problemsOf("execFileSync('git', ['status'], { cwd: '/tmp' });").length, 1);
+        assert.equal(problemsOf("execFileSync('git', ['status'], options);").length, 1);
     });
 
     it('flags stdio that passes the output through, literally or by constant', () => {
-        expect(problemsOf("execFileSync('git', [], { stdio: 'inherit' });")).toHaveLength(1);
-        expect(
-            problemsOf("execFileSync('git', [], { stdio: ['ignore', 'pipe', 'inherit'] });")
-        ).toHaveLength(1);
-        expect(problemsOf("execFileSync('git', [], { stdio: [0, 1, 2] });")).toHaveLength(1);
-        expect(
-            problemsOf("execFileSync('git', [], { stdio: [null, process.stdout] });")
-        ).toHaveLength(1);
-        expect(
-            problemsOf("const OUT = 'inherit';\nexecFileSync('git', [], { stdio: OUT });")
-        ).toHaveLength(1);
-        expect(problemsOf("spawnSync('git', [], { stdio: 'inherit' });")).toHaveLength(1);
+        assert.equal(problemsOf("execFileSync('git', [], { stdio: 'inherit' });").length, 1);
+        assert.equal(
+            problemsOf("execFileSync('git', [], { stdio: ['ignore', 'pipe', 'inherit'] });").length,
+            1
+        );
+        assert.equal(problemsOf("execFileSync('git', [], { stdio: [0, 1, 2] });").length, 1);
+        assert.equal(
+            problemsOf("execFileSync('git', [], { stdio: [null, process.stdout] });").length,
+            1
+        );
+        assert.equal(
+            problemsOf("const OUT = 'inherit';\nexecFileSync('git', [], { stdio: OUT });").length,
+            1
+        );
+        assert.equal(problemsOf("spawnSync('git', [], { stdio: 'inherit' });").length, 1);
     });
 
     it('flags a stdio it cannot follow to a value, instead of trusting it', () => {
-        expect(problemsOf("execFileSync('git', [], { stdio: chooseStdio() });")).toHaveLength(1);
-        expect(problemsOf("execFileSync('git', [], { stdio: imported });")).toHaveLength(1);
+        assert.equal(problemsOf("execFileSync('git', [], { stdio: chooseStdio() });").length, 1);
+        assert.equal(problemsOf("execFileSync('git', [], { stdio: imported });").length, 1);
     });
 
     it('accepts a call that captures, literally, by constant or by shorthand', () => {
@@ -239,13 +249,13 @@ describe('uncapturedChildren', () => {
         ];
 
         for (const body of captured) {
-            expect(problemsOf(body), body).toEqual([]);
+            assert.deepEqual(problemsOf(body), [], body);
         }
     });
 
     it('leaves alone a call whose output is buffered by default', () => {
-        expect(problemsOf("spawnSync('git', ['status'], { cwd: '/tmp' });")).toEqual([]);
-        expect(problemsOf("spawnSync('git', ['status']);")).toEqual([]);
+        assert.deepEqual(problemsOf("spawnSync('git', ['status'], { cwd: '/tmp' });"), []);
+        assert.deepEqual(problemsOf("spawnSync('git', ['status']);"), []);
     });
 
     it('reads the module through a rename or a namespace import, and ignores other calls named exec', () => {
@@ -259,31 +269,48 @@ describe('uncapturedChildren', () => {
             "import { execFileSync } from 'node:child_process';\n/a/.exec('a');\nother.execFileSync('git');"
         );
 
-        expect(renamed.problems).toHaveLength(1);
-        expect(namespaced.problems).toHaveLength(1);
-        expect(unrelated.calls).toBe(0);
+        assert.equal(renamed.problems.length, 1);
+        assert.equal(namespaced.problems.length, 1);
+        assert.equal(unrelated.calls, 0);
+    });
+});
+
+describe('foldersOf', () => {
+    it('is scripts alone for a repository with no lib or bin, and adds each folder that exists', () => {
+        const root = mkdtempSync(join(tmpdir(), 'self-test-capture-'));
+        try {
+            mkdirSync(join(root, 'scripts'));
+            assert.deepEqual(foldersOf(root), ['scripts']);
+            mkdirSync(join(root, 'bin'));
+            assert.deepEqual(foldersOf(root), ['scripts', 'bin']);
+            mkdirSync(join(root, 'lib'));
+            assert.deepEqual(foldersOf(root), ['scripts', 'lib', 'bin']);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
     });
 });
 
 describe('the harness self-tests', () => {
     it('start every child process with its output captured', () => {
-        const files = readdirSync(SCRIPTS, { recursive: true })
-            .filter((name) => name.endsWith('.test.mjs'))
-            .sort();
-        const results = files.map((name) =>
-            uncapturedChildren(
-                readFileSync(join(SCRIPTS, name), 'utf8'),
-                relative(ROOT, join(SCRIPTS, name))
-            )
+        const files = foldersOf(ROOT).flatMap((folder) =>
+            readdirSync(join(ROOT, folder), { recursive: true })
+                .filter((name) => name.endsWith('.test.mjs'))
+                .sort()
+                .map((name) => join(folder, name))
+        );
+        const results = files.map((file) =>
+            uncapturedChildren(readFileSync(join(ROOT, file), 'utf8'), file)
         );
 
-        expect(
-            results.reduce((total, { calls }) => total + calls, 0),
+        assert.ok(
+            results.reduce((total, { calls }) => total + calls, 0) > 0,
             'no self-test starts a child process: the scan is broken'
-        ).toBeGreaterThan(0);
-        expect(
+        );
+        assert.deepEqual(
             results.flatMap(({ problems }) => problems),
+            [],
             `give each child \`stdio: ['ignore', 'pipe', 'pipe']\` and assert on the captured text`
-        ).toEqual([]);
+        );
     });
 });

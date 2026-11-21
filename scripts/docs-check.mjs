@@ -43,6 +43,11 @@
  *              A `scripts/*.test.mjs` the manifest lists as moved still counts for the paths check
  *   versions   "Vitest 5" / "React 19.3" in a doc matches the installed version (package-lock.json)
  *   table      every non-internal package.json script is documented in AGENTS.md or README.md
+ *   roles      the command table in AGENTS.md tags a command line with the role it plays by opening
+ *              the line's comment with `[<role>]`; the roles are defined once, in the shared block.
+ *              Every tag names a defined role and every role not marked optional has a line. A table
+ *              with no tag is not judged and prints one note, unless gate-tiers.json
+ *              `docs.roleColumn` is "required" (set it once the table carries its roles)
  *   dead       every doc file has an inbound reference (platform-discovered files exempt)
  *   ciSteps    every `run:` step in a PR-triggered workflow is declared in gate-tiers.json §
  *              ci.allowedRunSteps (a check running only in CI, not in `verify`), with a reason
@@ -514,6 +519,91 @@ export const checkCommandTable = ({
         }
     }
     return findings;
+};
+
+/* Command roles. The shared block names what a command is for (the iterate command, the gate command),
+   never the command, and defines the role names once: a bullet `- **<role>** - ...` (`(optional)` after
+   the name when a repo may have none) in the list that follows its `**Command roles.**` paragraph. The
+   repo's command table, the fenced list in AGENTS.md outside the block, tags a command line with its role
+   by opening the line's comment with `[<role>]`: `npm run x  # [iterate command] ...`. Two-step: a table
+   with no tag at all is not judged and prints one note (a repo that has not written its column yet stays
+   green); `docs.roleColumn: "required"` in gate-tiers.json turns that note into a finding. Once one line
+   is tagged, every tag must name a defined role and every role that is not optional needs a line. */
+const ROLES_HEADING = '**Command roles.**';
+const ROLE_ITEM = /^- \*\*([A-Za-z][A-Za-z -]*[A-Za-z])\*\*( \(optional\))? - /;
+const ROLE_TAG = /^\[([^\]\n]+)\]/;
+const COMMENT_START = /\s#\s/;
+
+/** The roles a block defines, in its order: `{ name, optional }`; none when it has no roles list. */
+export const definedRoles = (blockText) => {
+    const roles = [];
+    let heading = false;
+    for (const line of blockText.split('\n')) {
+        if (line.startsWith(ROLES_HEADING)) heading = true;
+        const item = heading ? ROLE_ITEM.exec(line) : null;
+        if (item) roles.push({ name: item[1], optional: item[2] !== undefined });
+        else if (roles.length > 0 && line.trim() !== '') break;
+    }
+    return roles;
+};
+
+/** The `[<role>]` tags that open the comment of a fenced command line, with their 1-based lines. */
+export const taggedRoles = (text) => {
+    const tags = [];
+    let open = '';
+    text.split('\n').forEach((line, index) => {
+        const fence = FENCE.exec(line)?.[1] ?? '';
+        if (open) {
+            if (fence[0] === open[0] && fence.length >= open.length) open = '';
+        } else if (fence) {
+            open = fence;
+        } else {
+            return;
+        }
+        if (!open) return;
+        const cut = COMMENT_START.exec(line);
+        if (cut === null || line.startsWith('#')) return;
+        const tag = ROLE_TAG.exec(line.slice(cut.index + cut[0].length));
+        if (tag) tags.push({ role: tag[1].trim(), line: index + 1 });
+    });
+    return tags;
+};
+
+export const checkCommandRoles = ({ agentsText, required = false }) => {
+    const none = { findings: [], notes: [] };
+    const block = SHARED_BLOCK.exec(agentsText);
+    if (block === null) return none;
+    const roles = definedRoles(block[1]);
+    if (roles.length === 0) return none;
+    // The table is everything outside the block; the block's own lines go blank so line numbers hold.
+    const outside =
+        agentsText.slice(0, block.index) +
+        block[0].replace(/[^\n]+/g, '') +
+        agentsText.slice(block.index + block[0].length);
+    const tags = taggedRoles(outside);
+    if (tags.length === 0) {
+        const message =
+            'AGENTS.md: the command table has no role column (tag a command line with `# [<role>]`; the roles are in the shared block)';
+        return required ? { findings: [message], notes: [] } : { findings: [], notes: [message] };
+    }
+    const findings = [];
+    const known = new Set(roles.map(({ name }) => name));
+    for (const { role, line } of tags) {
+        if (!known.has(role)) {
+            findings.push(
+                `AGENTS.md:${line}: the role "${role}" is not one the shared block defines (${[...known].join(', ')})`
+            );
+        }
+    }
+    const used = new Set(tags.map(({ role }) => role));
+    for (const { name, optional } of roles) {
+        if (!optional && !used.has(name)) {
+            findings.push(
+                `AGENTS.md: the shared block defines the role "${name}" and no command line in the table carries it`
+            );
+        }
+    }
+    return { findings, notes: [] };
 };
 
 /** A Cursor rule with globs or alwaysApply is attached by the editor, so no doc has to point at it. */
@@ -2569,7 +2659,11 @@ export const run = ({ root, today }) => {
         workflows,
         allowlist: ciConfig.rulesetContextAllowlist ?? []
     });
-    const notes = [...rulesetCheck.notes];
+    const roles = checkCommandRoles({
+        agentsText: docs.find(([file]) => file === 'AGENTS.md')?.[1] ?? '',
+        required: docsConfig.roleColumn === 'required'
+    });
+    const notes = [...rulesetCheck.notes, ...roles.notes];
     /* Without a file list topDirs is empty, so no token is read as a path and the path and
        line-pointer checks judge nothing, bar a pointer into a file at the root, which the disk
        alone still answers. Say so, and keep the summary from claiming the check; the run does not
@@ -2595,6 +2689,7 @@ export const run = ({ root, today }) => {
             scripts,
             internalScripts: [...DEFAULT_INTERNAL_SCRIPTS, ...(docsConfig.internalScripts ?? [])]
         }),
+        ...roles.findings,
         ...checkDeadDocs({ docs, extraText: workflowText }),
         ...checkSectionPointers({
             docs: listMarkdownFiles(root, listed).map((file) => [

@@ -13,8 +13,7 @@ fi
 # phase 0 (scaffold, pre-deploy) runs verify:scaffold:push and loudly SKIPS the stages that need a
 # build — no prod boundary exists yet to guard; phase 1 (deployed) runs
 # the full verify:ci chain, which is the same script CI runs, so a green pre-push keeps predicting a
-# green pipeline. The harness tests live in gatelaw, so scripts/gate-tiers.json lists none to leave out
-# of a push and every push prints that all harness self-tests run.
+# green pipeline. The harness tests live in gatelaw, so no push leaves a test out.
 # Pushing implies network, so the network-bound checks run in both phases.
 # The stages of each chain are listed in scripts/gate-tiers.json (checks.<name>.chain).
 # GATE_PHASE=full runs every stage for one push; Prettier still reads .prettiercache. The run that

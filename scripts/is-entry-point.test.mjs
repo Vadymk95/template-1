@@ -1,4 +1,8 @@
+// Runner-agnostic on purpose: this file is byte-identical in every template, and the templates run their
+// script tests under different runners (vitest with globals, or `node --test`).
+import assert from 'node:assert/strict';
 import {
+    existsSync,
     mkdirSync,
     mkdtempSync,
     readFileSync,
@@ -12,17 +16,22 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { afterEach, describe, expect, it } from 'vitest';
-
 import { isEntryPoint } from './is-entry-point.mjs';
 
+const { afterEach, describe, it } = globalThis.describe ? globalThis : await import('node:test');
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+// Where a repository keeps its own code: scripts/ in every one, lib/ and bin/ where it has them (the kit).
+const foldersOf = (root) =>
+    ['scripts', 'lib', 'bin'].filter((folder) => existsSync(path.join(root, folder)));
 
 describe('isEntryPoint', () => {
     const roots = [];
 
     afterEach(() => {
-        for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+        for (const root of roots.splice(0)) {
+            rmSync(root, { recursive: true, force: true });
+        }
     });
 
     /* A real file, in a directory whose name the case chooses. Node gives a module the URL of its
@@ -39,31 +48,30 @@ describe('isEntryPoint', () => {
     it('is true when node was started on the module itself', () => {
         const { file, url } = makeScript();
 
-        expect(isEntryPoint(url, file)).toBe(true);
+        assert.equal(isEntryPoint(url, file), true);
     });
 
-    it.each(['has#hash', 'has%percent', 'has?question', 'has space', 'a#b%c?d e'])(
-        'is true when the path has %s in it, which a hand-built file:// URL cannot spell',
-        (directory) => {
+    for (const directory of ['has#hash', 'has%percent', 'has?question', 'has space', 'a#b%c?d e']) {
+        it(`is true when the path has ${directory} in it, which a hand-built file:// URL cannot spell`, () => {
             const { file, url } = makeScript(directory);
 
-            expect(isEntryPoint(url, file)).toBe(true);
-        }
-    );
+            assert.equal(isEntryPoint(url, file), true);
+        });
+    }
 
     it('is true when node was started through a symlink to the module', () => {
         const { root, file, url } = makeScript();
         const link = path.join(root, 'link.mjs');
         symlinkSync(file, link);
 
-        expect(isEntryPoint(url, link)).toBe(true);
+        assert.equal(isEntryPoint(url, link), true);
     });
 
     it('is true when node was started through a symlinked directory', () => {
         const { root, file, url } = makeScript('real');
         symlinkSync(path.dirname(file), path.join(root, 'linked'));
 
-        expect(isEntryPoint(url, path.join(root, 'linked', 'script.mjs'))).toBe(true);
+        assert.equal(isEntryPoint(url, path.join(root, 'linked', 'script.mjs')), true);
     });
 
     it('is true when node keeps the symlink in the module URL (--preserve-symlinks-main)', () => {
@@ -71,14 +79,14 @@ describe('isEntryPoint', () => {
         const link = path.join(root, 'link.mjs');
         symlinkSync(file, link);
 
-        expect(isEntryPoint(pathToFileURL(link).href, link)).toBe(true);
+        assert.equal(isEntryPoint(pathToFileURL(link).href, link), true);
     });
 
     it('is false for a module that was only imported: node was started on another file', () => {
         const entry = makeScript('entry');
         const imported = makeScript('imported');
 
-        expect(isEntryPoint(imported.url, entry.file)).toBe(false);
+        assert.equal(isEntryPoint(imported.url, entry.file), false);
     });
 
     it('is false for a different file that shares the directory and a name prefix', () => {
@@ -86,26 +94,52 @@ describe('isEntryPoint', () => {
         const sibling = path.join(root, 'plain', 'script.mjs.bak');
         writeFileSync(sibling, '');
 
-        expect(isEntryPoint(pathToFileURL(sibling).href, file)).toBe(false);
+        assert.equal(isEntryPoint(pathToFileURL(sibling).href, file), false);
     });
 
-    it.each([undefined, ''])('is false when there is no entry file (%j): -e, a REPL', (entry) => {
-        const { url } = makeScript();
+    for (const entry of [undefined, '']) {
+        it(`is false when there is no entry file (${JSON.stringify(entry)}): -e, a REPL`, () => {
+            const { url } = makeScript();
 
-        expect(isEntryPoint(url, entry)).toBe(false);
-    });
+            assert.equal(isEntryPoint(url, entry), false);
+        });
+    }
 
     it('is false, and does not throw, when the entry path does not exist', () => {
         const { root, url } = makeScript();
 
-        expect(isEntryPoint(url, path.join(root, 'gone', 'script.mjs'))).toBe(false);
+        assert.equal(isEntryPoint(url, path.join(root, 'gone', 'script.mjs')), false);
     });
 
+    /* `node --test` runs each test file as `node <file>`, so the real `process.argv[1]` here is this
+       very file: the case sets it to a script of its own instead of relying on the runner. */
     it('reads process.argv[1] when no entry is given', () => {
-        const entry = realpathSync(process.argv[1]);
+        const entry = makeScript('entry');
+        const other = makeScript('other');
+        const original = process.argv[1];
+        process.argv[1] = entry.file;
+        try {
+            assert.equal(isEntryPoint(entry.url), true);
+            assert.equal(isEntryPoint(other.url), false);
+        } finally {
+            process.argv[1] = original;
+        }
+    });
+});
 
-        expect(isEntryPoint(pathToFileURL(entry).href)).toBe(true);
-        expect(isEntryPoint(import.meta.url)).toBe(false);
+describe('foldersOf', () => {
+    it('is scripts alone for a repository with no lib or bin, and adds each folder that exists', () => {
+        const root = mkdtempSync(path.join(tmpdir(), 'entry-point-folders-'));
+        try {
+            mkdirSync(path.join(root, 'scripts'));
+            assert.deepEqual(foldersOf(root), ['scripts']);
+            mkdirSync(path.join(root, 'bin'));
+            assert.deepEqual(foldersOf(root), ['scripts', 'bin']);
+            mkdirSync(path.join(root, 'lib'));
+            assert.deepEqual(foldersOf(root), ['scripts', 'lib', 'bin']);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
     });
 });
 
@@ -114,26 +148,40 @@ describe('isEntryPoint', () => {
    it or goes through a symlink. For a gate check that is a pass that checked nothing. These cases keep
    the class closed: a script asks the helper, and a new script cannot bring the old guard back. */
 describe('the scripts', () => {
-    const scripts = readdirSync(HERE)
-        .filter((name) => /\.m?js$/.test(name) && !name.includes('.test.'))
-        .filter((name) => name !== 'is-entry-point.mjs')
-        .map((name) => [name, readFileSync(path.join(HERE, name), 'utf8')]);
+    const ROOT = path.dirname(HERE);
+    // [path, source, the import the helper is asked through]: lib/ and bin/ reach it across the folder.
+    const scripts = foldersOf(ROOT).flatMap((folder) =>
+        readdirSync(path.join(ROOT, folder))
+            .filter((name) => /\.m?js$/.test(name) && !name.includes('.test.'))
+            .filter((name) => `${folder}/${name}` !== 'scripts/is-entry-point.mjs')
+            .map((name) => [
+                `${folder}/${name}`,
+                readFileSync(path.join(ROOT, folder, name), 'utf8'),
+                folder === 'scripts' ? './is-entry-point.mjs' : '../scripts/is-entry-point.mjs'
+            ])
+    );
 
     it('never decide by hand whether they are the entry point', () => {
         const byHand = scripts
             .filter(([, source]) => /argv\[1\]|argv\.at\(1\)/.test(source))
             .map(([name]) => name);
 
-        expect(byHand).toEqual([]);
+        assert.deepEqual(byHand, []);
     });
 
     it('ask the helper in one shape, and import it', () => {
         const asking = scripts.filter(([, source]) => source.includes('isEntryPoint'));
 
-        expect(asking.length).toBeGreaterThan(0);
-        for (const [name, source] of asking) {
-            expect(source, name).toContain("import { isEntryPoint } from './is-entry-point.mjs';");
-            expect(source, name).toContain('if (isEntryPoint(import.meta.url)) {');
+        assert.ok(asking.length > 0, 'no script asks the helper');
+        for (const [name, source, from] of asking) {
+            assert.ok(
+                source.includes(`import { isEntryPoint } from '${from}';`),
+                `${name} does not import the helper in the shared shape`
+            );
+            assert.ok(
+                source.includes('if (isEntryPoint(import.meta.url)) {'),
+                `${name} does not guard main() in the shared shape`
+            );
         }
     });
 });

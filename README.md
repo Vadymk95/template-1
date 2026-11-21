@@ -298,8 +298,7 @@ hook prints the remedy: `npm run fix && git add -u`.
 The harness's own tests live in gatelaw and run there; this repository keeps the tests that read it (the files named
 `*.repo.test.mjs` and the guards over its configs) and byte-identical copies of the three that scan every file under
 `scripts/` (`output-limits`, `self-test-capture`, `is-entry-point`), so they still guard what is added here.
-`scripts/gate-tiers.json` therefore lists no harness test to leave out, and every push prints
-`all harness self-tests run (scripts/gate-tiers.json lists no test to leave out)`.
+No push leaves a test out.
 
 The hooks exist only after `npm run prepare` (lifecycle scripts are disabled via `.npmrc`). `check-hooks` is the first
 step of `verify:iter` and of `verify`: on a clone without hooks they stop with "Git hooks are not installed", so a push

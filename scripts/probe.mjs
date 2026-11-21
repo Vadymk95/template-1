@@ -23,7 +23,8 @@
  * different route than the one asked for, the table says so: the numbers then describe that page.
  *
  * The server it measures is its own: it starts on the first free port from PORT (3000 for `--dev`,
- * 4273 for the build), never on a port something already answers on, and its whole process group is
+ * 4273 for the build; `probe` in scripts/gate-tiers.json says what another stack serves with, and on
+ * which ports), never on a port something already answers on, and its whole process group is
  * stopped on every way out, signals included. A probe that attached to another checkout's server
  * measured the wrong tree, and one that left a dev server running made the next probe do the same.
  * A probe that is killed outright (SIGKILL, a power cut) cannot clean up, so it records the group in
@@ -31,7 +32,7 @@
  * and command prove that it is the same server (`scripts/server-group.mjs`).
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -59,6 +60,97 @@ const THEME_FLAG = '--theme=';
 // cannot import TypeScript. `probe.test.mjs` reads that file and fails when these drift from it.
 export const USER_STORE_KEY = 'user-store';
 export const THEME_KEY = 'theme';
+
+/*
+ * How the stack serves itself, and who a signed-in visitor is, is data: `probe` in the
+ * `scripts/gate-tiers.json` beside this script, over the defaults here (a Vite app: `npm run dev` and
+ * `npm run preview` bound to the loopback with `--strictPort`, and the user store of the template).
+ *   dev, prod   { script, args, port }: the `npm run <script> -- <args>` that serves, the first port it
+ *               is tried on, and `{port}` in an argument standing for the port that was found free
+ *   userSeed    the state a `--signed-in` run writes into the user store, or null for a repository that
+ *               has none (the flag is then refused rather than ignored)
+ */
+const DEFAULT_SERVE_ARGS = ['--host', '127.0.0.1', '--port', '{port}', '--strictPort'];
+const DEFAULT_PROBE = {
+    dev: { script: 'dev', args: DEFAULT_SERVE_ARGS, port: 3000 },
+    prod: { script: 'preview', args: DEFAULT_SERVE_ARGS, port: 4273 },
+    userSeed: { isLoggedIn: true, username: 'probe', token: 'probe' }
+};
+
+const isPlainObject = (value) =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** One `dev` or `prod` entry over its default: { serve }, or { error } naming the key. */
+const readServe = (name, given, fallback) => {
+    if (given === undefined) return { serve: fallback };
+    const bad = (reason) => ({ error: `probe.${name}${reason}` });
+    if (!isPlainObject(given)) return bad(' must be an object');
+    const unknown = Object.keys(given).find((key) => !(key in fallback) && !key.startsWith('_'));
+    if (unknown)
+        return bad(
+            ` has the unknown key "${unknown}" (known: ${Object.keys(fallback).join(', ')})`
+        );
+    if (
+        given.script !== undefined &&
+        !(typeof given.script === 'string' && /^\w[\w:.-]*$/.test(given.script))
+    ) {
+        return bad('.script must be the name of an npm script');
+    }
+    if (
+        given.args !== undefined &&
+        !(Array.isArray(given.args) && given.args.every((a) => typeof a === 'string'))
+    ) {
+        return bad('.args must be a list of strings');
+    }
+    if (
+        given.port !== undefined &&
+        !(Number.isInteger(given.port) && given.port > 0 && given.port < 65_536)
+    ) {
+        return bad('.port must be a port number');
+    }
+    return { serve: { ...fallback, ...given } };
+};
+
+/**
+ * The `probe` key of the `gate-tiers.json` beside this script, over the defaults: { config }, or
+ * { error } for a file that is there but cannot be read and for a key it cannot use. A missing file
+ * or key is the default; a wrong one is never read as the default.
+ */
+export const readProbeConfig = (scriptsDir = SCRIPTS_DIR) => {
+    const file = join(scriptsDir, 'gate-tiers.json');
+    let given;
+    if (existsSync(file)) {
+        try {
+            given = JSON.parse(readFileSync(file, 'utf8'))?.probe;
+        } catch (error) {
+            return { error: `scripts/gate-tiers.json cannot be read: ${error.message}` };
+        }
+    }
+    if (given === undefined) return { config: DEFAULT_PROBE };
+
+    if (!isPlainObject(given)) return { error: 'scripts/gate-tiers.json: probe must be an object' };
+    const unknown = Object.keys(given).find(
+        (key) => !(key in DEFAULT_PROBE) && !key.startsWith('_')
+    );
+    if (unknown) {
+        return {
+            error: `scripts/gate-tiers.json: probe has the unknown key "${unknown}" (known: ${Object.keys(DEFAULT_PROBE).join(', ')})`
+        };
+    }
+    const config = { ...DEFAULT_PROBE };
+    for (const name of ['dev', 'prod']) {
+        const read = readServe(name, given[name], DEFAULT_PROBE[name]);
+        if (read.error) return { error: `scripts/gate-tiers.json: ${read.error}` };
+        config[name] = read.serve;
+    }
+    if (given.userSeed !== undefined) {
+        if (given.userSeed !== null && !isPlainObject(given.userSeed)) {
+            return { error: 'scripts/gate-tiers.json: probe.userSeed must be an object or null' };
+        }
+        config.userSeed = given.userSeed;
+    }
+    return { config };
+};
 
 export const parseProbeArgs = (argv) => {
     const useDev = argv.includes('--dev');
@@ -210,13 +302,15 @@ export const waitForQuiet = (page, timeoutMs = 5000) =>
  * demo token the store keeps (`probe.test.mjs` checks the fields against `src/store/user/userStore.ts`).
  * The theme is stored as the plain string `useTheme` reads. No entry for what was not asked for.
  */
-export const buildStorageSeed = ({ signedIn, theme }) => {
+export const buildStorageSeed = ({ signedIn, theme, userSeed = DEFAULT_PROBE.userSeed }) => {
     const seed = {};
     if (signedIn) {
-        seed[USER_STORE_KEY] = JSON.stringify({
-            state: { isLoggedIn: true, username: 'probe', token: 'probe' },
-            version: 0
-        });
+        if (userSeed === null) {
+            throw new Error(
+                'probe: --signed-in has no state to seed: this repository sets no "probe.userSeed" in scripts/gate-tiers.json'
+            );
+        }
+        seed[USER_STORE_KEY] = JSON.stringify({ state: userSeed, version: 0 });
     }
     if (theme !== null) {
         seed[THEME_KEY] = theme;
@@ -332,6 +426,7 @@ export const withServer = async (
     {
         useDev,
         basePort,
+        serve = useDev ? DEFAULT_PROBE.dev : DEFAULT_PROBE.prod,
         environment = process.env,
         findPort = findFreePort,
         spawnServer = spawn,
@@ -352,13 +447,9 @@ export const withServer = async (
     // port that was taken in the meantime an error instead of a silent move to the next one.
     const args = [
         'run',
-        useDev ? 'dev' : 'preview',
+        serve.script,
         '--',
-        '--host',
-        '127.0.0.1',
-        '--port',
-        String(port),
-        '--strictPort'
+        ...serve.args.map((argument) => argument.replaceAll('{port}', String(port)))
     ];
     const server = spawnServer('npm', args, {
         stdio: 'ignore',
@@ -411,6 +502,15 @@ export const withServer = async (
 
 const run = async () => {
     const { path, widths, useDev, signedIn, theme } = parseProbeArgs(process.argv.slice(2));
+    const loaded = readProbeConfig();
+    if (loaded.error) {
+        console.error(`✖ probe: ${loaded.error}`);
+        process.exit(2);
+    }
+    const { config } = loaded;
+    // Before the build: a flag this repository cannot honour must not cost a build first.
+    const storageSeed = buildStorageSeed({ signedIn, theme, userSeed: config.userSeed });
+    const serve = useDev ? config.dev : config.prod;
 
     if (!useDev) {
         const build = spawnSync('npm', ['run', 'build'], { stdio: 'inherit', shell: false });
@@ -423,11 +523,10 @@ const run = async () => {
     clearScreenshots();
 
     const { chromium } = await import('@playwright/test');
-    const basePort = Number(process.env.PORT ?? (useDev ? 3000 : 4273));
-    const storageSeed = buildStorageSeed({ signedIn, theme });
+    const basePort = Number(process.env.PORT ?? serve.port);
     const rows = [];
 
-    await withServer({ useDev, basePort }, async ({ server, port }) => {
+    await withServer({ useDev, basePort, serve }, async ({ server, port }) => {
         if (port !== basePort) {
             console.log(
                 `probe: port ${String(basePort)} is busy, so the server runs on ${String(port)}.`

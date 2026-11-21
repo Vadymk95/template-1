@@ -4,81 +4,138 @@
  * should.
  *
  * Why this exists, measured rather than assumed: when a file inside the coverage scope cannot be
- * parsed, vitest prints `Failed to parse <file>. Excluding it from coverage.` — and then **exits 0**.
- * The percentage that follows is computed over the surviving files, so it can even go UP. A threshold
- * gate cannot see this: the number it checks is honest about a set that quietly shrank.
+ * parsed, vitest prints `Failed to parse <file>. Excluding it from coverage.` and jest prints
+ * `Failed to collect coverage from <file>` — and then **exits 0**. The percentage that follows is
+ * computed over the surviving files, so it can even go UP. A threshold gate cannot see this: the number
+ * it checks is honest about a set that quietly shrank. The wording differs per runner, which is why
+ * each runner has its own marker, copied from a measured run: a grep for a string nobody has seen is
+ * decoration.
  *
  * Marker-based on purpose. A file-count baseline is the stronger guard in a real application, but in a
  * TEMPLATE it would record the file count of an empty scaffold and then have to be edited by hand on
  * every commit that adds a file.
  *
- * Usage:
- *   node scripts/check-coverage.mjs            # runs `vitest run --coverage` and guards its output
+ * The runner is `coverage.runner` in scripts/gate-tiers.json: "vitest" (the default when the key or the
+ * file is missing) or "jest". Any other value, or a file that is not JSON, stops the run with one line.
+ * Under jest the `text` reporter is refused too: it prints a row per file into every coverage log and
+ * nothing reads it; `text-summary` prints the four totals and a missed threshold is still named.
  *
- * A push that changes no harness file leaves out the harness tests listed in gate-tiers.json
- * (`selfTests`): scripts/verify-push.mjs decides and tells this step through SELF_TESTS_FLAG in the
- * environment of the chain it starts. The flag only switches the list on; the files always come from
- * the list. Without the flag, or under CI, every test runs. Coverage does not count `scripts/**`,
- * so no number moves.
+ * Usage:
+ *   node scripts/check-coverage.mjs            # runs the coverage of the configured runner and guards its output
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-import { isCi } from './check-test-siblings.mjs';
 import { describeOutputOverflow, OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
-export const SELF_TESTS_FLAG = 'GATE_LEAVE_OUT_SELF_TESTS';
+// Per runner: the arguments after `npx` and the lines that say a file left the report. `--no-install` so a
+// missing or incomplete `node_modules` cannot make npx fetch a different runner from the network and gate on
+// a tool this repo does not pin. Vitest's two halves must both be present: "Failed to parse" alone also
+// appears in ordinary test failures.
+const RUNNERS = {
+    vitest: {
+        args: ['--no-install', 'vitest', 'run', '--coverage'],
+        markers: ['Failed to parse', 'Excluding it from coverage']
+    },
+    jest: {
+        args: ['--no-install', 'jest', '--coverage'],
+        markers: ['Failed to collect coverage from']
+    }
+};
+const TIERS_FILE = 'scripts/gate-tiers.json';
 
-/** The harness tests a push may leave out; empty when the list is missing or malformed. */
-export const readSelfTests = (cwd) => {
+/** The runner `coverage.runner` names in the repository at `cwd`; vitest when the file or the key is missing. */
+export const readRunner = (cwd) => {
+    let tiers = {};
     try {
-        const files = JSON.parse(readFileSync(`${cwd}/scripts/gate-tiers.json`, 'utf8')).selfTests
-            ?.files;
-        return Array.isArray(files) && files.every((file) => typeof file === 'string') ? files : [];
-    } catch {
-        return [];
+        tiers = JSON.parse(readFileSync(`${cwd}/${TIERS_FILE}`, 'utf8'));
+    } catch (error) {
+        if (error?.code !== 'ENOENT') {
+            throw new Error(`${TIERS_FILE} cannot be read as JSON`, { cause: error });
+        }
     }
-};
-
-/** The arguments of the vitest run (after `npx`), with the listed tests excluded only when told to. */
-export const coverageArguments = ({ env, cwd }) => {
-    // `--no-install` so a missing or incomplete `node_modules` cannot make npx fetch a different
-    // vitest from the network and gate on a tool this repo does not pin.
-    const args = ['--no-install', 'vitest', 'run', '--coverage'];
-    if (env[SELF_TESTS_FLAG] === '1' && !isCi(env)) {
-        for (const file of readSelfTests(cwd)) args.push('--exclude', file);
-    }
-    return args;
-};
-
-/** The one line that says the run leaves harness tests out; undefined when it leaves none out. */
-export const leftOutNotice = (args) => {
-    const count = args.filter((arg) => arg === '--exclude').length;
-    return count === 0
-        ? undefined
-        : `check-coverage: ${String(count)} listed harness tests left out (${SELF_TESTS_FLAG}=1; CI runs them)`;
+    const runner = tiers?.coverage?.runner;
+    if (runner === undefined) return 'vitest';
+    if (typeof runner === 'string' && Object.hasOwn(RUNNERS, runner)) return runner;
+    throw new Error(
+        `${TIERS_FILE} names the coverage runner ${JSON.stringify(runner)}; the choices are ${Object.keys(RUNNERS).join(' and ')}`
+    );
 };
 
 /**
- * Vitest's own wording, copied from a measured run rather than guessed. Both halves must be present:
- * "Failed to parse" alone also appears in ordinary test failures.
+ * The arguments after `npx` for a runner. Vitest reads `VITEST_MAX_WORKERS` itself; jest reads no cap from
+ * its environment, so a jest run gets `--maxWorkers=<n>` from `JEST_MAX_WORKERS` (unset or empty: jest's own
+ * default). A value that is not a positive whole number throws, so a misspelled cap never reads as no cap.
  */
-const DROPOUT_MARKERS = ['Failed to parse', 'Excluding it from coverage'];
+export const runnerArguments = (runner, env = process.env) => {
+    const cap = env.JEST_MAX_WORKERS;
+    if (runner !== 'jest' || cap === undefined || cap === '') return RUNNERS[runner].args;
+    if (!/^[1-9]\d*$/.test(cap)) {
+        throw new Error(
+            `JEST_MAX_WORKERS=${JSON.stringify(cap)} is not a positive whole number; unset it for jest's own default or give the number of workers`
+        );
+    }
+    return [...RUNNERS[runner].args, `--maxWorkers=${cap}`];
+};
+
+/**
+ * What is wrong with the coverage reporters in the `jest` key of a package.json, or undefined: the
+ * summary is there and the per-file table is not. Unset means jest's own default list, which has `text`.
+ * A config that lives outside package.json cannot be seen here and is not judged.
+ */
+export const jestReporterProblem = (pkg) => {
+    if (pkg?.jest === undefined) return undefined;
+    const reporters = (pkg.jest.coverageReporters ?? ['json', 'text', 'lcov', 'clover']).map(
+        (entry) => (Array.isArray(entry) ? entry[0] : entry)
+    );
+    if (reporters.includes('text'))
+        return 'jest.coverageReporters in package.json lists "text", which prints a row per file; use "text-summary"';
+    if (!reporters.includes('text-summary'))
+        return 'jest.coverageReporters in package.json lacks "text-summary", the four totals in the terminal';
+    return undefined;
+};
 
 /**
  * Pure, so the decision is testable without running a suite. Returns the offending lines, so the
  * failure message can name the files instead of just asserting that something happened.
  */
-export const findCoverageDropouts = (output) =>
+export const findCoverageDropouts = (output, runner = 'vitest') =>
     String(output)
         .split('\n')
-        .filter((line) => DROPOUT_MARKERS.every((marker) => line.includes(marker)));
+        .filter((line) => RUNNERS[runner].markers.every((marker) => line.includes(marker)));
+
+const readPackage = (cwd) => {
+    try {
+        return JSON.parse(readFileSync(`${cwd}/package.json`, 'utf8'));
+    } catch {
+        return undefined;
+    }
+};
 
 const main = () => {
-    const args = coverageArguments({ env: process.env, cwd: process.cwd() });
-    const notice = leftOutNotice(args);
-    if (notice !== undefined) console.log(notice);
+    let runner;
+    try {
+        runner = readRunner(process.cwd());
+    } catch (error) {
+        console.error(`check-coverage: ${error.message}`);
+        process.exitCode = 1;
+        return;
+    }
+    const problem = runner === 'jest' ? jestReporterProblem(readPackage(process.cwd())) : undefined;
+    if (problem !== undefined) {
+        console.error(`check-coverage: ${problem}`);
+        process.exitCode = 1;
+        return;
+    }
+    let args;
+    try {
+        args = runnerArguments(runner);
+    } catch (error) {
+        console.error(`check-coverage: ${error.message}`);
+        process.exitCode = 1;
+        return;
+    }
     const result = spawnSync('npx', args, {
         encoding: 'utf8',
         shell: false,
@@ -107,7 +164,7 @@ const main = () => {
         return;
     }
 
-    const dropouts = findCoverageDropouts(`${result.stdout ?? ''}\n${result.stderr ?? ''}`);
+    const dropouts = findCoverageDropouts(`${result.stdout ?? ''}\n${result.stderr ?? ''}`, runner);
 
     if (dropouts.length > 0) {
         console.error(
@@ -117,7 +174,7 @@ const main = () => {
             console.error(`  ${line.trim()}`);
         }
         console.error(
-            '\nThe percentage above describes a SMALLER set of files than the coverage scope, and vitest exits 0 on its own.\n'
+            `\nThe percentage above describes a SMALLER set of files than the coverage scope, and ${runner} exits 0 on its own.\n`
         );
         process.exitCode = 1;
     }

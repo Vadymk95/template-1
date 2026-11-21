@@ -9,12 +9,12 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 | Entry                                                              | Date    | Status         |
 | ------------------------------------------------------------------ | ------- | -------------- |
 | The harness and its tests live in gatelaw, and a sync copies them | 2026-11 | in force       |
+| The process rules, the role column and the engines floor come from gatelaw | 2026-11 | in force       |
 | The report lists the last pushes and a guard keeps the moments map whole | 2026-11 | in force       |
 | A trace row names its commit and the red step | 2026-11 | in force       |
 | The push runs its steps through one runner that names the red one | 2026-11 | in force       |
 | A log keeps four coverage totals and a command's first and last lines | 2026-11 | in force       |
 | A script reads a child's whole output and a full phase says its caches | 2026-11 | in force   |
-| A push leaves out the harness tests that read only the harness     | 2026-11 | in force       |
 | Mutation on the lines a pull request changed is informational      | 2026-11 | in force       |
 | Stryker runs the suite in the `forks` pool, as `vitest run` does   | 2026-11 | in force       |
 | Cross-browser runs in the Playwright image                         | 2026-11 | in force       |
@@ -94,9 +94,27 @@ A doc may keep naming a test the manifest lists as moved.
 `canary.json`, and runs `npm run verify:scaffold` there, so a change this repository's config cannot carry is red
 before the sync pull request.
 
-**What follows:** `scripts/gate-tiers.json` lists no `selfTests`, so every push prints that all harness self-tests
-run. The mechanism stays in the synced scripts for a repository that keeps harness tests of its own; the entry "A push
-leaves out the harness tests that read only the harness" describes it.
+**What follows:** `scripts/gate-tiers.json` lists no `selfTests` and the synced scripts carry no code to leave a
+harness test out of a push: every push runs the whole chain, as CI does.
+
+## [2026-11] The process rules, the role column and the engines floor come from gatelaw
+
+**Status:** in force. **Evidence:** `.gatelaw.json`, `scripts/docs-check.mjs` (the role column check), `scripts/check-engines-floor.mjs`, `scripts/bench-verify.repo.test.mjs`.
+
+**Context:** the first sync left four process rules, the floor script and a push that could leave harness tests out as
+this repository's own text. The other templates carried the same rules in four versions, and the kit's tests no
+longer exist here, so the leave-out had no list and no test left to leave out.
+
+**Decision:** `agent-pipeline.mdc`, `global.mdc`, `workflow.mdc` and `test-driven-development.mdc` are synced from
+gatelaw and name no stack, path or library. What they drop stays where it is true: the routing list of the old
+`global.mdc` is `READING_INDEX.md` § Rule routing, and the repository's runner, library and layout facts are
+`VERIFICATION.md` § What the shared process rules leave to this repository. The command table of `AGENTS.md` tags each
+command with a role of the tier law (`# [<role>]`) and `docs.roleColumn` in `scripts/gate-tiers.json` is `required`, so
+a table with no tag is red in `docs:check`. The floor step of `verify` and `verify:scaffold` is
+`scripts/check-engines-floor.mjs`; `scripts/check-node-floor.mjs` is a synced alias that nothing calls.
+
+**Consequences:** the leave-out of harness tests is gone (code, `selfTests` key, the entry that described it, the
+fork-init case that guarded its list). A change to a process rule is made in gatelaw, never here.
 
 ## [2026-11] The report lists the last pushes and a guard keeps the moments map whole
 
@@ -161,45 +179,18 @@ for lines (<n>%) does not meet global threshold (<n>%)`, exit 1). The per-file t
 `status` fails with no reason. Measured (Node 24.10.0, macOS): 600 KiB on stdout plus 600 KiB on stderr ends in
 `ENOBUFS`, and with 64 MiB the same call ends in status 0. A script that echoes a captured output and then calls
 `process.exit()` loses its tail on a pipe: 65,536 of 1,048,576 bytes arrive, while `process.exitCode` and a return
-deliver all of them. `GATE_PHASE=full` was documented as "the full chain"; it runs every stage, but Prettier still reads `.prettiercache` (no workflow restores it, so CI starts without) and the
-harness self-tests stay left out when no harness file changed.
+deliver all of them. `GATE_PHASE=full` was documented as "the full chain"; it runs every stage, but Prettier still reads `.prettiercache` (no workflow restores it, so CI starts without).
 
 **Decision:** every capture in `scripts/*.mjs` passes `maxBuffer: OUTPUT_LIMIT_BYTES` (256 MiB, `scripts/child-output.mjs`);
 `check-coverage` and `audit-gate` print one line naming the limit when `ENOBUFS` stops a child, and fail. A script that
 echoes a child's output sets `process.exitCode` and returns. `scripts/output-limits.test.mjs` fails both a capture with
-no limit and an echo followed by `process.exit(`. A full `GATE_PHASE` (`full` or `1`) prints one line: every stage runs, the Prettier cache still applies, and `rm -f .prettiercache && GATE_PHASE=full GATE_SELF_TESTS=all git push` skips nothing.
+no limit and an echo followed by `process.exit(`. A full `GATE_PHASE` (`full` or `1`) prints one line: every stage runs, the Prettier cache still applies, and `rm -f .prettiercache && GATE_PHASE=full git push` skips nothing.
 
 The push's `lint` runs ESLint uncached (no `--cache` in `package.json`): a cached run replays an old verdict of a
 type-aware rule (typescript-eslint FAQ, "Can I use ESLint's `--cache` with typescript-eslint?": "it will only work
 reliably for untyped rules -- and even then, not always", https://typescript-eslint.io/troubleshooting/faqs/eslint/).
 Measured 2026-11-19, median of 3 runs per mode on the maintainer's Mac, one file changed: 3.8 s cached, 11.0 s
 uncached. `fix`, the staged pass and `lint-changed` keep their cache.
-
-## [2026-11] A push leaves out the harness tests that read only the harness
-
-**Status:** in force. **Evidence:** `scripts/verify-push.self-tests.test.mjs`, `scripts/gate-tiers.self-tests.test.mjs`.
-
-**Context:** the harness's own tests were about 35 s of a 41 s unit run, and a fork that only writes app code paid
-for them at every push. Five test files that build real git repositories in temp folders were 106.7 s of 125.2 s of
-summed test time. Only a change to the harness can change their result. The rule has to be narrow: of the harness
-test files, 21 of 47 (measured 2026-11-11) read the real repository (app files, configs, `package.json`) and are
-guards over the project.
-
-**Decision:** `selfTests.files` in `scripts/gate-tiers.json` names the test files that read nothing but `scripts/`
-and temp folders (its own test, `verify-push.self-tests.test.mjs`, qualified by measurement: 10 s, no other read). A
-push whose commits change no path of `scripts/gate-files.json`, none under `scripts/`, no `package.json` and no
-lockfile leaves exactly those out of the `test:coverage` stage, in either phase, and prints how many and why.
-Anything unknown runs them: no remote branch, no merge base, a git failure, a package below the repository root, an
-unreadable manifest, `CI`, or `GATE_SELF_TESTS=all git push`. Any other non-empty value of `GATE_SELF_TESTS` stops
-the push with a message, so a mistyped override never leaves the tests out in silence. Coverage counts `src/**`
-only, so no number moves.
-
-**How a file gets on the list:** a pull request that adds it. The list is a gate file (`scripts/**`), so the
-`gate-change` label applies, and `scripts/gate-tiers.self-tests.test.mjs` fails a name that is missing, duplicated or
-not a test file under `scripts/`. A test that reads any app file, config or `package.json` is never listed.
-
-**What CI guarantees:** `CI`, `npm test` and `npm run verify` leave nothing out, so every listed test runs on every
-pull request; a push can only be earlier than CI, never different from it.
 
 ## [2026-11] Mutation on the lines a pull request changed is informational
 

@@ -7,27 +7,24 @@ priority: 95
 
 # Global Standards
 
-## Pipeline Initialization (CRITICAL)
+**Any task MUST begin** with the protocol in `agent-pipeline.mdc` (Discovery → Simulation → TDD Execution → Verification → Brain Sync → Confidence). Domain standards live in their own rules; the pipeline enforces them - never bypass it.
 
-Any task MUST begin by initializing the protocol in `agent-pipeline.mdc` (Discovery → Simulation → TDD Execution → Verification → Brain Sync → Confidence). Domain standards live in their own rules; the pipeline enforces them — never bypass it.
+## 0.1 Rule routing
 
-## 0.1 Conditional Rule Routing
+Do **NOT** rely on an editor to attach every glob-scoped rule: rules with `alwaysApply: false` are not always injected for a task, and silently skipping them is a real failure mode. Before planning or editing in a task area, **explicitly read the matching rules**.
 
-Cursor does NOT reliably auto-attach glob-scoped rules (`alwaysApply: false`). The always-on rules — this file, `agent-pipeline.mdc`, `workflow.mdc` — load on their own. Before planning or editing in a task area, **explicitly read the matching rules**:
-
-- **React / UI / component / hook / page / HOC** → `react-patterns.mdc`, `engineering-standards.mdc`, `performance.mdc`
-- **New or changed component behaviour, tests, fixtures, mocks, coverage** → `test-driven-development.mdc` (before implementing)
-- **Styling / Tailwind / theme tokens / i18n strings / accessibility / path aliases** → `project-config.mdc`
-- **API client / TanStack Query / data fetching / payload contracts** → `api.mdc`, `state-management.mdc`, `resilience.mdc`
-- **Zustand stores / `createSelectors`** → `state-management.mdc`, `resilience.mdc`, `test-driven-development.mdc`
-- **Routing / lazy pages** → `routing.mdc`, `react-patterns.mdc`
-- **Async / error handling / debugging** → `resilience.mdc`
-- **Render performance / memo / list keys / bundle budgets** → `performance.mdc`, `react-patterns.mdc`
-- **Constants / magic strings / config values** → `constants.mdc`, `engineering-standards.mdc`
+- The always-on core is `agent-pipeline.mdc`, `workflow.mdc` and this file. They attach themselves and need not appear in the Rule Receipt (`agent-pipeline.mdc` Step 1). Everything else is conditional.
+- The routing table of a repo (task area → the rules to read, for example UI work, tests and fixtures, data fetching and payload contracts, client-global state, routing, async and error handling, styling and accessibility, constants, build and project configuration, a platform's own surface) lives in `.cursor/brain/READING_INDEX.md`, in its Rule routing section. A task that touches a danger zone also reads `.cursor/brain/SKELETONS.md`.
+- Behaviour that is new or changed, and any test, fixture or mock: read `test-driven-development.mdc` **before** implementing.
+- Async work, error handling and debugging: read `resilience.mdc`.
+- `agent-pipeline.mdc` Step 1 enforces this: load the matching rules, then emit a **Rule Receipt** listing the ones actually loaded.
 
 ## Standards
 
-- **Language:** English only in source, identifiers, comments, JSDoc, tests and Git messages. Brain docs under `.cursor/brain/` too.
-- **Authority:** code is ground truth, `AGENTS.md` the canonical guide, `.cursor/brain/` the depth layer (`AGENTS.md` § Source of truth); sync drift in the same session.
-- **Code:** strict TypeScript; existing libraries over custom logic; minimal code; no magic strings (constants or i18n keys); a written plan with one adversarial pass for logic, `context7` for library docs.
-- **Git:** `type(scope): description`, English, max 96 chars, no "Co-authored-by" tags (`workflow.mdc` § Git Commits).
+- **Language**: English only - source, identifiers, comments, doc comments, tests, Git messages and the docs under `.cursor/brain/`.
+- **Authority**: code is ground truth, `AGENTS.md` is the canonical guide, `.cursor/brain/` is the depth layer; sync drift in the same session.
+- **Code**: strict typing where the language has it; prefer existing libraries over custom logic and over custom infrastructure; minimal code and a minimal diff; no magic strings (constants, tokens, typed keys or translation keys); one import alias over deep relative paths, except where a tool that reads the file outside the build needs relative ones (the repo says where); descriptive names; explain complex logic with single-line comments only. User-visible copy lives in the repo's one translation or copy location.
+- **Reasoning**: for multi-step work, write the plan in the reply and run one adversarial pass over it before the first edit; use the documentation lookup tool for library docs, or the official docs where there is none.
+- **Danger zones**: a frozen or protected surface (named in `AGENTS.md` and `.cursor/brain/SKELETONS.md`) is not touched without explicit approval first (`workflow.mdc` § The Approval Law).
+- **Git**: `type(scope): description`, English, imperative mood, header of at most 96 characters, no "Co-authored-by" tags (`workflow.mdc` § Git Commits and Pushes).
+- **Hygiene**: AI metadata and agent-only specs live under `.cursor/`; normal project docs (the README, a deployment checklist) may live in the root when they are part of the repo's contract.
