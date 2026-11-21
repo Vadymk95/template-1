@@ -37,6 +37,10 @@
  *              (`skipIf(c)`, `test.skip(cond, ...)`, `{ skip: cond }`) needs none. The date is the
  *              first RED day (UTC, not a day later) and may be at most 30 days after today
  *              (QUARANTINE_MAX_DAYS): a quarantine is a short loan, so `until 2099-12-31` is red too
+ *   gatelaw    every file `.gatelaw.json` lists keeps the sha256 and mode gatelaw wrote, the AGENTS.md
+ *              shared block keeps its sha256, the manifest does not record a `dirty` gatelaw tree; no
+ *              manifest is a finding in a template, one printed line in a fork (`.template-origin.json`).
+ *              A `scripts/*.test.mjs` the manifest lists as moved still counts for the paths check
  *   versions   "Vitest 5" / "React 19.3" in a doc matches the installed version (package-lock.json)
  *   table      every non-internal package.json script is documented in AGENTS.md or README.md
  *   dead       every doc file has an inbound reference (platform-discovered files exempt)
@@ -102,6 +106,7 @@
  *             that expires while nobody pushes still turns the scheduled run red
  */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -279,7 +284,14 @@ const isRootFile = (root, name, listed) => {
     }
 };
 
-export const checkPathsAndScripts = ({ docs, root, scripts, topDirs, listed = null }) => {
+export const checkPathsAndScripts = ({
+    docs,
+    root,
+    scripts,
+    topDirs,
+    listed = null,
+    moved = movedTests(root)
+}) => {
     const findings = [];
     const families = scriptFamilies(scripts);
     for (const [file, text] of docs) {
@@ -297,7 +309,7 @@ export const checkPathsAndScripts = ({ docs, root, scripts, topDirs, listed = nu
                 );
             }
             if (kind === 'path') {
-                if (!pathExists(root, value, listed)) {
+                if (!pathExists(root, value, listed) && !moved.has(value)) {
                     findings.push(`${file}:${line}: \`${token}\` does not exist in the tree`);
                 }
             } else if (
@@ -390,6 +402,70 @@ export const checkMemoryImports = (root) => {
         });
     }
     return findings;
+};
+
+const GATELAW_MANIFEST = '.gatelaw.json';
+const GATELAW_REMEDY = 'edit it in gatelaw, then run `gatelaw sync --to <this repository>`';
+const SHARED_BLOCK = /<!-- shared-harness:begin -->\n([\s\S]*?)<!-- shared-harness:end -->/;
+const sha256Of = (data) => createHash('sha256').update(data).digest('hex');
+
+/** The manifest gatelaw sync wrote, or null when there is none or it cannot be read. */
+const readGatelawManifest = (root) => {
+    try {
+        return JSON.parse(readFileSync(path.join(root, GATELAW_MANIFEST), 'utf8'));
+    } catch {
+        return null;
+    }
+};
+
+/** The tests gatelaw took over; a doc may keep naming them. The paths check reads it from `root`. */
+const movedTests = (root) => new Set(readGatelawManifest(root)?.tests ?? []);
+
+/**
+ * The files gatelaw synced here must stay as it wrote them: a hand edit of a copy is lost at the next
+ * sync, so it is a finding now, where it is cheap. Returns { findings, notes }.
+ */
+export const checkGatelaw = (root) => {
+    const manifest = readGatelawManifest(root);
+    if (manifest === null) {
+        // A fork may detach on purpose; a template that lost the manifest has lost its gate.
+        return existsSync(path.join(root, '.template-origin.json'))
+            ? { findings: [], notes: ['gatelaw: detached (no .gatelaw.json)'] }
+            : {
+                  findings: [
+                      `${GATELAW_MANIFEST} is missing or unreadable: run \`gatelaw sync --to <this repository>\` from a clean gatelaw checkout`
+                  ],
+                  notes: []
+              };
+    }
+    const findings = [];
+    if (manifest.commit === 'dirty')
+        findings.push(
+            `${GATELAW_MANIFEST} records a dirty gatelaw tree: sync again from a clean gatelaw commit`
+        );
+    for (const [file, { sha256, mode }] of Object.entries(manifest.files ?? {})) {
+        const full = path.join(root, file);
+        const actual = existsSync(full) && (statSync(full).mode & 0o111 ? '100755' : '100644');
+        if (!actual)
+            findings.push(
+                `${file} is listed in ${GATELAW_MANIFEST} but missing: ${GATELAW_REMEDY}`
+            );
+        else if (sha256Of(readFileSync(full)) !== sha256)
+            findings.push(`${file} differs from its gatelaw copy: ${GATELAW_REMEDY}`);
+        else if (actual !== mode)
+            findings.push(
+                `${file} has mode ${actual}, gatelaw's copy has ${mode}: ${GATELAW_REMEDY}`
+            );
+    }
+    const agents = existsSync(path.join(root, 'AGENTS.md'))
+        ? readFileSync(path.join(root, 'AGENTS.md'), 'utf8')
+        : '';
+    const block = SHARED_BLOCK.exec(agents)?.[1];
+    if (block === undefined)
+        findings.push(`AGENTS.md has no shared-harness block: ${GATELAW_REMEDY}`);
+    else if (sha256Of(block) !== manifest.block?.sha256)
+        findings.push(`AGENTS.md shared block differs from the gatelaw copy: ${GATELAW_REMEDY}`);
+    return { findings, notes: [] };
 };
 
 export const compareVersion = (docMajor, docMinor, installed) => {
@@ -2633,6 +2709,9 @@ const main = () => {
     const weekly = argv.includes('--weekly');
     const today = new Date().toISOString().slice(0, 10);
     const { findings, budget, notes, skipped } = run({ root, today });
+    const gatelaw = checkGatelaw(root);
+    findings.push(...gatelaw.findings);
+    notes.push(...gatelaw.notes);
 
     console.log(`docs:check${weekly ? ' (weekly)' : ''}`);
     // A line that asks a person to act starts at the margin, so a scan for `ACT` finds it.

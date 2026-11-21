@@ -8,6 +8,7 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 
 | Entry                                                              | Date    | Status         |
 | ------------------------------------------------------------------ | ------- | -------------- |
+| The harness and its tests live in gatelaw, and a sync copies them | 2026-11 | in force       |
 | The report lists the last pushes and a guard keeps the moments map whole | 2026-11 | in force       |
 | A trace row names its commit and the red step | 2026-11 | in force       |
 | The push runs its steps through one runner that names the red one | 2026-11 | in force       |
@@ -65,6 +66,37 @@ log. Each entry has one row in the index below and holds at most 30 lines after 
 | Component pattern: arrow function plus `FunctionComponent`         | 2026-04 | in force       |
 | Build stack: Tailwind v4, Vite 8 with Rolldown, `plugin-react` v6  | 2026-03 | in force       |
 | No FSD; Zustand for client state, TanStack Query for server state  | 2026-03 | in force       |
+
+## [2026-11] The harness and its tests live in gatelaw, and a sync copies them
+
+**Status:** in force. **Evidence:** `.gatelaw.json`, `scripts/docs-check.mjs` (`checkGatelaw`) and its tests in gatelaw.
+
+**Context:** every template carried its own copy of the gate scripts, 54 test files, the `.cursor/` templates and
+commands and the shared block of `AGENTS.md`. The copies drifted: a fix made in one template had to be remembered in
+the others.
+
+**Decision:** gatelaw, a repository that is not a published package, holds the one copy. `gatelaw sync --to <repo>`
+writes the listed files at the same paths, fills the block between the `shared-harness` markers of `AGENTS.md`,
+removes the test files that moved out, and records each copy (sha256 and mode), the block and the removed tests in
+`.gatelaw.json`. A test file moves whole when it reads nothing of this repository, stays when it reads only this
+repository, and splits when it does both: gatelaw keeps the half that reads gatelaw's files under the same name, this
+repository keeps the other as a `*.repo.test.mjs` file. Sync never writes or deletes those, nor `scripts/*.json` or
+`fork-init*`. Of the 54 test files 16 stayed, 10 split, 25 moved and 3 are synced as copies: a test that
+scans every file under `scripts/` guards the repository it runs in.
+
+**How a hand edit is caught:** `docs:check` compares each listed file and the block with the manifest. It is red on a
+changed file, a changed exec bit, a missing file, a manifest that records a `dirty` gatelaw tree and a missing
+manifest; the remedy is to edit the file in gatelaw and run `gatelaw sync`. A fork (it has `.template-origin.json`)
+detaches by deleting `.gatelaw.json`; `docs:check` then prints `gatelaw: detached (no .gatelaw.json)` on every run.
+A doc may keep naming a test the manifest lists as moved.
+
+**What gatelaw's CI guarantees:** a canary syncs the candidate into this repository, at the ref named in gatelaw's
+`canary.json`, and runs `npm run verify:scaffold` there, so a change this repository's config cannot carry is red
+before the sync pull request.
+
+**What follows:** `scripts/gate-tiers.json` lists no `selfTests`, so every push prints that all harness self-tests
+run. The mechanism stays in the synced scripts for a repository that keeps harness tests of its own; the entry "A push
+leaves out the harness tests that read only the harness" describes it.
 
 ## [2026-11] The report lists the last pushes and a guard keeps the moments map whole
 

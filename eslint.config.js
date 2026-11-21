@@ -421,10 +421,11 @@ export default defineConfig([
     },
     // Both Tailwind rule families below read the stylesheet on their own, and ESLint's cache keys on the
     // linted file and the resolved config, never on a file a rule opens itself: after a token or utility
-    // change a cached run replays the verdicts of the old stylesheet (`scripts/lint-config.test.mjs`
-    // reproduces it against ESLint itself). `settings` is part of that key, so a fingerprint of the
-    // stylesheet, the local files it imports and the installed version of each package it imports
-    // re-lints exactly the files these rules cover. How the hash is built: `scripts/css-fingerprint.mjs`.
+    // change a cached run replays the verdicts of the old stylesheet (gatelaw's
+    // `scripts/lint-config.test.mjs` reproduces it against ESLint itself). `settings` is part of that
+    // key, so a fingerprint of the stylesheet, the local files it imports and the installed version of
+    // each package it imports re-lints exactly the files these rules cover. How the hash is built:
+    // `scripts/css-fingerprint.mjs`.
     {
         files: ['**/*.tsx'],
         settings: {

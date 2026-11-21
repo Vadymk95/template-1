@@ -3,26 +3,40 @@
  * docs-trigger - runs `npm run docs:check` when the changed files can change what it judges.
  *
  * `docs:check` takes seconds and reads the whole repository, so it runs only when the change touches
- * docs, rules, commands, brain files, workflows, hooks, the tier data, the checker itself or
- * `package.json` (the scripts the docs name). This file is the ONE place that condition lives: the
- * pre-commit hook runs it with `--staged` and the iterate chain runs it on the working tree, so the
- * two cannot disagree. The decision and the run are one script on purpose: a crash here exits
- * non-zero, where a hook's `if grep` would read it as "not needed".
+ * docs, rules, commands, brain files, workflows, hooks, the tier data, the checker itself,
+ * `package.json` (the scripts the docs name), or `.gatelaw.json` and the files it lists (the drift
+ * check). This file is the ONE place that condition lives: the pre-commit hook runs it with `--staged`
+ * and the iterate chain runs it on the working tree, so the two cannot disagree. The decision and the
+ * run are one script on purpose: a crash here exits non-zero, where a hook's `if grep` would read it
+ * as "not needed".
  *
  * Usage (from the repository root):
  *   node scripts/docs-trigger.mjs            # files that differ from HEAD, deleted ones included, plus untracked
  *   node scripts/docs-trigger.mjs --staged   # the staged files (the commit hook)
  */
 import { execFileSync, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 import { OUTPUT_LIMIT_BYTES } from './child-output.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 import { changedFiles } from './lint-changed.mjs';
 
 export const DOCS_TRIGGER =
-    /\.(?:md|mdc)$|^\.cursor\/|^\.github\/|^\.husky\/|^scripts\/gate-tiers\.json$|^scripts\/docs-check\.|^package\.json$/;
+    /\.(?:md|mdc)$|^\.cursor\/|^\.github\/|^\.husky\/|^scripts\/gate-tiers\.json$|^scripts\/docs-check\.|^package\.json$|^\.gatelaw\.json$/;
 
-export const touchesDocs = (files) => files.some((file) => DOCS_TRIGGER.test(file));
+// `listed`: the files gatelaw synced here (`.gatelaw.json`); a change to one is what the drift
+// check judges.
+export const touchesDocs = (files, listed = []) =>
+    files.some((file) => DOCS_TRIGGER.test(file) || listed.includes(file));
+
+const syncedFiles = (cwd) => {
+    try {
+        return Object.keys(JSON.parse(readFileSync(path.join(cwd, '.gatelaw.json'), 'utf8')).files);
+    } catch {
+        return [];
+    }
+};
 
 // A hook chain can export these, and a child git that inherits them answers for the repository they
 // name instead of the one at `cwd`. GIT_INDEX_FILE stays: a partial commit hands the hook the
@@ -54,7 +68,7 @@ const main = () => {
     const files = args.includes('--staged')
         ? stagedFiles(cwd)
         : changedFiles({ cwd, deleted: true });
-    if (!touchesDocs(files)) {
+    if (!touchesDocs(files, syncedFiles(cwd))) {
         console.log('docs-trigger: no docs-class file changed, docs:check skipped');
         return;
     }
