@@ -18,29 +18,20 @@
  *
  * GATE_PHASE=full|0 overrides per run. Template maintainers push gate machinery with
  * GATE_PHASE=full: changes to the gate itself are exactly what the full chain exists to prove. It
- * runs every stage and nothing more: Prettier still reads `.prettiercache`, and the
- * harness self-tests stay left out when no harness file changed (that is
- * GATE_SELF_TESTS's decision). `describeOverride` prints that on every full override.
+ * runs every stage and nothing more: Prettier still reads `.prettiercache`. `describeOverride` prints
+ * that on every full override.
  *
  * A missing or unreadable phase resolves to FULL: the dispatcher fails toward the heavier gate,
  * never toward silence.
  *
- * One exception to "never shortened by what the diff touched": the harness's own tests that read
- * nothing outside the harness (gate-tiers.json, `selfTests`) are left out of a push that changes no
- * harness file (a path of gate-files.json or under scripts/, package.json or the lockfile). The decision
- * is made here, once, from the paths between the merge base with the remote branch and HEAD, and passed
- * to the unit step as SELF_TESTS_FLAG. Anything that cannot be told (a package below the repository
- * root too), CI and `GATE_SELF_TESTS=all` run them all.
- * Every push prints which way it went. The target's steps run through scripts/bench-verify.mjs
+ * The push is never shortened by what the diff touched: every test of the repository runs.
+ * The target's steps run through scripts/bench-verify.mjs
  * (`runScript`): the same leaf commands `npm run <target>` ran, stopping at the first red with one
  * verdict line that names the step.
  */
 import { readFileSync } from 'node:fs';
 
 import { runScript } from './bench-verify.mjs';
-import { MANIFEST_PATH, matchesGlob } from './check-gate-integrity.mjs';
-import { readSelfTests, SELF_TESTS_FLAG } from './check-coverage.mjs';
-import { FALLBACK_BASE, isCi, makeGit, resolveBase } from './check-test-siblings.mjs';
 import { isEntryPoint } from './is-entry-point.mjs';
 
 const FULL_TARGET = 'verify:ci';
@@ -143,68 +134,6 @@ export const readChecks = (cwd) => readTiers(cwd)?.checks;
 
 export const readScripts = (cwd) => readJson(`${cwd}/package.json`)?.scripts;
 
-const OVERRIDE_VARIABLE = 'GATE_SELF_TESTS';
-const ALWAYS_HARNESS = new Set(['package.json', 'package-lock.json']);
-
-/** The harness paths of scripts/gate-files.json; undefined when it cannot be read. */
-export const readGateGlobs = (cwd) => {
-    const paths = readJson(`${cwd}/${MANIFEST_PATH}`)?.paths;
-    return Array.isArray(paths) && paths.every((glob) => typeof glob === 'string')
-        ? paths
-        : undefined;
-};
-
-/**
- * The paths this push changes: between the merge base of HEAD with the remote default branch (the
- * base `check-test-siblings --range` uses) and HEAD, a deleted path and both sides of a rename
- * included. { paths }, or { why } when it cannot be told.
- */
-export const readPushChange = ({ cwd, env, git = makeGit(cwd) }) => {
-    const base = resolveBase({ git, env });
-    if (!base.ref || base.ref === FALLBACK_BASE) {
-        return { why: 'no merge base with origin/master or origin/main' };
-    }
-    // `git diff` names paths from the repository root; the harness globs are relative to the package.
-    if (git(['rev-parse', '--show-prefix'])?.trim() !== '') {
-        return { why: 'the package is not at the repository root, or git could not say' };
-    }
-    const out = git(['diff', '--name-only', '-z', '--no-renames', base.ref, 'HEAD']);
-    return out === null
-        ? { why: 'git could not list the changed paths' }
-        : { paths: out.split('\0').filter(Boolean) };
-};
-
-/** Whether the listed self-tests are left out of this push; `readChange` is only called when it matters. */
-export const decideSelfTests = ({ env, listed, globs, readChange }) => {
-    const run = (reason) => ({ leaveOut: false, reason });
-    const override = env[OVERRIDE_VARIABLE];
-    if (override !== undefined && override !== '' && override !== 'all') {
-        throw new Error(
-            `${OVERRIDE_VARIABLE}="${override}" is not an override. The only value is all (unset or empty means none) — an unknown value must not silently leave tests out.`
-        );
-    }
-    if (override === 'all') return run(`${OVERRIDE_VARIABLE}=all`);
-    if (isCi(env)) return run('CI is set');
-    if (listed.length === 0) return run('scripts/gate-tiers.json lists no test to leave out');
-    if (globs === undefined) return run(`${MANIFEST_PATH} cannot be read`);
-    const change = readChange();
-    if (change.why !== undefined) return run(`cannot tell what this push changes: ${change.why}`);
-    const harness = change.paths.filter(
-        (file) =>
-            ALWAYS_HARNESS.has(file) ||
-            file.startsWith('scripts/') ||
-            globs.some((glob) => matchesGlob(glob, file))
-    );
-    if (harness.length === 0) return { leaveOut: true, reason: '' };
-    const more = harness.length > 1 ? ` and ${String(harness.length - 1)} more` : '';
-    return run(`harness path changed: ${harness[0]}${more}`);
-};
-
-export const describeSelfTests = ({ leaveOut, reason }, count) =>
-    leaveOut
-        ? `── push gate: ${String(count)} harness self-tests left out (this push changes no harness file; CI runs them; ${OVERRIDE_VARIABLE}=all git push runs them here) ──`
-        : `── push gate: all harness self-tests run (${reason}) ──`;
-
 /** The two lines phase 0 ends with: the trigger and the one-off run. */
 export const PHASE_0_FOOTER = [
     '   First deploy = the trigger: set "phase": 1 in scripts/gate-tiers.json',
@@ -218,7 +147,7 @@ export const PHASE_0_FOOTER = [
  */
 export const describeOverride = (override) =>
     override === 'full' || override === '1'
-        ? `── push gate: GATE_PHASE=${override} runs every stage; Prettier still reads .prettiercache; the run that skips nothing: rm -f .prettiercache && GATE_PHASE=full GATE_SELF_TESTS=all git push (CI starts without it) ──`
+        ? `── push gate: GATE_PHASE=${override} runs every stage; Prettier still reads .prettiercache; the run that skips nothing: rm -f .prettiercache && GATE_PHASE=full git push (CI starts without it) ──`
         : undefined;
 
 const main = () => {
@@ -227,16 +156,6 @@ const main = () => {
         override: process.env.GATE_PHASE,
         checks: readChecks(process.cwd()),
         scripts: readScripts(process.cwd())
-    });
-
-    const cwd = process.cwd();
-    const listed = readSelfTests(cwd);
-    // Decided before anything is printed: a refused override stops the push with its message alone.
-    const decision = decideSelfTests({
-        env: process.env,
-        listed,
-        globs: readGateGlobs(cwd),
-        readChange: () => readPushChange({ cwd, env: process.env })
     });
 
     if (plan.phase === 0) {
@@ -255,14 +174,8 @@ const main = () => {
     const overrideLine = describeOverride(process.env.GATE_PHASE);
     if (overrideLine !== undefined) console.log(overrideLine);
 
-    console.log(describeSelfTests(decision, listed.length));
-    // Only this decision sets the signal: one exported by hand never reaches the unit step.
-    const env = { ...process.env };
-    delete env[SELF_TESTS_FLAG];
-    if (decision.leaveOut) env[SELF_TESTS_FLAG] = '1';
-
     // The target's steps run through the step runner, one at a time: a red push names the step that failed.
-    process.exitCode = runScript(readScripts(cwd), plan.target, { env });
+    process.exitCode = runScript(readScripts(process.cwd()), plan.target);
 };
 
 if (isEntryPoint(import.meta.url)) {

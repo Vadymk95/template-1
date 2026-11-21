@@ -53,14 +53,15 @@ describe('parseVerifySteps', () => {
         expect(labels).toContain('check-version-holds');
     });
 
-    it('keeps the node-floor check in verify and verify:scaffold, so a stale engines floor turns the push red', () => {
+    it('keeps the engines-floor check in verify and verify:scaffold, so a stale engines floor turns the push red', () => {
         const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
 
         for (const name of ['verify:inner', 'verify:scaffold']) {
             const labels = parseVerifySteps(resolveScript(manifest.scripts, name)).map(
                 (step) => step.label
             );
-            expect(labels, name).toContain('check-node-floor');
+            expect(labels, name).toContain('check-engines-floor');
+            expect(labels, name).not.toContain('check-node-floor');
         }
     });
 

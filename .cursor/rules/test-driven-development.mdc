@@ -1,90 +1,77 @@
 ---
-description: 'TDD protocol and testing standards for Vitest + Testing Library'
-globs: ['**/*.{test,spec}.{ts,tsx}', '**/store/**/*.ts', '**/hooks/**/*.ts', '**/lib/**/*.ts']
+description: 'TDD protocol and testing standards: tests before implementation, and tests worth having'
+globs: ['**/*.{test,spec}.*']
 alwaysApply: false
 priority: 85
 ---
 
 # TDD Protocol
 
-## 1. Mandatory Test-First (Strict TDD)
+This file is the order of work and the standard a test must meet. The runner, its mock API, its configuration and the test utilities are the repo's own (`AGENTS.md` and the command table; the single-test command runs one file).
 
-Write tests **before** implementation for:
+## 0. The hook enforces existence; you are responsible for worth
 
-- **Zustand stores** (`src/store/*/`)
-- **Custom hooks** with logic > 10 lines (`src/hooks/*/`)
-- **Utilities and transforms** (`src/lib/`)
-- **Zod schemas** — validate schema before using it
+The pre-commit hook runs the sibling gate: every **staged** logic file under the source tree that is not on the exemption list needs a co-located test sibling that is in the git **index** with content (in HEAD, or staged), or the commit is refused. A test left untracked on disk, or only marked with `git add -N`, does not count. The gate (so the push and CI) repeats the same rule over every file the branch changed (`--range`), so a commit made with the hook skipped is caught there. Both look at changed files only, so it ratchets: nothing in the tree breaks retroactively, but the next edit to an untested file demands a test. A missing test is a blocked commit, not a follow-up TODO; skipping the hook (`--no-verify`) is forbidden.
 
-## 2. Hybrid UI Approach
+What the hook cannot check, and what actually matters:
 
-- **Runtime orchestration → Hook** (strict TDD for the hook)
-- **Pure computation → Utility** (strict TDD for the utility)
-- **UI → Component** (integration test after component is built)
-- **Rule**: If component logic exceeds 10 lines — extract to `useComponentName.ts` hook, apply strict TDD to the hook.
+- **Mutation check.** Revert the behaviour the test guards and confirm the test goes red. A test that still passes with the fix reverted is characterisation, not coverage, and it is worse than no test because it reads as protection.
+- **Assertions that cannot fail**: a truthiness check on a value the test just built, a wait whose body cannot throw, asserting empty text where an emptiness matcher was meant.
+- The exemption list sits with its reasons in the sibling gate's configuration. Do not extend it to move a commit along.
 
-```typescript
-// Integration test with providers
-import { renderWithProviders } from '@/test/test-utils';
-import { screen } from '@testing-library/react';
+## 1. Mandatory test-first (strict TDD)
 
-it('displays user name after login', async () => {
-    renderWithProviders(<UserCard id="1" />);
-    expect(await screen.findByText('John')).toBeInTheDocument();
-});
-```
+Write the failing test **before** the implementation, **always**, for:
 
-## 3. Implementation Cycle
+- global and domain state (stores, selectors, reducers) and their actions
+- hooks or runtime units with logic over 10 lines, or with non-trivial orchestration
+- utilities and transforms, including schemas and parsers (validate a schema before using it)
+- API operations, data transformations and form validation
+- server entry points (route handlers, server actions)
 
-1. **Requirements**: List test cases explicitly before coding.
-2. **Red**: Failing test — BDD style (`describe`/`it`), Arrange-Act-Assert.
-3. **Green**: Minimal code to pass.
-4. **Refactor**: Clean up while staying green.
+**Vertical slices, NOT horizontal (mandatory):** one test, then its implementation, then repeat. NEVER write all tests and then all code, and NEVER write the implementation first and backfill tests. Test behaviour through the public interface, not implementation details, so tests survive refactors.
 
-## 4. Quality Standards
+A fix whose only residual is a lint finding has no behaviour to assert: the red is the lint run on the unfixed copy (the rule name in the output). Say so in the report instead of inventing a test. For any other fix the regression test is written first and must fail without the fix.
 
-- **Isolation**: Mock external APIs and modules via `vi.mock()`. Never let tests hit real network. Mocks reset before every test (`mockReset` in `vitest.config.ts`): a mock keeps only the implementation it was created with, so set a return value or a spy inside the test or a `beforeEach`, never once at module level.
-- **Edge cases**: Always include error boundary tests, empty state, and network failure scenarios.
-- **Behavior over internals**: Test public API and user behavior — not implementation details.
+## 2. Hybrid UI approach
+
+- **Runtime orchestration → runtime unit** (strict TDD for it).
+- **Pure computation → utility** (strict TDD for it).
+- **UI → component**: an integration test after the component is built, or once the screen's API stabilises; it drives user-visible behaviour (interactions, roles and labels users depend on), not implementation details.
+- **Rule**: if component logic exceeds 10 lines, extract it to a runtime unit and apply strict TDD to that unit. Components stay presentational.
+- A UI refactor that moves copy, routing or validation boundaries leaves at least one behaviour-level integration test proving the visible contract still holds.
+
+## 3. Implementation cycle
+
+1. **Requirements**: list the test cases explicitly before coding (in chat).
+2. **Red**: a failing test, BDD style (`describe` / `it`), Arrange-Act-Assert.
+3. **Green**: minimal code to pass.
+4. **Refactor**: clean up while staying green.
+
+## 4. Quality standards
+
+- **Isolation**: mock external APIs and modules; a test never hits the real network or native I/O (inject dependencies or mock at module boundaries). Whether the runner resets mocks between tests is its configuration; never rely on state set outside the test: a mock keeps only the implementation it was created with, so set a return value, a spy or a once-value inside the test or its setup hook, never once at module level, and reset what the test changed.
+- **Edge cases**: always cover error paths, empty state, boundaries (empty, one, many, full, partial), async transitions (loading to loaded), entity switches (A to B) and network failure.
+- **Behaviour over internals**: test the public API and user behaviour, not implementation details.
+- **Async is awaited**: a runner or library whose calls return promises is always awaited; an un-awaited call poisons the next test.
 - **BDD naming**: `describe('UserStore')` → `it('sets username and marks as logged in on setUser()')`.
-- **Return types**: test files (`**/*.test.{ts,tsx}`, `src/test/**`) are exempt from `@typescript-eslint/explicit-function-return-type` (file-scoped override in `eslint.config.js`) — helpers/fixtures don't need declared return contracts.
+- **Return types**: helpers and fixtures in test files may be exempt from the linter's return-type rule where the repo's lint config says so.
 
-```typescript
-describe('userStore', () => {
-    it('sets username and isLoggedIn on setUser()', () => {
-        const { result } = renderHook(() => useUserStore());
-        act(() => result.current.setUser('alice'));
-        expect(result.current.username).toBe('alice');
-        expect(result.current.isLoggedIn).toBe(true);
-    });
+## 5. Test file location
 
-    it('clears state on logout()', () => {
-        const { result } = renderHook(() => useUserStore());
-        act(() => { result.current.setUser('alice'); result.current.logout(); });
-        expect(result.current.username).toBeNull();
-        expect(result.current.isLoggedIn).toBe(false);
-    });
-});
-```
-
-## 5. Test File Location
-
-- Co-locate tests with the file: `userStore.ts` → `userStore.test.ts`.
-- Component tests: `ComponentName.test.tsx` next to `ComponentName.tsx`.
+- Co-locate tests with the file: `userStore.ts` → `userStore.test.ts`; a component test sits next to the component.
 - No separate `__tests__` directories.
+- Import through the repo's alias in test files, as in source.
 
 ## 6. Exceptions (TDD can be skipped for)
 
-- Type-only files (interfaces, `*.d.ts`)
-- Static constants
-- Simple presentational components with no logic
-- Dev-only utilities (e.g., HMR hooks)
-- A fix whose only residual is a lint finding has no behaviour to assert: the red is the lint run on the unfixed copy (the rule name in the output); say so in the report instead of inventing a test.
+- Type-only files (interfaces, declaration files), configuration and static constants.
+- Simple presentational components with no logic; very simple functions (under 10 lines, one responsibility).
+- Dev-only utilities (for example hot-reload hooks).
+- Server Components or entry points with simple data fetching (test the fetching separately).
+
+Add tests anyway when the function has complex logic, is critical to the business logic or is reused in several places.
 
 ## 7. Commands
 
-```bash
-npm test              # vitest run (the gate runs test:coverage)
-npm run test:watch    # vitest watch (development)
-npm run test:coverage # coverage report
-```
+The commands are in the command table of `AGENTS.md`: the single-test command for one file, the iterate command per change. A watch mode and a coverage report are the runner's own scripts, listed there.

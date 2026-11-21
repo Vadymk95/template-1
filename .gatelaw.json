@@ -1,6 +1,7 @@
 {
     "kit": "gatelaw",
-    "commit": "26cede0ca70db9d36d873c955d88f11bcae6f289",
+    "commit": "1f65989886c02f71d17de21de466f4051d39569a",
+    "profile": "spa",
     "files": {
         ".cursor/commands/docs.md": {
             "sha256": "c54e58c5120a495daab10e8667f836f0041a64072d365de956a9fc3c9c599ff6",
@@ -22,8 +23,24 @@
             "sha256": "1f521b54893f1e1d5cea684fb75f4499ddb0e6500a5528acf56892b010f43232",
             "mode": "100644"
         },
+        ".cursor/rules/agent-pipeline.mdc": {
+            "sha256": "47fdc173dfbbf4ad2dbe2a08128575838c2691fe049b4a5faaac03fb9976dbae",
+            "mode": "100644"
+        },
+        ".cursor/rules/global.mdc": {
+            "sha256": "22646c1d1919ee8cd1b6bc5fdcbb74604904ac0ebc905032534d492b0ebccc5e",
+            "mode": "100644"
+        },
+        ".cursor/rules/test-driven-development.mdc": {
+            "sha256": "8bb3d8d226fedd30fee16f8548dfb607e78d5a8f8dbe4d86b87c583cd5330c0f",
+            "mode": "100644"
+        },
+        ".cursor/rules/workflow.mdc": {
+            "sha256": "ba490fc46b05a92762e4682cc9735fc13958ece7dfa37a5833c278679ef91df4",
+            "mode": "100644"
+        },
         ".cursor/templates/LANE.md": {
-            "sha256": "83183f29bdd66f0b14817bfd6eb42d7dfd8c0abbd6293fab6ac4f4ba410d0a73",
+            "sha256": "d2ac77ceb7495eb32a206f64ac3756b3971fb0396e7f3e5d97b5a298477d5a85",
             "mode": "100644"
         },
         ".cursor/templates/PLAN.md": {
@@ -43,15 +60,19 @@
             "mode": "100644"
         },
         "scripts/check-coverage.mjs": {
-            "sha256": "3bd8e438385f0b05e7cbfb90c32b482e563547f9a9f46b970ee9640b472bfeda",
+            "sha256": "78f09f178c732144bd2f3e5376665b52f1c5fdb1b3714f8ea75a66139721cbb1",
             "mode": "100644"
         },
         "scripts/check-cross-browser-selection.mjs": {
-            "sha256": "f1900f38a024bd9bafd3c146b2ff080607f9c6deeb11eeefc7d82693a7637207",
+            "sha256": "e893d5ad353855613d6d7aa203768141a247501ffea7636ad49fcc4f171e31aa",
+            "mode": "100644"
+        },
+        "scripts/check-engines-floor.mjs": {
+            "sha256": "76b4bd1a8186068ad604aef3d3a0abc0ef60eeaf41aa622ef8512ae7cf39b095",
             "mode": "100644"
         },
         "scripts/check-gate-env.mjs": {
-            "sha256": "8cce66f92b63aba2d2063d375e52ac19411d48c34ba5a39cec8b109b9647899f",
+            "sha256": "480ca1e41459dc7352835d908009ab05a7c8368e4df4eb9435abd57edae626c5",
             "mode": "100644"
         },
         "scripts/check-gate-integrity.mjs": {
@@ -67,11 +88,11 @@
             "mode": "100644"
         },
         "scripts/check-node-floor.mjs": {
-            "sha256": "a1a8a6a84357a0eac20beadb5a5d326fecd6155824fde7fc7833b164ac908e7b",
+            "sha256": "c9e785687adcdd92c6165e10b0b44051babdffc3ccacc9e4fea1c8faa5b85667",
             "mode": "100644"
         },
         "scripts/check-test-siblings.mjs": {
-            "sha256": "ff25f456ca7c604318236a9071e066af70caf7244ae645debc84721e87cfb69c",
+            "sha256": "65ff7aeadf2f0965b8f568a0eb28e9e69cab4d94db4e43e0cb9e6d0dbfe249d0",
             "mode": "100755"
         },
         "scripts/check-version-holds.mjs": {
@@ -79,7 +100,7 @@
             "mode": "100644"
         },
         "scripts/check-web-vitals-chunks.mjs": {
-            "sha256": "5ea9abeb28462568a04e41591c342c0f2d883677b26f28876d3a4c17e7be4cf1",
+            "sha256": "1af9fc9629dbebb096facd9a7d69a962ad9ed70240934797b6dc8b040afcd49b",
             "mode": "100644"
         },
         "scripts/child-output.mjs": {
@@ -95,7 +116,7 @@
             "mode": "100644"
         },
         "scripts/docs-check.mjs": {
-            "sha256": "91208f83fa72925a4a3a3ba6744b90dffacc949b544d537e24eff350ca8422b7",
+            "sha256": "0a7df8560e75f2ffd3c6e6859289d93111a5bad45981b5cecc4e9f85d63ab904",
             "mode": "100644"
         },
         "scripts/docs-trigger.mjs": {
@@ -123,7 +144,7 @@
             "mode": "100644"
         },
         "scripts/is-entry-point.test.mjs": {
-            "sha256": "2a60843b94229fb936508d02174635e4963872aeb2745eccece5c376791e6134",
+            "sha256": "0b2d475aa7b3e9dfc3b5fa8689178c4dff8839deaa47862c4b9576e37785c6e6",
             "mode": "100644"
         },
         "scripts/lint-changed.mjs": {
@@ -135,11 +156,11 @@
             "mode": "100644"
         },
         "scripts/output-limits.test.mjs": {
-            "sha256": "60b58ccecea78d44b08be72c1e49165bbe0a1722e5c8c7bb12f783559b94b03a",
+            "sha256": "4a1f00a6622e4a355eb76812838d959aca60c1cd9beac78dd3ae48e9c033ea59",
             "mode": "100644"
         },
         "scripts/probe.mjs": {
-            "sha256": "de29104dff09fc1b483a15dc169ccdb2c03ccbcbd7976c2c8ef599cf8a3057e8",
+            "sha256": "454f152d65a94191028d7af88a7405a31d2df646b4c0a9cd95fabca4e4e911d5",
             "mode": "100644"
         },
         "scripts/quiet-ports.mjs": {
@@ -151,7 +172,7 @@
             "mode": "100644"
         },
         "scripts/self-test-capture.test.mjs": {
-            "sha256": "4efe00086060b16f43e97530dca207f477689dc91fefa0f58a8053483d11f077",
+            "sha256": "73b3592f649a967a88c7ebf92f78a486ff37263294f31dc3abcec2aab57b4239",
             "mode": "100644"
         },
         "scripts/server-group.mjs": {
@@ -163,22 +184,23 @@
             "mode": "100644"
         },
         "scripts/verify-measure.mjs": {
-            "sha256": "afa72c27531bc5fb244ae2667d85d48c8e3e4b8f37a9472774b190f93e926b17",
+            "sha256": "47b6dec70661ed415744ecb829c4c48256db4ca87cddd15701cd99d2769fdd04",
             "mode": "100644"
         },
         "scripts/verify-push.mjs": {
-            "sha256": "460f849be33d6d937f63070c0e884f5748b2ce5b42f4c7d1cc785b8c4b5f029d",
+            "sha256": "a5240c51ab309d01f8cab8280d6d810d663d527ac7e083cc00c1a2cc7219c80d",
             "mode": "100644"
         }
     },
     "block": {
-        "sha256": "0f61d068df2d7e43d23f3773287fac4113a92efd869ec02ead456f2d42b27e86"
+        "sha256": "1bf205b7488178ee298085662bb6c980cf66e79747d05bd65659ee59314e45a4"
     },
     "tests": [
         "scripts/audit-gate.test.mjs",
         "scripts/bench-verify.test.mjs",
         "scripts/check-coverage.test.mjs",
         "scripts/check-cross-browser-selection.test.mjs",
+        "scripts/check-engines-floor.test.mjs",
         "scripts/check-gate-env.test.mjs",
         "scripts/check-gate-integrity.fixtures.mjs",
         "scripts/check-gate-integrity.gate-files.test.mjs",
@@ -187,7 +209,6 @@
         "scripts/check-gate-integrity.suppressions-3.test.mjs",
         "scripts/check-hooks.test.mjs",
         "scripts/check-lock-age.test.mjs",
-        "scripts/check-node-floor.test.mjs",
         "scripts/check-test-siblings.test.mjs",
         "scripts/check-version-holds.test.mjs",
         "scripts/check-web-vitals-chunks.test.mjs",

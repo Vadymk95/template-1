@@ -10,7 +10,9 @@
  *    `dist`. The plugin's unit test cannot see a deleted `fontPreload()` line, or the plugin losing
  *    its post-order in `generateBundle` so it runs before the font stylesheet exists: the plugin then
  *    does nothing and every test stays green. No font stylesheet (a fork dropped the font) means
- *    nothing to preload, so the check passes.
+ *    nothing to preload, so the check passes. A repository that has no such plugin says
+ *    `"fontPreload": false` in `scripts/gate-tiers.json` and this check is not run for it; absent
+ *    (or `true`), it runs.
  *
  * Usage:
  *   node scripts/check-web-vitals-chunks.mjs
@@ -27,9 +29,32 @@ import { fileURLToPath } from 'node:url';
 
 import { isEntryPoint } from './is-entry-point.mjs';
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(scriptsDir, '..');
 const distDir = path.join(root, 'dist');
 const distAssets = path.join(distDir, 'assets');
+
+/**
+ * Whether the font-preload check runs: the `fontPreload` key of the `gate-tiers.json` beside this
+ * script, `true` when the file or the key is missing. { fontPreload } or { error }: a value that is
+ * not a boolean is never read as either answer, because a mistyped `"false"` would otherwise keep a
+ * check on that its author meant to turn off.
+ */
+export const readFontPreloadSetting = (dir = scriptsDir) => {
+    const file = path.join(dir, 'gate-tiers.json');
+    if (!fs.existsSync(file)) return { fontPreload: true };
+    let given;
+    try {
+        given = JSON.parse(fs.readFileSync(file, 'utf8'))?.fontPreload;
+    } catch (error) {
+        return { error: `scripts/gate-tiers.json cannot be read: ${error.message}` };
+    }
+    if (given === undefined) return { fontPreload: true };
+    if (typeof given !== 'boolean') {
+        return { error: 'scripts/gate-tiers.json: fontPreload must be true or false' };
+    }
+    return { fontPreload: given };
+};
 
 function listJsNames() {
     if (!fs.existsSync(distAssets)) {
@@ -151,6 +176,11 @@ function runBuild(env) {
 }
 
 const main = () => {
+    const setting = readFontPreloadSetting();
+    if (setting.error) {
+        console.error(`✖ check-web-vitals-chunks: ${setting.error}`);
+        process.exit(2);
+    }
     const full = process.argv.includes('--full');
 
     if (full) {
@@ -166,10 +196,12 @@ const main = () => {
     } else {
         assertDefault(analyze(listJsNames()));
         console.log('check-web-vitals-chunks: dist matches default web-vitals chunk split.');
-        assertFontPreload();
-        console.log(
-            'check-web-vitals-chunks: font preload OK (Latin woff2 preloaded, or no Latin font in dist).'
-        );
+        if (setting.fontPreload) {
+            assertFontPreload();
+            console.log(
+                'check-web-vitals-chunks: font preload OK (Latin woff2 preloaded, or no Latin font in dist).'
+            );
+        }
     }
 };
 

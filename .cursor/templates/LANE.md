@@ -24,8 +24,8 @@ tier law stay in `AGENTS.md`. The numbers below were measured in a fork: startin
   code, the log's first line and its last 40 lines, and name the log path in the hand-back. Give every
   run its own numbered log, never overwrite the first red log, and quote the first red in the hand-back.
 - A lane never waits on a prompt, because nobody answers it: read with Read and Grep, run
-  `npm run --prefix <dir>` and `git -C <dir>` instead of `cd`, and use no shell variable and no `;`
-  chain.
+  the package manager's own directory option (the command table's notes name it) and `git -C <dir>`
+  instead of `cd`, and use no shell variable and no `;` chain.
 - A permission ask, a deny or a hook block is a stop for that one action. Report it with the path and
   the rule, never reach the same file another way (a shell redirect, a script, another tool), and
   continue with the rest.

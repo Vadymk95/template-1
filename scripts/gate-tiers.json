@@ -11,7 +11,7 @@
         "verify": {
             "class": "code",
             "description": "the offline gate: every check CI runs except the network-bound ones",
-            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> check-gate-env --kill-port -> lint:oxlint -> format:check -> typecheck:force -> lint -> test:coverage -> build -> verify:web-vitals-chunks -> size:check -> ensure-playwright -> test:e2e:prod"
+            "chain": "check-hooks -> check-version-holds -> check-engines-floor -> check-test-siblings --range -> docs-check -> check-gate-env --kill-port -> lint:oxlint -> format:check -> typecheck:force -> lint -> test:coverage -> build -> verify:web-vitals-chunks -> size:check -> ensure-playwright -> test:e2e:prod"
         },
         "verify:ci": {
             "class": "code",
@@ -30,7 +30,7 @@
         "verify:scaffold": {
             "class": "code",
             "description": "phase-0 offline gate: verify without the stages that need a build",
-            "chain": "check-hooks -> check-version-holds -> check-node-floor -> check-test-siblings --range -> docs-check -> lint:oxlint -> format:check -> typecheck:force -> lint -> test:coverage"
+            "chain": "check-hooks -> check-version-holds -> check-engines-floor -> check-test-siblings --range -> docs-check -> lint:oxlint -> format:check -> typecheck:force -> lint -> test:coverage"
         },
         "verify:scaffold:push": {
             "class": "code",
@@ -140,10 +140,11 @@
         "rulesetContextAllowlist": []
     },
     "docs": {
+        "roleColumn": "required",
         "_description": "Data for scripts/docs-check.mjs. sentinels = verbatim fragments of the tier law that may live only in AGENTS.md; versions = doc names -> package names compared with package-lock.json (node -> .nvmrc); stageWords = a stage of the verify chains -> the words the docs use for it besides its script name (a line outside the chain view that names enough distinct stages, or two parts of one script, is a retelling).",
         "stageWords": {
             "check-version-holds": ["version holds"],
-            "check-node-floor": ["node floor"],
+            "check-engines-floor": ["engines floor"],
             "check-test-siblings": ["sibling-test range", "sibling gate"],
             "check-gate-env": ["gate env", "preflight"],
             "lint:oxlint": ["oxlint"],
@@ -235,7 +236,7 @@
             "requiresMainCheckout": false
         },
         "push": {
-            "description": "Husky pre-push -> verify:push (phase-aware). Runs at every push, never shortened by what the diff touched. The harness tests run in gatelaw, so this repository lists none to leave out and the push prints that all its harness self-tests run.",
+            "description": "Husky pre-push -> verify:push (phase-aware). Runs at every push, never shortened by what the diff touched. The harness tests run in gatelaw, and no push leaves a test out.",
             "expected": ["verify:push"],
             "forbidden": [],
             "runsRegardlessOfDiff": true,

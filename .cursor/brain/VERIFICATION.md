@@ -12,10 +12,9 @@ a clean run (`rm -f .prettiercache && GATE_PHASE=full git push` is; CI starts wi
 
 The harness's own tests live in gatelaw, not here: `.gatelaw.json` lists the scripts `gatelaw sync` copied in and the tests it removed.
 The three that scan every file under `scripts/` (`output-limits`, `self-test-capture`, `is-entry-point`) are synced copies, so they still run here.
-`scripts/gate-tiers.json` has no `selfTests` list, so no push leaves a harness test out: `scripts/verify-push.mjs` prints
-`all harness self-tests run (scripts/gate-tiers.json lists no test to leave out)` on every push, and `scripts/check-coverage.mjs` excludes nothing.
+`scripts/gate-tiers.json` has no `selfTests` list, so no push leaves a harness test out: `scripts/verify-push.mjs` and `scripts/check-coverage.mjs` run everything.
 The tests that read this repository stay here and run in `npm test`, `npm run verify` and CI like any other: the `*.repo.test.mjs` halves of the
-tests that split, and the guards over this repository's configs. `GATE_SELF_TESTS=all` is still accepted and changes nothing.
+tests that split, and the guards over this repository's configs.
 
 | Check | Runs at phase 0 (scaffold) | Added when (the trigger) |
 | --- | --- | --- |
@@ -227,6 +226,25 @@ exempted all 11 components under `src/components/**` from the gate, six of which
 component written as `Dir/index.tsx` is satisfied by `Dir/Dir.test.tsx`, matching the convention the
 existing components already follow — and only by that name, so a test for a different module in the same
 folder does not count.
+
+---
+
+## What the shared process rules leave to this repository
+
+`agent-pipeline.mdc`, `workflow.mdc`, `test-driven-development.mdc` and `global.mdc` come from gatelaw and name no stack,
+path or library. The facts of this repository that they point at:
+
+- **Rule routing:** the task-area routing list of the old `global.mdc` is `.cursor/brain/READING_INDEX.md` § Rule routing.
+- **Fast-track:** a task touching only styles, translation resources (`public/locales/**/*.json`), tests (`*.test.ts(x)`, `*.spec.ts`) or docs (`*.md`) skips the Brain reads.
+- **Critique:** the alias is `@/`; Zustand holds global client state, TanStack Query server state (stores use `createSelectors` and are imported directly, with no `index.ts` re-export); indentation is 4 spaces; user-visible strings go through `t()`; orchestration lives in hooks and pure computation in utilities (`react-patterns.mdc` § 2).
+- **Commands the pipeline names by role:** `npm run verify:iter` (iterate), `npm run e2e:one -- e2e/<file>.spec.ts` (the one spec the change affects), `npm run verify:measure` (look at a built result); the commit format is `AGENTS.md` › Commit format.
+- **A change of contract needs approval:** a store's shape, a TanStack Query key or payload, an API payload, a route others link to (`workflow.mdc` § The Approval Law).
+- **Verification integrity, examples:** write a check's exit code to a log without a pipe (`npm run verify:iter > /tmp/verify.log 2>&1; echo $?`, a re-run to `/tmp/verify-2.log`); a new gate is proved by an expired `scripts/audit-allowlist.json` entry, a raw hex in a component or a staged `src` logic file with no `*.test.*` sibling; vacuous greens: a layout measurement taken while i18next still hides the document, a Playwright `testMatch` that matches nothing, `vitest --coverage` printing `Excluding it from coverage` for a file it could not parse.
+- **Cases that "cannot happen":** `npm run verify:measure -- <spec>` and `npm run smoke:dev` for the dev-only fixture; jsdom has no layout; `CROSS_BROWSER=1` and `DECISIONS.md` § Cross-engine coverage is opt-in and scoped for what a browser does.
+- **Tests (Vitest + Testing Library):** test-first for stores (`src/store/*/`), hooks with more than 10 lines of logic (`src/hooks/*/`), utilities (`src/lib/`) and Zod schemas; a UI component gets an integration test with `renderWithProviders` from `@/test/test-utils` (`await screen.findByText(...)`); mocks use `vi.mock()` and are reset before every test (`mockReset` in `vitest.config.ts`), so a mock keeps only the implementation it was created with and a return value or a spy is set inside the test or a `beforeEach`, never once at module level.
+- **Test files and return types:** `**/*.test.{ts,tsx}` and `src/test/**` are exempt from `@typescript-eslint/explicit-function-return-type` (a file-scoped override in `eslint.config.js`).
+- **Test commands:** `npm test` (`vitest run`; the gate runs `test:coverage`), `npm run test:watch`, `npm run test:coverage`.
+- **Library documentation:** looked up through `context7`; TypeScript is strict.
 
 ---
 

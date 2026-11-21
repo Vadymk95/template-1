@@ -73,6 +73,21 @@ sibling project two of five dispatched lanes returned "already done" after ~430k
 and both were answerable by five minutes of grep. **This entry is first in cost order even though it
 is last in the list.**
 
+## Rule routing
+
+The rules to read before planning or editing in a task area (`.cursor/rules/global.mdc` § 0.1 points here).
+`agent-pipeline.mdc` Step 1 turns the list read into the Rule Receipt.
+
+- **React / UI / component / hook / page / HOC** → `react-patterns.mdc`, `engineering-standards.mdc`, `performance.mdc`
+- **New or changed component behaviour, tests, fixtures, mocks, coverage** → `test-driven-development.mdc` (before implementing)
+- **Styling / Tailwind / theme tokens / i18n strings / accessibility / path aliases** → `project-config.mdc`
+- **API client / TanStack Query / data fetching / payload contracts** → `api.mdc`, `state-management.mdc`, `resilience.mdc`
+- **Zustand stores / `createSelectors`** → `state-management.mdc`, `resilience.mdc`, `test-driven-development.mdc`
+- **Routing / lazy pages** → `routing.mdc`, `react-patterns.mdc`
+- **Async / error handling / debugging** → `resilience.mdc`
+- **Render performance / memo / list keys / bundle budgets** → `performance.mdc`, `react-patterns.mdc`
+- **Constants / magic strings / config values** → `constants.mdc`, `engineering-standards.mdc`
+
 ## Keeping this honest
 
 Add a situation only after an agent was actually sent to the wrong file over it. When two files could

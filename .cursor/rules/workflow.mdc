@@ -9,30 +9,41 @@ priority: 90
 
 ## The Approval Law
 
-Gate by **risk, not LOC**.
+Gate by **risk, not LOC** (surface, reasoning, reversibility: the highest axis sets the discipline):
 
-| Task Risk | Protocol |
-|---|---|
-| Trivial leaf edit (no danger zone, no contract change) | Proceed with brief notification |
-| One slice that only ADDS (a new page, store, query, route), no danger zone, no existing contract changed | Proceed; the acceptance criteria open the pull request description |
-| Changes an EXISTING contract (a store's shape, a TanStack Query key or payload, an API payload, a route others link to) or touches a SKELETONS danger zone | Present plan → wait for approval → implement |
-| Two or more slices, or a new architecture pattern | `SPEC.md` + `PLAN.md`, approved as a pull-request review |
+| Task risk                                                                                                                                                                         | Protocol                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Trivial leaf edit: self-contained, reversible, no danger zone, no contract or state impact                                                                                        | Proceed with brief notification                                    |
+| One slice that only ADDS (a new page, screen, store, query, route handler), no danger zone, no existing contract changed                                                          | Proceed; the acceptance criteria open the pull request description |
+| Changes an EXISTING contract (a store or domain-state shape, an API or payload contract, a route others link to, the router topology, environment or build configuration, a public export) or touches a SKELETONS danger zone or a security surface, or is otherwise hard to reverse | Present plan → wait for approval → implement                       |
+| Two or more slices, or a new architecture or cross-cutting pattern                                                                                                                | `SPEC.md` + `PLAN.md`, approved as a pull-request review           |
 
-**FORBIDDEN**: changing an existing contract or entering a danger zone before approval.
+**FORBIDDEN**: changing an existing contract or entering a danger zone before approval. In autonomous agent sessions this means a written plan and an explicit user approval checkpoint before implementation, never skipping straight to code.
 
-For work of two or more slices the approval is the non-author PR review of `SPEC.md`/`PLAN.md` (`AGENTS.md` › Before code); the table is the gate below that size. A plan is `.cursor/<feature-slug>/PLAN.md`, copied from `.cursor/templates/PLAN.md`. The steps are in `agent-pipeline.mdc`; Approve sits between Simulate and Execute.
+For work of two or more slices the approval is the non-author PR review of `SPEC.md` / `PLAN.md` (`AGENTS.md` › Before code); the table is the chat-level gate below that size. A plan is `.cursor/<feature-slug>/PLAN.md`, copied from `.cursor/templates/PLAN.md`; plan before implementing, and confirm it when the table requires it.
+
+## Implementation Workflow
+
+The steps are in `agent-pipeline.mdc` (Discover → Simulate → Execute → Verify → Brain Sync → Confidence); the Approve step sits between Simulate and Execute and is § The Approval Law above. Test-first inside Execute: `test-driven-development.mdc` (strict TDD for logic, hybrid for UI).
 
 ## Scope Discipline
 
 - **Flag unrequested work the MOMENT it appears**, not in the final write-up. A padding fix that arrives with a new animation, a new class name and a new test is scope creep even when each piece is defensible. The resolution is often to move the idea onto an existing primitive rather than revert it, but the flag is not optional and not late.
 - **A review finding must sit on a line the diff touches.** Discovered debt gets its own issue, never this diff.
+- **Brain**: after a meaningful architecture or risk change, update `.cursor/brain/` or declare `Brain sync: none needed` (`agent-pipeline.mdc` Step 5).
 
 ## Post-Edit Verification
 
-After every change: `agent-pipeline.mdc` § 4.1 (the iteration tier).
+After every change run `agent-pipeline.mdc` § 4.1 (the iterate command) and fix what it finds before the next batch; `agent-pipeline.mdc` § 4.1a is the integrity checklist. Never commit code with lint, type or formatting errors, or code that violates the repo's layer rules.
 
-## Git Commits
+## Runtime orchestration versus pure computation (mandatory split)
 
-Format and types: `AGENTS.md` › Commit format. English, imperative mood ("add", not "added"), no Co-authored-by tags.
+- **Runtime unit** (a hook in React): logic that needs the UI runtime: lifecycle and effect orchestration, subscriptions, timers, DOM or native APIs, store mutations and selectors, navigation, async UI state in event handlers.
+- **Utility**: logic that is pure and deterministic: mapping, filtering, sorting, formatting, parsing, validation, transformation.
+- **Split rule**: a runtime unit that contains pure computation extracts it to a utility first and stays a thin orchestration layer. Pure business computation never stays in a runtime unit when it can be unit-tested as a utility. Unit-test the utility first.
 
-Before committing: `npm run verify:iter` green (the pre-commit hook enforces the commit moment; the push runs the chain), `git diff` reviewed for unintended changes, no `console.log` in production code.
+## Git Commits and Pushes
+
+- **Before committing: the iterate command, green.** The pre-commit hook enforces the commit moment; the pre-push hook owns the push moment, phase-aware. Do NOT run the gate command or a fuller variant by hand; the tier law is `AGENTS.md` § The tier law and is not restated here. Individual scripts (one stage, one test file) are drill-downs on a specific failure, and none replaces the tiers.
+- **Message**: `type(scope): description` (scope optional), header of at most 96 characters, English, imperative mood ("add", not "added"), no Co-authored-by tags. The types and the rules are the repo's commit-message config, which the commit-message hook enforces (the format is also in `AGENTS.md`).
+- **Before pushing**: all checks pass, `git status` and `git diff` reviewed for unintended changes, no `console.log` in production code, and the message follows the commit-message config.
