@@ -15,11 +15,12 @@
  * Usage:
  *   npm run probe -- /                        # default widths
  *   npm run probe -- /login 390 1440
+ *   npm run probe -- /login 1440x900 390x844  # a size is a width or a WxH pair; a bare width is 900 high
  *   npm run probe -- / --dev                  # against the dev server (default: production build)
  *   npm run probe -- /dashboard --signed-in   # as a signed-in visitor (a protected route lands on /login otherwise)
  *   npm run probe -- /login --theme=dark      # in the light, dark or system theme (default: the app's own)
  *
- * Output: `.probe/<slug>-<width>.png` (gitignored) plus a table on stdout. When the page ends up on a
+ * Output: `.probe/<slug>-<width>.png` (`-<width>x<height>` for a height other than 900; gitignored) plus a table on stdout. When the page ends up on a
  * different route than the one asked for, the table says so: the numbers then describe that page.
  *
  * The server it measures is its own: it starts on the first free port from PORT (3000 for `--dev`,
@@ -33,6 +34,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { connect } from 'node:net';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -53,6 +55,7 @@ const OUT_DIR = '.probe';
 const GROUP_FILE = join(OUT_DIR, 'server.json');
 const DEFAULT_WIDTHS = [390, 768, 1440];
 const VIEWPORT_HEIGHT = 900;
+const PORT_CONNECT_TIMEOUT_MS = 1000;
 const THEMES = ['light', 'dark', 'system'];
 const THEME_FLAG = '--theme=';
 
@@ -167,12 +170,53 @@ export const parseProbeArgs = (argv) => {
     }
     const positional = argv.filter((argument) => !argument.startsWith('--'));
     const [path = '/', ...widthArgs] = positional;
-    const widths = widthArgs.length > 0 ? widthArgs.map(Number) : DEFAULT_WIDTHS;
-    if (widths.some((width) => !Number.isFinite(width) || width <= 0)) {
-        throw new Error(`probe: widths must be positive numbers, got "${widthArgs.join(' ')}"`);
-    }
-    return { path, widths, useDev, signedIn, theme };
+    const viewports = (widthArgs.length > 0 ? widthArgs : DEFAULT_WIDTHS.map(String)).map(
+        parseViewport
+    );
+    return { path, viewports, useDev, signedIn, theme };
 };
+
+// `1440x900` or a bare `390` (900 high): positive numbers, nothing else.
+const SIZE = /^(\d+(?:\.\d+)?)(?:x(\d+(?:\.\d+)?))?$/i;
+
+const parseViewport = (argument) => {
+    const match = SIZE.exec(argument);
+    const width = Number(match?.[1]);
+    const height = match?.[2] === undefined ? VIEWPORT_HEIGHT : Number(match[2]);
+    if (match === null || !(width > 0) || !(height > 0)) {
+        throw new Error(
+            `probe: sizes must be positive numbers, a width or a WxH pair like 1440x900, got ${JSON.stringify(argument)}`
+        );
+    }
+    return { width, height };
+};
+
+/** What names a viewport in a file name and in the table: the width, plus `xH` when it is not 900 high. */
+const viewportLabel = ({ width, height }) =>
+    height === VIEWPORT_HEIGHT ? String(width) : `${String(width)}x${String(height)}`;
+
+/**
+ * Whether something accepts a connection on `port` (localhost, either address family). A dev server
+ * accepts at once and answers its first request only after it has compiled the page, which can take
+ * longer than any fixed timeout of a fetch, so "up" is decided by the connection and nothing else.
+ */
+export const portAnswers = (port, { timeoutMs = PORT_CONNECT_TIMEOUT_MS } = {}) =>
+    new Promise((resolveAnswer) => {
+        const socket = connect({ host: 'localhost', port, timeout: timeoutMs });
+        const settle = (answered) => {
+            socket.destroy();
+            resolveAnswer(answered);
+        };
+        socket.once('connect', () => {
+            settle(true);
+        });
+        socket.once('timeout', () => {
+            settle(false);
+        });
+        socket.once('error', () => {
+            settle(false);
+        });
+    });
 
 /** A file name a human can scan in a directory listing: `/en/example-form` -> `en-example-form`. */
 export const slugForPath = (path) => path.replace(/^\/+|\/+$/g, '').replace(/\//g, '-') || 'root';
@@ -501,7 +545,7 @@ export const withServer = async (
 };
 
 const run = async () => {
-    const { path, widths, useDev, signedIn, theme } = parseProbeArgs(process.argv.slice(2));
+    const { path, viewports, useDev, signedIn, theme } = parseProbeArgs(process.argv.slice(2));
     const loaded = readProbeConfig();
     if (loaded.error) {
         console.error(`✖ probe: ${loaded.error}`);
@@ -535,16 +579,7 @@ const run = async () => {
         const baseUrl = `http://localhost:${String(port)}`;
         const browser = await launchProbeBrowser(chromium);
         try {
-            await waitForServer(() =>
-                startedServerAnswers(server, async () => {
-                    try {
-                        await fetch(baseUrl, { signal: AbortSignal.timeout(2000) });
-                        return true;
-                    } catch {
-                        return false;
-                    }
-                })
-            );
+            await waitForServer(() => startedServerAnswers(server, () => portAnswers(port)));
 
             const context = await browser.newContext({ colorScheme: colorSchemeFor(theme) });
             if (Object.keys(storageSeed).length > 0) {
@@ -553,17 +588,18 @@ const run = async () => {
             const page = await context.newPage();
             await page.goto(`${baseUrl}${path}`, { waitUntil: 'load', timeout: 60_000 });
 
-            for (const width of widths) {
-                await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+            for (const viewport of viewports) {
+                await page.setViewportSize(viewport);
                 await page.goto(`${baseUrl}${path}`, { waitUntil: 'load' });
                 await waitForQuiet(page);
                 const { measurement, rendered } = await waitForContent(() =>
                     page.evaluate(measureInPage)
                 );
                 const landing = describeLanding(path, page.url());
-                const file = join(OUT_DIR, `${slugForPath(path)}-${String(width)}.png`);
+                const label = viewportLabel(viewport);
+                const file = join(OUT_DIR, `${slugForPath(path)}-${label}.png`);
                 await page.screenshot({ path: file, fullPage: true });
-                rows.push({ width, file, rendered, landing, ...measurement });
+                rows.push({ label, file, rendered, landing, ...measurement });
             }
         } finally {
             await browser.close();
@@ -577,7 +613,7 @@ const run = async () => {
     ].filter(Boolean);
     console.log(`\nProbe of ${path} (${state.join(', ')})\n`);
     for (const row of rows) {
-        console.log(`  ${String(row.width)}px  →  ${row.file}`);
+        console.log(`  ${row.label}px  →  ${row.file}`);
         console.log(
             `      overflow ${String(row.horizontalOverflowPx)}px · scrollbar ${String(row.scrollbarPx)}px · controls ${String(row.controls)} (in main ${String(row.mainControls)}) · smallest ${row.smallestControl} · headings ${String(row.headings)} (in main ${String(row.mainHeadings)})`
         );

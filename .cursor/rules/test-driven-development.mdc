@@ -17,6 +17,12 @@ What the hook cannot check, and what actually matters:
 
 - **Mutation check.** Revert the behaviour the test guards and confirm the test goes red. A test that still passes with the fix reverted is characterisation, not coverage, and it is worse than no test because it reads as protection.
 - **Assertions that cannot fail**: a truthiness check on a value the test just built, a wait whose body cannot throw, asserting empty text where an emptiness matcher was meant.
+- **Wait for the new frame**: wait for what only the new frame draws, never for something that was on screen before the change.
+- **Absence**: an absence assertion targets the text the defect would show, not text in general.
+- **Held states and flakes**: a transient or loading state is held on a promise the test resolves, never a timer. A flake is fixed by waiting for the state it means, never a sleep, a retry, a raised timeout or a skip.
+- **Pinned thresholds**: a threshold is a literal value in the test, never computed from the code under test.
+- **Hermetic gate-switch tests**: a test of a gate switch builds its own inputs and environment; nothing of the real repo state leaks in.
+- **Whole-tree reads**: a test that reads the whole tree carries its own timeout.
 - The exemption list sits with its reasons in the sibling gate's configuration. Do not extend it to move a commit along.
 
 ## 1. Mandatory test-first (strict TDD)
@@ -41,14 +47,7 @@ A fix whose only residual is a lint finding has no behaviour to assert: the red 
 - **Rule**: if component logic exceeds 10 lines, extract it to a runtime unit and apply strict TDD to that unit. Components stay presentational.
 - A UI refactor that moves copy, routing or validation boundaries leaves at least one behaviour-level integration test proving the visible contract still holds.
 
-## 3. Implementation cycle
-
-1. **Requirements**: list the test cases explicitly before coding (in chat).
-2. **Red**: a failing test, BDD style (`describe` / `it`), Arrange-Act-Assert.
-3. **Green**: minimal code to pass.
-4. **Refactor**: clean up while staying green.
-
-## 4. Quality standards
+## 3. Quality standards
 
 - **Isolation**: mock external APIs and modules; a test never hits the real network or native I/O (inject dependencies or mock at module boundaries). Whether the runner resets mocks between tests is its configuration; never rely on state set outside the test: a mock keeps only the implementation it was created with, so set a return value, a spy or a once-value inside the test or its setup hook, never once at module level, and reset what the test changed.
 - **Edge cases**: always cover error paths, empty state, boundaries (empty, one, many, full, partial), async transitions (loading to loaded), entity switches (A to B) and network failure.
@@ -57,13 +56,13 @@ A fix whose only residual is a lint finding has no behaviour to assert: the red 
 - **BDD naming**: `describe('UserStore')` → `it('sets username and marks as logged in on setUser()')`.
 - **Return types**: helpers and fixtures in test files may be exempt from the linter's return-type rule where the repo's lint config says so.
 
-## 5. Test file location
+## 4. Test file location
 
 - Co-locate tests with the file: `userStore.ts` → `userStore.test.ts`; a component test sits next to the component.
 - No separate `__tests__` directories.
 - Import through the repo's alias in test files, as in source.
 
-## 6. Exceptions (TDD can be skipped for)
+## 5. Exceptions (TDD can be skipped for)
 
 - Type-only files (interfaces, declaration files), configuration and static constants.
 - Simple presentational components with no logic; very simple functions (under 10 lines, one responsibility).
@@ -72,6 +71,6 @@ A fix whose only residual is a lint finding has no behaviour to assert: the red 
 
 Add tests anyway when the function has complex logic, is critical to the business logic or is reused in several places.
 
-## 7. Commands
+## 6. Commands
 
 The commands are in the command table of `AGENTS.md`: the single-test command for one file, the iterate command per change. A watch mode and a coverage report are the runner's own scripts, listed there.
