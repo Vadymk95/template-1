@@ -1,6 +1,6 @@
 {
     "kit": "gatelaw",
-    "commit": "1f65989886c02f71d17de21de466f4051d39569a",
+    "commit": "19a9f9978f444e825bb01ec27801d28a9c186a05",
     "profile": "spa",
     "files": {
         ".cursor/commands/docs.md": {
@@ -32,7 +32,7 @@
             "mode": "100644"
         },
         ".cursor/rules/test-driven-development.mdc": {
-            "sha256": "8bb3d8d226fedd30fee16f8548dfb607e78d5a8f8dbe4d86b87c583cd5330c0f",
+            "sha256": "eaa44232de474fdb66fd2731968e5244e781a3a22dc4f150f8914664c298866f",
             "mode": "100644"
         },
         ".cursor/rules/workflow.mdc": {
@@ -40,7 +40,7 @@
             "mode": "100644"
         },
         ".cursor/templates/LANE.md": {
-            "sha256": "d2ac77ceb7495eb32a206f64ac3756b3971fb0396e7f3e5d97b5a298477d5a85",
+            "sha256": "ab833ff743227376aacf156bd1d4b2608f9abf23a7d661438759dc2fab8997ba",
             "mode": "100644"
         },
         ".cursor/templates/PLAN.md": {
@@ -116,7 +116,7 @@
             "mode": "100644"
         },
         "scripts/docs-check.mjs": {
-            "sha256": "0a7df8560e75f2ffd3c6e6859289d93111a5bad45981b5cecc4e9f85d63ab904",
+            "sha256": "b6e2d5d6cf0c19e0c2ef3e8042ae26e009674e6666f13bbffd10f9d3ff615488",
             "mode": "100644"
         },
         "scripts/docs-trigger.mjs": {
@@ -160,7 +160,7 @@
             "mode": "100644"
         },
         "scripts/probe.mjs": {
-            "sha256": "454f152d65a94191028d7af88a7405a31d2df646b4c0a9cd95fabca4e4e911d5",
+            "sha256": "20a19332495c2f35c0478c8b8edd2accf842f3f34c7723f8ec872ed297249c8d",
             "mode": "100644"
         },
         "scripts/quiet-ports.mjs": {
@@ -179,6 +179,10 @@
             "sha256": "258764c25e26a35482a7d8438677ca27865d272ea821f83a7bde11f8e548df51",
             "mode": "100644"
         },
+        "scripts/test-one.mjs": {
+            "sha256": "bfd02561f6f94228ee63b29d767a742fd2a55f55f4545148c507e4ac8e2c6e0d",
+            "mode": "100644"
+        },
         "scripts/trace-report.mjs": {
             "sha256": "8ca1b720937e65ab917fde11b8640af6915d58808294141b1d12fa9e24911258",
             "mode": "100644"
@@ -193,7 +197,7 @@
         }
     },
     "block": {
-        "sha256": "1bf205b7488178ee298085662bb6c980cf66e79747d05bd65659ee59314e45a4"
+        "sha256": "e75526ed44d99b37c4dea15b9b1b87a9ece55b0d03184255e3f0df19a79a7867"
     },
     "tests": [
         "scripts/audit-gate.test.mjs",
@@ -228,6 +232,7 @@
         "scripts/quiet-ports.test.mjs",
         "scripts/run-on-free-port.test.mjs",
         "scripts/server-group.test.mjs",
+        "scripts/test-one.test.mjs",
         "scripts/trace-report.test.mjs",
         "scripts/verify-measure.test.mjs",
         "scripts/verify-push.self-tests.test.mjs",

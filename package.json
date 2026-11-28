@@ -55,7 +55,7 @@
         "e2e:one": "node scripts/gate-trace.mjs e2e:one -- node scripts/run-on-free-port.mjs npx --no-install playwright test",
         "trace:report": "node scripts/trace-report.mjs",
         "probe": "node scripts/gate-trace.mjs verify:measure -- node scripts/probe.mjs",
-        "test:one": "node scripts/gate-trace.mjs test:one -- npx --no-install vitest run",
+        "test:one": "node scripts/gate-trace.mjs test:one -- node scripts/test-one.mjs",
         "docs:check": "node scripts/gate-trace.mjs docs:check -- node scripts/docs-check.mjs",
         "fork:init": "node scripts/fork-init.mjs"
     },

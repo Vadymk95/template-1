@@ -1700,6 +1700,13 @@ export const checkQuarantine = ({ tests, today }) => {
 };
 
 const TEST_CALL = /(?<![.\w])(?:test|it)\s*\(/g;
+/** A string literal (kept whole, so a `//` inside a URL stays code) or a line or block comment. */
+const STRING_OR_COMMENT =
+    /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
+/** The calls of `test(` and `it(` in the code of a file: a call spelled inside a comment is not one. */
+const countTestCalls = (source) =>
+    source.replace(STRING_OR_COMMENT, (_match, string) => string ?? ' ').match(TEST_CALL)?.length ??
+    0;
 
 /**
  * Ceilings on the browser suite, from `gate-tiers.json` § suites. The suite is counted in invariants,
@@ -1746,7 +1753,7 @@ const measureSuite = (root, suite) => {
     const files = listFilesRecursively(dir).filter((file) => pattern.test(file));
     if (suite.count === 'files') return { measured: files.length, unit: 'file(s)' };
     const calls = files.reduce(
-        (total, file) => total + (readFileSync(file, 'utf8').match(TEST_CALL)?.length ?? 0),
+        (total, file) => total + countTestCalls(readFileSync(file, 'utf8')),
         0
     );
     return { measured: calls, unit: 'test(s)' };
@@ -1853,6 +1860,9 @@ const readJsonOrEmpty = (file) => {
     }
 };
 
+const greenRuns = (rows, label, phase) =>
+    rows.filter((row) => row.label === label && row.exitCode === '0' && row.phase === phase);
+
 export const budgetReport = ({
     rows,
     label,
@@ -1862,9 +1872,7 @@ export const budgetReport = ({
     minRuns = 8,
     baselineMs = null
 }) => {
-    const successful = rows
-        .filter((row) => row.label === label && row.exitCode === '0' && row.phase === phase)
-        .map((row) => row.durationMs);
+    const successful = greenRuns(rows, label, phase).map((row) => row.durationMs);
     const durations = budgetWindow > 0 ? successful.slice(-budgetWindow) : successful;
     const scope =
         budgetWindow > 0 && successful.length > durations.length
@@ -1911,6 +1919,77 @@ export const budgetReport = ({
         baselineMs,
         message: `budget: "${label}" p90 ${seconds}s in phase ${phase} over ${scope}, ${(p90 / baselineMs).toFixed(2)}x this machine's ${(baselineMs / 1000).toFixed(1)}s baseline`
     };
+};
+
+const DORMANT_DEFAULTS = { pushP90Seconds: 120, iterateSeconds: 60, redPushes: 5 };
+/** A threshold from gate-tiers.json when it is a positive number, else the default (a missing or unusable key means the default). */
+const thresholdOr = (value, fallback) =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+
+/**
+ * Tools that sleep until a measurement says they are worth building announce themselves here, from
+ * the same trace rows and the same window as `budgetReport`. Report only: a line never fails
+ * docs:check. Each line prints while its trigger holds, and none prints before `minRuns` green
+ * pushes exist. A threshold is a default here; `dormantPushP90Seconds` and `dormantRedPushes`
+ * (moments.push) and `dormantIterateSeconds` (moments.iterate) in a template's own gate-tiers.json
+ * override it.
+ */
+export const dormantReport = ({
+    rows,
+    pushLabel,
+    iterateLabel = 'verify:iter',
+    phase,
+    budgetWindow = 0,
+    minRuns = 8,
+    pushMoment = {},
+    iterateMoment = {}
+}) => {
+    const pushP90Seconds = thresholdOr(
+        pushMoment.dormantPushP90Seconds,
+        DORMANT_DEFAULTS.pushP90Seconds
+    );
+    const iterateSeconds = thresholdOr(
+        iterateMoment.dormantIterateSeconds,
+        DORMANT_DEFAULTS.iterateSeconds
+    );
+    const redPushes = thresholdOr(pushMoment.dormantRedPushes, DORMANT_DEFAULTS.redPushes);
+    const lines = [];
+    const windowOf = (list) => (budgetWindow > 0 ? list.slice(-budgetWindow) : list);
+    const seconds = (ms) => (ms / 1000).toFixed(1);
+
+    const greenPushes = windowOf(greenRuns(rows, pushLabel, phase));
+    if (greenPushes.length >= minRuns) {
+        const p90 = percentile90(greenPushes.map((row) => row.durationMs));
+        if (p90 / 1000 >= pushP90Seconds) {
+            lines.push(
+                `ACT dormant: a test result cache, then per-folder entries — the green "${pushLabel}" push p90 is ${seconds(p90)}s over the last ${String(greenPushes.length)} runs, past the ${String(pushP90Seconds)}s line. Measure before building: the share of pushes that re-run the same tree (at least 30% before a cache is worth it), or raise dormantPushP90Seconds in scripts/gate-tiers.json with a reason`
+            );
+        }
+        const start = rows.indexOf(greenPushes[0]);
+        const red = rows.filter(
+            (row, index) =>
+                index >= start &&
+                row.label === pushLabel &&
+                row.exitCode !== '0' &&
+                row.failedStep !== ''
+        );
+        if (red.length >= redPushes) {
+            lines.push(
+                `ACT dormant: a flake re-run and a commit set — ${String(red.length)} red "${pushLabel}" pushes in the window record a failed step, past the ${String(redPushes)} line. Measure before building: which steps failed and whether a re-run turned them green, or raise dormantRedPushes in scripts/gate-tiers.json with a reason`
+            );
+        }
+    }
+
+    const iterRuns = windowOf(
+        rows.filter((row) => row.label === iterateLabel && row.exitCode === '0')
+    );
+    const slowest = Math.max(0, ...iterRuns.map((row) => row.durationMs));
+    if (iterRuns.length >= minRuns && slowest / 1000 >= iterateSeconds) {
+        lines.push(
+            `ACT dormant: a related-count guard — a green "${iterateLabel}" run took ${seconds(slowest)}s among its last ${String(iterRuns.length)}, past the ${String(iterateSeconds)}s line. Measure before building: how many tests that run selected, or raise dormantIterateSeconds in scripts/gate-tiers.json with a reason`
+        );
+    }
+    return lines;
 };
 
 /*
@@ -2161,6 +2240,7 @@ const lastValue = (args, flag) => {
 };
 
 const WATCH_FLAG = /^--watch(?:All)?(?:=true)?$/;
+const ESLINT_CACHE_FLAG = /^--cache(?:-location|-strategy)?(?:=(?!false$)|$)/;
 /** Per tool, what a gate command must carry; each rule answers with the problem, or null. */
 const STRICT_FLAGS = new Map([
     [
@@ -2202,7 +2282,9 @@ const STRICT_FLAGS = new Map([
  * both equality checks pass. This reads the commands themselves: every command of a script that is
  * a gate check, or that an `npm run` step reaches from one, keeps the flags of STRICT_FLAGS, and
  * `--passWithNoTests`, which turns "no test found" into a pass, stays inside the iterate chain
- * (`iterate` is that check's name). What a `node scripts/*.mjs` step spawns is not read.
+ * (`iterate` is that check's name), and so does an eslint cache (`--cache`, `--cache-location`,
+ * `--cache-strategy`): type-aware lint reads other files than the one it judges, so a cached run
+ * can replay an old verdict. A formatter's cache stays legal; its key holds what its verdict reads. What a `node scripts/*.mjs` step spawns is not read.
  */
 export const checkGateFlags = ({ checks, scripts, iterate = 'verify:iter' }) => {
     const findings = [];
@@ -2212,6 +2294,15 @@ export const checkGateFlags = ({ checks, scripts, iterate = 'verify:iter' }) => 
         if (args.includes('--passWithNoTests') && [...from].some((check) => check !== iterate)) {
             problems.push(
                 `carries --passWithNoTests outside the iterate chain (${iterate}), so a gate that finds no test passes`
+            );
+        }
+        if (
+            tool === 'eslint' &&
+            args.some((arg) => ESLINT_CACHE_FLAG.test(arg)) &&
+            [...from].some((check) => check !== iterate)
+        ) {
+            problems.push(
+                `carries an eslint cache flag outside the iterate chain (${iterate}), so a gate could replay an old lint verdict`
             );
         }
         for (const problem of problems.filter(Boolean)) {
@@ -2769,6 +2860,17 @@ export const run = ({ root, today }) => {
                   baselineMs
               });
 
+    const dormant = dormantReport({
+        rows,
+        pushLabel,
+        iterateLabel: tiers.moments?.iterate?.expected?.[0] ?? 'verify:iter',
+        phase,
+        budgetWindow,
+        minRuns,
+        pushMoment,
+        iterateMoment: tiers.moments?.iterate ?? {}
+    });
+
     if (budget.baselineMs !== null && budget.baselineMs !== baselineMs) {
         writeFileSync(
             baselinePath,
@@ -2776,7 +2878,7 @@ export const run = ({ root, today }) => {
         );
     }
 
-    return { findings, budget, notes, skipped };
+    return { findings, budget, notes, skipped, dormant };
 };
 
 /** What a run without a finding vouches for, as its summary line names it; `run` lists the ones it skipped. */
@@ -2803,7 +2905,7 @@ const main = () => {
     const root = rootFlag === -1 ? process.cwd() : path.resolve(argv[rootFlag + 1]);
     const weekly = argv.includes('--weekly');
     const today = new Date().toISOString().slice(0, 10);
-    const { findings, budget, notes, skipped } = run({ root, today });
+    const { findings, budget, notes, skipped, dormant } = run({ root, today });
     const gatelaw = checkGatelaw(root);
     findings.push(...gatelaw.findings);
     notes.push(...gatelaw.notes);
@@ -2811,6 +2913,7 @@ const main = () => {
     console.log(`docs:check${weekly ? ' (weekly)' : ''}`);
     // A line that asks a person to act starts at the margin, so a scan for `ACT` finds it.
     console.log(budget.message.startsWith('ACT ') ? budget.message : `  ${budget.message}`);
+    for (const line of dormant) console.log(line);
     for (const note of notes) console.log(`  ${note}`);
     for (const finding of findings) console.log(`  ✖ ${finding}`);
     if (findings.length === 0) {

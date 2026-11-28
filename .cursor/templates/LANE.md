@@ -12,20 +12,17 @@ tier law stay in `AGENTS.md`. The numbers below were measured in a fork: startin
 - State the write boundary: a lane writes only inside its worktree and its scratch folder. A change to
   a planner file or a gate file goes in the report as exact lines; the lead applies it with the
   operator.
+- Start the lane's session inside its worktree or a folder that holds it: a session started elsewhere
+  loads none of the worktree's instruction files or path rules, even as an added folder (0 of 12 runs).
 - Change no package. If one looks necessary, stop that item and report the package and version.
 - Name the worker cap the lane's test commands carry and the load check it runs before anything heavy.
 - An item that tightens a page-level check names who fixes what it turns red.
 
 ## While the lane runs
 
-- Batch independent reads, 3 to 5 per turn. Read no file over 300 lines whole: find the heading or
-  the symbol with a search, then read that range.
 - Send command output to a log, never pipe a command whose exit code you report, then print the exit
   code, the log's first line and its last 40 lines, and name the log path in the hand-back. Give every
   run its own numbered log, never overwrite the first red log, and quote the first red in the hand-back.
-- A lane never waits on a prompt, because nobody answers it: read with Read and Grep, run
-  the package manager's own directory option (the command table's notes name it) and `git -C <dir>`
-  instead of `cd`, and use no shell variable and no `;` chain.
 - A permission ask, a deny or a hook block is a stop for that one action. Report it with the path and
   the rule, never reach the same file another way (a shell redirect, a script, another tool), and
   continue with the rest.
@@ -34,6 +31,7 @@ tier law stay in `AGENTS.md`. The numbers below were measured in a fork: startin
   worthless. Break code on disk only to prove a NEW gate.
 - Keep short working notes in the scratch folder, so that a compaction costs one short re-read. The
   brief is self-contained: never read the lead's files.
+- Before the hand-back, stop every background run you started; name any you leave running, and why.
 - Stop polishing at about 200 tool calls. A fix of a few lines on a lane past about 200K tokens of
   context goes to a fresh small agent with the plan row and the file, not to the long one.
 
@@ -41,7 +39,8 @@ tier law stay in `AGENTS.md`. The numbers below were measured in a fork: startin
 
 - Per item: done, partial or blocked. Then the files changed, the tests added with their red-before
   output, the commands run with exit codes, the deviations from the brief and why, and anything
-  blocked with its path and rule.
+  blocked with its path and rule. Name every check you did not run; a check that did not run is not a
+  pass.
 - A lane that reports docs instead of editing them gives each line as file, section and exact text.
 - When the lead decides against a proposal in a report, put a line `superseded by <block>` directly
   under it; the proposal text stays.

@@ -60,13 +60,11 @@ npm run test:mutation:changed # survivors on the lines this change touches; info
 
 ### The tier law - this section is the ONLY place it lives
 
-Every other file (rules, commands, brain, README, Copilot instructions) points here and restates nothing.
-A restated pipeline rule goes stale in place; a stale copy cost a sibling repo a day of 40-minute rounds
-because five copies still demanded the full chain before the first report. `scripts/gate-tiers.json` is
-the machine-readable form (expected and forbidden scripts per moment, budgets, phase) and the one readable
-list of the stages each gate script runs (`checks.<name>.chain`, checked against the repo's script manifest
-by the docs-drift command); when this prose and that file disagree, the file wins and the prose is fixed in
-the same commit.
+Every other file (rules, commands, brain, README, a tool's instruction file) points here and restates
+nothing. A restated pipeline rule goes stale in place. `scripts/gate-tiers.json` is the machine-readable
+form (expected and forbidden scripts per moment, budgets, phase) and the one readable list of the stages
+each gate script runs (`checks.<name>.chain`, checked against the repo's script manifest by the docs-drift
+command); when this prose and that file disagree, the file wins and the prose is fixed in the same commit.
 
 **Command roles.** This law names what a command is for, never the command. The repo's command table (the
 fenced list in `AGENTS.md` outside this block) tags each command line with its role in a comment that opens
@@ -88,9 +86,10 @@ are written. A role marked optional may have no row in a repo that has no such t
 
 **Four moments, and one that is not a gate.**
 
-- **Iterate** - per change, seconds. Run the iterate command. Where the change touches a surface that has its
-  own spec and the repo has a browser lane, run that ONE spec through the single-spec command. Nothing
-  heavier.
+- **Iterate** - per change, seconds. Run the iterate command, then the single-test command on each test file
+  the change touched or added, never the suite. Where the change touches a surface that has its own spec
+  and the repo has a browser lane, run that ONE spec through the single-spec command. Nothing heavier. A
+  command that takes a file list runs nothing, and says so, when the list is empty.
 - **Measure** - whenever only a rendered result can answer the question: the measure command (build +
   look) or the probe command, where the repo has them. Legal at any time, in any lane, never a violation.
   Measuring is not verifying: it runs no lint, no types, no tests.
@@ -143,6 +142,10 @@ file. The network-bound checks sit in the CI chain rather than in the gate comma
 network, so an offline agent can still run the whole offline gate. The bench command derives its step list
 from the gate command's script; a hand-written second list has already drifted once.
 
+**A cache is not a verdict.** A cached result is valid only when its key holds everything the verdict reads
+(a formatter's key: the file, its options, the tool version); type-aware lint reads other files, so it runs
+uncached in the gate command and in CI.
+
 **Every gate run is traced** to the gate trace log; the trace report command turns the log into findings
 (forbidden moments, blown budgets, gate runs from a worktree). After a push, gate output in the terminal is
 part of the contract: **silence is a failure, not a pass** - a push that printed no gate ran no gate,
@@ -158,38 +161,33 @@ someone else's). Only the push gate clears its own port.
 
 - **Main agent, inline.** Iterate and measure while working; the push runs the chain, never a hand-run.
 - **Implementer subagent.** Works in a hand-made `git worktree` OUTSIDE the repo directory, on its own port,
-  with the installed dependencies linked from the main checkout. Iterate and measure only; the gate never
-  runs from a worktree. The lead removes the worktree, checks the branch out in the main checkout and pushes
-  from there, so the gate runs once, at the push, for every writer. A lane never waits on a prompt: it
-  writes only in its worktree and its scratch folder (a planner or gate file change goes in the report as
-  exact lines, which the lead applies with the operator), reads with Read and Grep, and runs `git -C <dir>`
-  and the package manager's own directory option (the command table's notes name it) instead of `cd`, with
-  no shell variable or `;` chain. Lane rules: `.cursor/templates/LANE.md`.
-- **Copilot coding agent.** Hand-over is a fully specified issue (goal as behaviour, paths in scope,
-  acceptance, out of scope; use `.github/ISSUE_TEMPLATE/agent-task.yml` where the repo ships it), assigned
-  to Copilot. It works on its own branch and opens a draft pull request; workflows on that PR start only
-  after a human approves the run. Task class: verifiable by the gate, under ~400 changed lines, contract
-  stated in the issue, nothing on the mandatory-human-review list. Its review context is
-  `.github/copilot-instructions.md`, which points here for the gate.
+  with its own dependency tree or, if linked, its own tool cache directory. Iterate and measure only; the
+  gate never runs from a worktree. The lead removes the worktree, checks the branch out in the main checkout
+  and pushes from there, so the gate runs once, at the push, for every writer. A lane never waits on a
+  prompt: it writes only in its worktree and its scratch folder (a planner or gate file change goes in the
+  report as exact lines, which the lead applies with the operator), reads with Read and Grep, and runs
+  `git -C <dir>` and the package manager's own directory option (the command table's notes name it) instead
+  of `cd`, with no shell variable or `;` chain. Lane rules: `.cursor/templates/LANE.md`.
+- **Delegated agent (hosted or remote).** Hand-over is a fully specified issue (goal as behaviour, paths in
+  scope, acceptance, out of scope; use `.github/ISSUE_TEMPLATE/agent-task.yml` where the repo ships it). It
+  works on its own branch and opens a draft pull request. Task class: verifiable by the gate, under ~400
+  changed lines, contract stated in the issue, nothing on the mandatory-human-review list.
 - **Review, any lane.** The diff plus the iterate command, never a re-run of the gate. Findings are
   correctness, test strength, security, readability; style belongs to the linters. A non-author human
   approves; an agent's own green is not an approval. A gate or suppression change stays red until a reviewer
   adds the `gate-change` label, never the author (`scripts/check-gate-integrity.mjs` lists the change).
-- **Two tools, one file.** Claude Code reads `CLAUDE.md` -> `AGENTS.md` -> the brain files this guide
-  points at (read on demand; nothing beyond `AGENTS.md` is `@`-imported); Cursor reads `AGENTS.md` plus
-  every `alwaysApply: true` rule; Copilot reads `.github/copilot-instructions.md`. `AGENTS.md` is the only
-  file all of them read, which is why the law lives here and everything else is a pointer.
-- **What an agent may not do.** `.claude/settings.json` holds the agent-side limits; they bind Claude Code
-  only (Cursor, Copilot and Codex do not read that file). Denied in every permission mode, bypass
-  included: reading .env files other than the example, editing `.claude/settings.json` itself, a force
-  push (a `+branch` refspec too), `--no-verify` or `-n` on a commit, `--no-verify` on a push,
-  `git reset --hard`, `git clean -f`. Asked before every edit of the gate files, the documented edits
-  included (the phase flip, a raised mutation threshold); the list lives in `permissions.ask` of
-  `.claude/settings.json`. A rule matches the command or path as an agent usually writes it and is not a
+- **One file for every tool.** `AGENTS.md` is the one file every agent tool reads, which is why the law lives
+  here and each tool's own entry file is a pointer to it.
+- **What an agent may not do.** These bind every writer, whatever its tool and settings: no reading .env
+  files other than the example, no force push (a `+branch` refspec too), no `--no-verify` or `-n` on a
+  commit, no `--no-verify` on a push, no `git reset --hard`, no `git clean -f`, no edit of the file that
+  holds the agent-side limits. Ask before every edit of a gate file, the documented edits included (the
+  phase flip, a raised mutation threshold). A tool that has a limits file denies the bans there, and its
+  entry file names it. A deny rule matches the command or path as an agent usually writes it and is not a
   security boundary: `sh -c`, a full binary path, a `git -C` or `git -c` prefix, a bundled flag such as
   `-uf`, or a command that reads a file without naming it (`grep -r`) walks past it. The boundary is the
-  required CI check on the default branch. To change a guarded file, edit it yourself or change the rule
-  in a reviewed commit.
+  required CI check on the default branch. To change a guarded file, edit it yourself or change the rule in
+  a reviewed commit.
 
 ### Before code - spec and plan
 
